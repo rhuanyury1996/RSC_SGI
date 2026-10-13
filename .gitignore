@@ -1,5 +1,6 @@
 .venv/
 .pgdata/
+_deploy_tmp/
 __pycache__/
 *.py[cod]
 *.sqlite3

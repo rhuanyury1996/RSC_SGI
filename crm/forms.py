@@ -321,9 +321,9 @@ class CardPreVendasForm(forms.ModelForm):
         if empresa_id:
             contatos = contatos.filter(empresa_id=empresa_id)
         self.fields["contato"].queryset = contatos
-        self.fields["contato"].required = True
+        self.fields["contato"].required = False
         self.fields["contato"].empty_label = "Selecione o contato cadastrado"
-        self.fields["contato"].help_text = "Apenas contatos já cadastrados na empresa."
+        self.fields["contato"].help_text = "Opcional — apenas contatos já cadastrados na empresa."
 
         self.fields["responsavel"].queryset = Funcionario.objects.filter(ativo=True).order_by(
             "nome", "sobrenome"
