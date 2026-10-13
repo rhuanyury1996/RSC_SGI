@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Entrar · SGI RSC{% endblock %}
+{% block content %}
+<section class="login-stage">
+  <div class="login-frame">
+    <aside class="login-aside">
+      <div class="login-aside-top">
+        <img class="login-aside-logo" src="{% static 'img/logo-rsc-white.png' %}" alt="RSC">
+        <span class="login-pill">Acesso interno · SGI</span>
+        <h2>Comece o dia com clareza</h2>
+        <p>Entre no Sistema de Gestão Interna da RSC para atividades, comercial, informativos e rotina do time.</p>
+      </div>
+
+      <ul class="login-steps" aria-label="O que você encontra no SGI">
+        <li class="is-active">
+          <span class="login-step-num">1</span>
+          <span>Organize atividades e o planner do dia</span>
+        </li>
+        <li>
+          <span class="login-step-num">2</span>
+          <span>Acompanhe comercial, ponto e calendário</span>
+        </li>
+        <li>
+          <span class="login-step-num">3</span>
+          <span>Receba avisos e mantenha o time alinhado</span>
+        </li>
+      </ul>
+    </aside>
+
+    <div class="login-card">
+      <div class="login-card-head">
+        <h1>Entrar</h1>
+        <p class="login-card-sub">Use seu usuário e senha do sistema.</p>
+      </div>
+
+      <form method="post" action="{% url 'login' %}" class="login-form" autocomplete="on">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="login-alert" role="alert">
+          {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="login-field">
+          <label for="id_username">Usuário</label>
+          {{ form.username }}
+          {{ form.username.errors }}
+        </div>
+
+        <div class="login-field">
+          <label for="id_password">Senha</label>
+          <div class="login-password">
+            {{ form.password }}
+            <button type="button" class="login-eye" id="togglePassword" aria-label="Mostrar senha" title="Mostrar senha">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            </button>
+          </div>
+          {{ form.password.errors }}
+          <p class="login-hint">Os campos diferenciam maiúsculas e minúsculas.</p>
+        </div>
+
+        {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+
+        <button type="submit">Entrar</button>
+      </form>
+
+      <p class="login-footer">SGI RSC · uso interno. Em caso de bloqueio, fale com a gestão.</p>
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  var btn = document.getElementById("togglePassword");
+  var input = document.getElementById("id_password");
+  if (!btn || !input) return;
+  btn.addEventListener("click", function () {
+    var show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+    btn.title = show ? "Ocultar senha" : "Mostrar senha";
+  });
+})();
+</script>
+{% endblock %}

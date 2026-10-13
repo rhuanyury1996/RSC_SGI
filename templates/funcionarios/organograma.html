@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Organograma · SGI RSC{% endblock %}
+{% block breadcrumb %}Organograma{% endblock %}
+{% block page_title %}Organograma{% endblock %}
+{% block content %}
+<section class="card org-card">
+  <div class="org-legend">
+    <span class="org-legend-item org-setor-gestao"><i></i> Gestão</span>
+    <span class="org-legend-item org-setor-comercial"><i></i> Comercial</span>
+    <span class="org-legend-item org-setor-financeiro"><i></i> Financeiro</span>
+    <span class="org-legend-item org-setor-desenvolvimento"><i></i> Desenvolvimento</span>
+  </div>
+  <p class="muted org-intro">{{ total }} colaborador(es) ativo(s), com base em “a quem responde”. O setor define a área e, depois, o acesso às páginas.</p>
+  {% if raizes %}
+  <div class="org-chart">
+    <ul>
+      {% for no in raizes %}
+        {% include "funcionarios/_org_node.html" with no=no %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% else %}
+    <p>Nenhum funcionário cadastrado ainda.</p>
+  {% endif %}
+</section>
+{% endblock %}

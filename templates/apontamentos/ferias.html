@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Férias · SGI RSC{% endblock %}
+{% block breadcrumb %}Agendamento de férias{% endblock %}
+{% block page_title %}Agendamento de férias{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Solicitar férias</h1>
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+    {% endfor %}
+    <button type="submit">Enviar solicitação</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Calendário — {{ mes }}/{{ ano }}</h2>
+  <div class="actions" style="margin-top:0;">
+    <a class="btn ghost" href="?ano={{ mes_anterior.0 }}&mes={{ mes_anterior.1 }}">Mês anterior</a>
+    <a class="btn ghost" href="?ano={{ mes_seguinte.0 }}&mes={{ mes_seguinte.1 }}">Próximo mês</a>
+  </div>
+  <table class="cal" style="margin-top:1rem;">
+    <thead>
+      <tr>
+        <th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for semana in semanas %}
+      <tr>
+        {% for celula in semana %}
+        <td>
+          {% if celula %}
+            <div class="daynum">{{ celula.dia }}</div>
+            {% for item in celula.eventos %}
+              <span class="evt" title="{{ item.funcionario }} ({{ item.get_status_display }})">
+                {{ item.funcionario.nome }}
+              </span>
+            {% endfor %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted">Exibe solicitações pendentes e aprovadas de todos.</p>
+</section>
+
+<section class="card">
+  <h2>Minhas solicitações</h2>
+  <table>
+    <thead><tr><th>Período</th><th>Status</th><th>Obs.</th></tr></thead>
+    <tbody>
+      {% for item in minhas %}
+      <tr>
+        <td>{{ item.data_inicio|date:"d/m/Y" }} → {{ item.data_fim|date:"d/m/Y" }}</td>
+        <td>{{ item.get_status_display }}</td>
+        <td>{{ item.observacao|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">Nenhuma solicitação.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

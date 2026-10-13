@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Alterar senha · SGI RSC{% endblock %}
+{% block breadcrumb %}Meu perfil <span>/</span> Senha{% endblock %}
+{% block page_title %}Alterar senha{% endblock %}
+{% block content %}
+<section class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+      {% if field.help_text %}<p class="muted">{{ field.help_text }}</p>{% endif %}
+    {% endfor %}
+    <div class="actions" style="margin-top:1rem;">
+      <button type="submit">Salvar nova senha</button>
+      <a class="btn ghost" href="{% url 'meu_perfil' %}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

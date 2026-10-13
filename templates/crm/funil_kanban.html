@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}{{ funil.get_tipo_display }} · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Funis</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
+{% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · {{ funil.get_tipo_display }}{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">{{ total_cards }} card(s)</span>
+  <span class="status-pill">Pipeline R$ {{ pipeline|floatformat:2 }}</span>
+  <a class="btn secondary" href="{% url 'crm_funis' %}">Todos os funis</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide funil-kanban-page{% if is_pos_vendas %} pos-vendas-page{% endif %}">
+  {% if subfunis_irmaos %}
+  <nav class="subfunil-tabs" aria-label="Subfunis do cliente">
+    {% for s in subfunis_irmaos %}
+      <a class="subfunil-tab {% if s.pk == funil.pk %}active{% endif %}" href="{% url 'crm_funil_detalhe' s.pk %}">{{ s.get_tipo_display }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if is_pos_vendas %}
+  <p class="muted kanban-hint">
+    Cards filhos nascem em <strong>Acompanhando serviço</strong> quando a proposta é ganha em Negociações.
+    Em <strong>Serviço finalizado</strong>, marque ATC/PSC e o retorno — com retorno recebido o card vai para <strong>Pós-venda finalizado</strong>.
+  </p>
+  {% else %}
+  <details class="apont-panel apont-lista" id="nova-oportunidade"{% if abrir_nova_opp %} open{% endif %}>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Nova oportunidade</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form">
+        {% csrf_token %}
+        {{ form.funil }}
+        {{ form.non_field_errors }}
+        <div class="empresa-grid">
+          <div class="field span-2">
+            <label for="{{ form.titulo.id_for_label }}">{{ form.titulo.label }}</label>
+            {{ form.titulo }}{{ form.titulo.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+            {{ form.empresa }}{{ form.empresa.errors }}
+            <button type="button" class="link-action" id="btnAbrirEmpresa">+ Cadastrar empresa</button>
+          </div>
+          <div class="field">
+            <label for="{{ form.etapa.id_for_label }}">{{ form.etapa.label }}</label>
+            {{ form.etapa }}{{ form.etapa.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ form.valor.id_for_label }}">Valor</label>
+            {{ form.valor }}{{ form.valor.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ form.responsavel.id_for_label }}">{{ form.responsavel.label }}</label>
+            {{ form.responsavel }}{{ form.responsavel.errors }}
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Adicionar ao funil</button>
+        </div>
+      </form>
+    </div>
+  </details>
+  <p class="muted kanban-hint">Clique no card para abrir o preview lateral. Arraste entre as colunas.</p>
+  {% endif %}
+
+  <div class="kanban-board-wrap">
+  <div class="kanban-board" id="kanbanBoard" data-mover-url="{% url 'crm_funil_mover' funil.pk %}">
+    {% csrf_token %}
+    {% for etapa in etapas %}
+    <section class="kanban-column {{ etapa.coluna_css|default:'' }}" data-etapa-id="{{ etapa.pk }}">
+      <header class="kanban-column-head">
+        <div>
+          <strong>{{ etapa.nome }}</strong>
+          <div class="muted"><span class="kanban-count">{{ etapa.oportunidades.all|length }}</span> card(s)</div>
+          {% if etapa.descricao_fase %}
+          <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
+          {% endif %}
+        </div>
+        <span class="kanban-step">{{ forloop.counter }}</span>
+      </header>
+      <div class="kanban-drop" data-etapa-id="{{ etapa.pk }}">
+        {% for opp in etapa.oportunidades.all %}
+        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
+          {% if is_pos_vendas %}
+          <div class="kanban-card-tags">
+            {% if opp.oportunidade_pai_id %}
+            <span class="badge-soft">Filho · Negociação #{{ opp.oportunidade_pai_id }}</span>
+            {% endif %}
+            {% if opp.atc_enviado %}<span class="badge-soft badge-ganha">ATC</span>{% endif %}
+            {% if opp.psc_enviado %}<span class="badge-soft badge-ganha">PSC</span>{% endif %}
+            {% if opp.retorno_recebido %}<span class="badge-soft badge-ganha">Retorno</span>{% endif %}
+          </div>
+          {% endif %}
+          <strong class="kanban-card-title">{{ opp.titulo_kanban }}</strong>
+          <div class="muted">{{ opp.empresa }}</div>
+          {% if opp.escopo_solicitado and is_pos_vendas %}
+          <div class="com-escopo-card">
+            <span class="com-escopo-label">Escopo</span>
+            <p>{{ opp.escopo_solicitado|truncatechars:120 }}</p>
+          </div>
+          {% endif %}
+          {% if opp.valor %}
+          <div class="kanban-card-field">
+            <span class="com-escopo-label">{% if is_pos_vendas %}Valor do negócio{% else %}Valor{% endif %}</span>
+            <strong class="com-value">R$ {{ opp.valor|floatformat:2 }}</strong>
+          </div>
+          {% endif %}
+          {% if opp.responsavel %}
+          <div class="kanban-card-owner">{{ opp.responsavel.nome_completo }}</div>
+          {% endif %}
+          <div class="kanban-card-time">{{ opp.tempo_etapa }}</div>
+        </article>
+        {% empty %}
+        <p class="muted kanban-empty">Solte cards aqui</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+  </div>
+</div>
+
+{% if card_ativo %}
+<div class="deal-overlay open" id="dealOverlay">
+  <button type="button" class="deal-backdrop" onclick="location.href='{% url 'crm_funil_detalhe' funil.pk %}'" aria-label="Fechar preview"></button>
+  <div class="deal-drawer lead-preview" role="dialog" aria-modal="true" aria-label="Preview da oportunidade">
+    <header class="lp-head">
+      <div>
+        <h2 class="lp-kicker">Preview da oportunidade</h2>
+        {% if posicao_na_etapa %}
+        <p class="muted lp-sub">{{ posicao_na_etapa.0 }} de {{ posicao_na_etapa.1 }} em {{ card_ativo.etapa.nome }}</p>
+        {% endif %}
+      </div>
+      <a class="lp-close" href="{% url 'crm_funil_detalhe' funil.pk %}">Fechar</a>
+    </header>
+
+    <div class="lp-scroll">
+      <section class="lp-profile">
+        <div class="lp-avatar" aria-hidden="true">{{ card_ativo.contato_exibicao|slice:":1"|upper }}</div>
+        <div class="lp-profile-main">
+          <h3 class="lp-name">{{ card_ativo.contato_exibicao }}</h3>
+          <p class="lp-company">{{ card_ativo.titulo_kanban }}</p>
+          <div class="lp-contacts">
+            {% if card_ativo.email_exibicao %}<a href="mailto:{{ card_ativo.email_exibicao }}">{{ card_ativo.email_exibicao }}</a>{% endif %}
+            {% if card_ativo.telefone_exibicao %}<a href="tel:{{ card_ativo.telefone_exibicao }}">{{ card_ativo.telefone_exibicao }}</a>{% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-meta-grid">
+        <div>
+          <span class="muted">Responsável</span>
+          <strong>{% if card_ativo.responsavel %}{{ card_ativo.responsavel.nome_completo }}{% else %}—{% endif %}</strong>
+        </div>
+        <div>
+          <span class="muted">Empresa</span>
+          <strong>{{ card_ativo.empresa.nome }}</strong>
+        </div>
+        <div>
+          <span class="muted">{% if is_pos_vendas %}Valor do negócio{% else %}Valor{% endif %}</span>
+          <strong>{% if card_ativo.valor %}R$ {{ card_ativo.valor|floatformat:2 }}{% else %}—{% endif %}</strong>
+        </div>
+        <div>
+          <span class="muted">Nesta etapa</span>
+          <strong>{% if card_ativo.tempo_etapa %}{{ card_ativo.tempo_etapa }}{% else %}—{% endif %}</strong>
+        </div>
+      </section>
+
+      {% if is_pos_vendas and card_ativo.oportunidade_pai_id %}
+      <div class="com-escopo-card">
+        <span class="com-escopo-label">Origem · Negociações</span>
+        <p>
+          <a href="{% url 'crm_funil_detalhe' card_ativo.oportunidade_pai.funil_id %}?card={{ card_ativo.oportunidade_pai_id }}">
+            {{ card_ativo.oportunidade_pai.titulo_kanban }}
+          </a>
+          {% if card_ativo.oportunidade_pai.etapa %}
+          <span class="muted">· {{ card_ativo.oportunidade_pai.etapa.nome }}</span>
+          {% endif %}
+        </p>
+        {% if card_ativo.escopo_solicitado %}
+        <span class="com-escopo-label" style="margin-top:0.45rem;">Escopo solicitado</span>
+        <p>{{ card_ativo.escopo_solicitado }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <section class="lp-progress js-etapa-stepper" aria-label="Progresso no funil">
+        {% for e in etapas %}
+        <button type="button"
+          class="lp-step js-etapa-step {% if card_ativo.etapa_id == e.pk %}current{% elif card_ativo.etapa and e.ordem < card_ativo.etapa.ordem %}done{% endif %} {% if e.coluna_css %}{{ e.coluna_css }}{% endif %}"
+          data-etapa-id="{{ e.pk }}"
+          data-fase="{{ e.fase_key|default:'geral' }}"
+          data-nome="{{ e.nome }}"
+          data-css="{{ e.coluna_css|default:'' }}"
+          title="Clique para ver · 3 cliques para mover para esta etapa">
+          <span class="lp-step-mark">
+            {% if card_ativo.etapa and e.ordem < card_ativo.etapa.ordem %}✓{% elif card_ativo.etapa_id == e.pk %}●{% else %}{% endif %}
+          </span>
+          <span class="lp-step-label">{{ e.nome }}</span>
+        </button>
+        {% endfor %}
+      </section>
+      <p class="muted lp-step-hint">Clique na etapa para ver os campos · clique 3 vezes para voltar o card para ela</p>
+
+      <nav class="lp-tabs" aria-label="Seções do card">
+        <button type="button" class="lp-tab active" data-tab="etapa">Fase atual</button>
+        <button type="button" class="lp-tab" data-tab="info">Cadastro</button>
+        <button type="button" class="lp-tab" data-tab="activity">Notas</button>
+      </nav>
+
+      <section class="deal-panel active lp-panel" data-panel="etapa">
+        <div class="lp-section-card">
+          <div class="lp-section-head">
+            <h4>Campos da fase</h4>
+            <span class="fase-pill js-fase-pill {% if card_ativo.etapa %}{{ card_ativo.etapa.coluna_css|default:'' }}{% endif %}">{% if card_ativo.etapa %}{{ card_ativo.etapa.nome }}{% else %}—{% endif %}</span>
+          </div>
+          {% for e in etapas %}
+          <div class="fase-panel js-fase-panel{% if card_ativo.etapa_id == e.pk %} is-active{% endif %}" data-etapa-id="{{ e.pk }}" data-fase="{{ e.fase_key|default:'geral' }}" {% if card_ativo.etapa_id != e.pk %}hidden{% endif %}>
+            <form method="post" class="com-form empresa-form deal-edit-form">
+              {% csrf_token %}
+              <input type="hidden" name="acao" value="atualizar_card">
+              <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+              <input type="hidden" name="fase_salvar" value="{{ e.fase_key|default:'geral' }}">
+              <div class="empresa-grid">
+                {% if is_pos_vendas and e.fase_key == "servico_finalizado" %}
+                <div class="field span-2">
+                  <span class="form-section-title" style="display:block;margin-bottom:0.45rem;">Checklist de envio</span>
+                  <label class="radio-block">
+                    <input type="checkbox" name="atc_enviado" value="1" {% if card_ativo.atc_enviado %}checked{% endif %}>
+                    ATC enviado
+                    {% if card_ativo.atc_enviado_em %}
+                    <span class="muted">· {{ card_ativo.atc_enviado_em|date:"d/m/Y H:i" }}</span>
+                    {% endif %}
+                  </label>
+                  <label class="radio-block">
+                    <input type="checkbox" name="psc_enviado" value="1" {% if card_ativo.psc_enviado %}checked{% endif %}>
+                    PSC enviado
+                    {% if card_ativo.psc_enviado_em %}
+                    <span class="muted">· {{ card_ativo.psc_enviado_em|date:"d/m/Y H:i" }}</span>
+                    {% endif %}
+                  </label>
+                </div>
+                <div class="field span-2">
+                  <span class="form-section-title" style="display:block;margin-bottom:0.45rem;">Retorno</span>
+                  <label class="radio-block">
+                    <input type="checkbox" name="retorno_recebido" value="1" {% if card_ativo.retorno_recebido %}checked{% endif %}>
+                    Retorno recebido
+                    {% if card_ativo.retorno_recebido_em %}
+                    <span class="muted">· {{ card_ativo.retorno_recebido_em|date:"d/m/Y H:i" }}</span>
+                    {% endif %}
+                  </label>
+                  <p class="field-hint muted">Ao marcar, o card entra em <strong>Pós-venda finalizado</strong>.</p>
+                </div>
+                <div class="field span-2">
+                  <label for="obs_fase_{{ e.pk }}">Observações</label>
+                  <textarea id="obs_fase_{{ e.pk }}" name="observacoes" rows="3">{{ card_ativo.observacoes }}</textarea>
+                </div>
+                {% elif is_pos_vendas and e.fase_key == "pos_venda_finalizado" %}
+                <div class="field span-2">
+                  <p class="muted" style="margin:0 0 0.5rem;">Checklist concluído:</p>
+                  <div class="kanban-card-tags">
+                    <span class="badge-soft {% if card_ativo.atc_enviado %}badge-ganha{% endif %}">ATC {% if card_ativo.atc_enviado %}✓{% else %}—{% endif %}</span>
+                    <span class="badge-soft {% if card_ativo.psc_enviado %}badge-ganha{% endif %}">PSC {% if card_ativo.psc_enviado %}✓{% else %}—{% endif %}</span>
+                    <span class="badge-soft {% if card_ativo.retorno_recebido %}badge-ganha{% endif %}">Retorno {% if card_ativo.retorno_recebido %}✓{% else %}—{% endif %}</span>
+                  </div>
+                </div>
+                <div class="field span-2">
+                  <label for="obs_fase_{{ e.pk }}">Observações</label>
+                  <textarea id="obs_fase_{{ e.pk }}" name="observacoes" rows="3">{{ card_ativo.observacoes }}</textarea>
+                </div>
+                {% else %}
+                <div class="field">
+                  <label for="valor_fase_{{ e.pk }}">Valor</label>
+                  <input id="valor_fase_{{ e.pk }}" type="number" name="valor" step="0.01" min="0" value="{% if card_ativo.valor %}{{ card_ativo.valor }}{% endif %}" placeholder="0,00">
+                </div>
+                <div class="field span-2">
+                  <label for="obs_fase_{{ e.pk }}">Observações</label>
+                  <textarea id="obs_fase_{{ e.pk }}" name="observacoes" rows="3">{{ card_ativo.observacoes }}</textarea>
+                </div>
+                {% endif %}
+              </div>
+              <div class="empresa-form-actions">
+                <button class="btn" type="submit">Salvar fase</button>
+              </div>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <form method="post" id="formVoltarEtapa" class="is-hidden" aria-hidden="true">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="voltar_etapa">
+        <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+        <input type="hidden" name="etapa_id" id="voltarEtapaId" value="">
+      </form>
+
+      <section class="deal-panel lp-panel" data-panel="info">
+        <div class="lp-section-card">
+          <div class="lp-section-head"><h4>Cadastro</h4></div>
+          <form method="post" class="com-form empresa-form deal-edit-form">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="atualizar_cadastro">
+            <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+            <div class="empresa-grid">
+              <div class="field span-2">
+                <label for="cad_titulo">Título</label>
+                <input id="cad_titulo" type="text" name="titulo" value="{{ card_ativo.titulo }}">
+              </div>
+              <div class="field">
+                <label for="cad_responsavel">Responsável</label>
+                <select id="cad_responsavel" name="responsavel_id">
+                  <option value="">—</option>
+                  {% for r in responsaveis %}
+                  <option value="{{ r.pk }}" {% if card_ativo.responsavel_id == r.pk %}selected{% endif %}>{{ r.nome_completo }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="empresa-form-actions">
+              <button class="btn" type="submit">Salvar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="deal-panel lp-panel" data-panel="activity">
+        <div class="lp-section-card">
+          <div class="lp-section-head"><h4>Notas</h4></div>
+          <form method="post" class="deal-note-form">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="nota">
+            <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+            <textarea name="nota" rows="2" placeholder="Adicionar nota…"></textarea>
+            <button class="btn" type="submit">Adicionar nota</button>
+          </form>
+          <ul class="lp-notes">
+            {% for h in historico %}
+            <li class="lp-note">
+              <div class="lp-note-meta">
+                <strong>{% if h.autor %}{{ h.autor.nome_completo }}{% else %}Sistema{% endif %}</strong>
+                <span class="muted">{{ h.criado_em|date:"d/m/Y H:i" }} · {{ h.get_tipo_display }}</span>
+              </div>
+              <p>{{ h.descricao }}</p>
+            </li>
+            {% empty %}
+            <li class="muted">Nenhuma nota ainda.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<dialog class="com-dialog" id="dialogEmpresa" {% if abrir_popup_empresa %}open{% endif %}>
+  <form method="post" class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="criar_empresa">
+    <div class="com-dialog-head">
+      <h3>Cadastrar empresa</h3>
+      <button type="button" class="btn ghost" id="btnFecharEmpresa">Fechar</button>
+    </div>
+    {{ empresa_form.non_field_errors }}
+    <div class="form-section" style="margin-top:0;">
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="{{ empresa_form.nome.id_for_label }}">{{ empresa_form.nome.label }}</label>
+          {{ empresa_form.nome }}{{ empresa_form.nome.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.cidade.id_for_label }}">{{ empresa_form.cidade.label }}</label>
+          {{ empresa_form.cidade }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.estado.id_for_label }}">{{ empresa_form.estado.label }}</label>
+          {{ empresa_form.estado }}
+        </div>
+      </div>
+    </div>
+    <div class="empresa-form-actions">
+      <button class="btn" type="submit">Criar empresa</button>
+    </div>
+  </form>
+</dialog>
+
+{% include "crm/_kanban_board_js.html" %}
+{% endblock %}

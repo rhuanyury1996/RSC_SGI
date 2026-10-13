@@ -1,0 +1,529 @@
+{% extends "base.html" %}
+{% block title %}Pré-vendas · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Funis</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> Pré-vendas{% endblock %}
+{% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Prospecção{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">{{ total_cards }} card(s)</span>
+  <a class="btn secondary" href="{% url 'crm_funis' %}">Todos os funis</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide pre-vendas-page">
+  {% if subfunis_irmaos %}
+  <nav class="subfunil-tabs" aria-label="Subfunis do cliente">
+    {% for s in subfunis_irmaos %}
+      <a class="subfunil-tab {% if s.pk == funil.pk %}active{% endif %}" href="{% url 'crm_funil_detalhe' s.pk %}">{{ s.get_tipo_display }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" id="novo-card"{% if abrir_novo_card %} open{% endif %}>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Formulário inicial</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin-top:0;">Empresa e contato vêm apenas dos cadastros. O card entra em <strong>Captura</strong>.</p>
+      <form method="post" class="com-form empresa-form js-card-form">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="criar">
+        {{ form.non_field_errors }}
+        <div class="form-section">
+          <h3 class="form-section-title">Cadastros</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+              <button type="button" class="link-action" id="btnAbrirEmpresa">+ Cadastrar empresa</button>
+            </div>
+            <div class="field">
+              <label for="{{ form.contato.id_for_label }}">{{ form.contato.label }}</label>
+              {{ form.contato }}{{ form.contato.errors }}
+              <p class="field-hint muted">{{ form.contato.help_text }}</p>
+              <a class="link-action" href="{% url 'crm_contatos' %}" target="_blank">+ Cadastrar contato</a>
+            </div>
+            <div class="field">
+              <label for="{{ form.responsavel.id_for_label }}">{{ form.responsavel.label }}</label>
+              {{ form.responsavel }}
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <h3 class="form-section-title">Qualificação</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.contato_sucesso.id_for_label }}">{{ form.contato_sucesso.label }}</label>
+              {{ form.contato_sucesso }}
+            </div>
+            <div class="field">
+              <label for="{{ form.existe_demanda.id_for_label }}">{{ form.existe_demanda.label }}</label>
+              {{ form.existe_demanda }}
+            </div>
+            <div class="field">
+              <label for="{{ form.data_retorno_envio.id_for_label }}">{{ form.data_retorno_envio.label }}</label>
+              {{ form.data_retorno_envio }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.dores_identificadas.id_for_label }}">{{ form.dores_identificadas.label }}</label>
+              {{ form.dores_identificadas }}
+            </div>
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Criar card na Captura</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <p class="muted kanban-hint">
+    Fluxo: Captura → 1º Contato → Retornar contato → Envio de material | Reunião → Follow Up → Sem oportunidade / Concluído.
+    Clique no card para abrir o preview lateral. Arraste entre as colunas.
+  </p>
+
+  <div class="kanban-board-wrap">
+  <div class="kanban-board" id="kanbanBoard" data-mover-url="{% url 'crm_funil_mover' funil.pk %}">
+    {% csrf_token %}
+    {% for etapa in etapas %}
+    <section class="kanban-column {{ etapa.coluna_css }}" data-etapa-id="{{ etapa.pk }}">
+      <header class="kanban-column-head">
+        <div>
+          <strong>{{ etapa.nome }}</strong>
+          <div class="muted"><span class="kanban-count">{{ etapa.oportunidades.all|length }}</span> card(s)</div>
+          {% if etapa.descricao_fase %}
+          <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
+          {% endif %}
+        </div>
+        <span class="kanban-step">{{ forloop.counter }}</span>
+      </header>
+      <div class="kanban-drop" data-etapa-id="{{ etapa.pk }}">
+        {% for opp in etapa.oportunidades.all %}
+        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
+          <div class="kanban-card-tags">
+            {% if opp.funil_venda %}
+            <span class="badge-soft">{{ opp.funil_venda.get_tipo_display }} · {{ opp.funil_venda.cliente_rsc.nome|default:opp.funil_venda.nome }}</span>
+            {% elif "sem oportunidade" in etapa.nome|lower %}
+            <span class="badge-temp frio">Sem opp.</span>
+            {% elif "conclu" in etapa.nome|lower %}
+            <span class="badge-soft badge-ganha">Qualificado</span>
+            {% endif %}
+          </div>
+          <strong class="kanban-card-title">{{ opp.titulo_kanban }}</strong>
+          <div class="kanban-card-field">
+            <span class="com-escopo-label">Contato</span>
+            <strong class="com-value">{{ opp.contato_exibicao }}</strong>
+          </div>
+          {% if opp.funil_venda %}
+          <div class="kanban-card-next"><span class="muted">Funil de venda</span> {{ opp.funil_venda }}</div>
+          {% endif %}
+          {% if opp.formas_contato_labels %}
+          <div class="kanban-card-next">{{ opp.formas_contato_labels|join:" · " }}</div>
+          {% endif %}
+          {% if opp.motivo_falta_retorno %}
+          <div class="kanban-card-next">{{ opp.get_motivo_falta_retorno_display }}{% if opp.data_retorno %} · {{ opp.data_retorno|date:"d/m/Y" }}{% endif %}</div>
+          {% elif opp.data_retorno %}
+          <div class="kanban-card-next"><span class="muted">Retorno</span> {{ opp.data_retorno|date:"d/m/Y" }}</div>
+          {% endif %}
+          {% if opp.motivo_sem_oportunidade %}
+          <div class="kanban-card-next">{{ opp.motivo_sem_oportunidade|truncatechars:60 }}</div>
+          {% endif %}
+          {% if opp.escopo_solicitado %}
+          <div class="com-escopo-card">
+            <span class="com-escopo-label">Escopo</span>
+            <p>{{ opp.escopo_solicitado|truncatechars:80 }}</p>
+          </div>
+          {% endif %}
+          {% if opp.responsavel %}
+          <div class="kanban-card-owner">{{ opp.responsavel.nome_completo }}</div>
+          {% endif %}
+          <div class="kanban-card-time">{{ opp.tempo_etapa }}</div>
+        </article>
+        {% empty %}
+        <p class="muted kanban-empty">Solte cards aqui</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+  </div>
+</div>
+
+{% if card_ativo and card_form %}
+<div class="deal-overlay open" id="dealOverlay">
+  <button type="button" class="deal-backdrop" onclick="location.href='{% url 'crm_funil_detalhe' funil.pk %}'" aria-label="Fechar preview"></button>
+  <div class="deal-drawer lead-preview" role="dialog" aria-modal="true" aria-label="Preview do lead">
+    <header class="lp-head">
+      <div>
+        <h2 class="lp-kicker">Preview do lead</h2>
+        {% if posicao_na_etapa %}
+        <p class="muted lp-sub">{{ posicao_na_etapa.0 }} de {{ posicao_na_etapa.1 }} em {{ card_ativo.etapa.nome }}</p>
+        {% endif %}
+      </div>
+      <a class="lp-close" href="{% url 'crm_funil_detalhe' funil.pk %}">Fechar</a>
+    </header>
+
+    <div class="lp-scroll">
+      <section class="lp-profile">
+        <div class="lp-avatar" aria-hidden="true">{{ card_ativo.contato_exibicao|slice:":1"|upper }}</div>
+        <div class="lp-profile-main">
+          <h3 class="lp-name">{{ card_ativo.contato_exibicao }}</h3>
+          <p class="lp-company">{{ card_ativo.titulo_kanban }}</p>
+          <div class="lp-contacts">
+            {% if card_ativo.email_exibicao %}
+            <a href="mailto:{{ card_ativo.email_exibicao }}">{{ card_ativo.email_exibicao }}</a>
+            {% endif %}
+            {% if card_ativo.telefone_exibicao %}
+            <a href="tel:{{ card_ativo.telefone_exibicao }}">{{ card_ativo.telefone_exibicao }}</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="lp-actions">
+          {% if card_ativo.email_exibicao %}
+          <a class="lp-icon-btn" href="mailto:{{ card_ativo.email_exibicao }}" title="E-mail">✉</a>
+          {% endif %}
+          {% if card_ativo.telefone_exibicao %}
+          <a class="lp-icon-btn" href="tel:{{ card_ativo.telefone_exibicao }}" title="Ligar">☎</a>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="lp-meta-grid">
+        <div>
+          <span class="muted">Responsável</span>
+          <strong>{% if card_ativo.responsavel %}{{ card_ativo.responsavel.nome_completo }}{% else %}—{% endif %}</strong>
+        </div>
+        <div>
+          <span class="muted">Empresa</span>
+          <strong>{{ card_ativo.empresa.nome }}</strong>
+        </div>
+        <div>
+          <span class="muted">Local</span>
+          <strong>{% if card_ativo.empresa.cidade %}{{ card_ativo.empresa.cidade }}{% if card_ativo.empresa.estado %} ({{ card_ativo.empresa.estado }}){% endif %}{% else %}—{% endif %}</strong>
+        </div>
+        <div>
+          <span class="muted">Nesta etapa</span>
+          <strong>{% if card_ativo.tempo_etapa %}{{ card_ativo.tempo_etapa }}{% else %}—{% endif %}</strong>
+        </div>
+      </section>
+
+      <section class="lp-progress js-etapa-stepper" aria-label="Progresso no funil">
+        {% for e in etapas %}
+        <button type="button"
+          class="lp-step js-etapa-step {% if card_ativo.etapa_id == e.pk %}current{% elif card_ativo.etapa and e.ordem < card_ativo.etapa.ordem %}done{% endif %} {% if e.coluna_css %}{{ e.coluna_css }}{% endif %}"
+          data-etapa-id="{{ e.pk }}"
+          data-fase="{{ e.fase_key }}"
+          data-nome="{{ e.nome }}"
+          data-css="{{ e.coluna_css }}"
+          title="Clique para ver os campos · 3 cliques para mover para esta etapa">
+          <span class="lp-step-mark">
+            {% if card_ativo.etapa and e.ordem < card_ativo.etapa.ordem %}✓{% elif card_ativo.etapa_id == e.pk %}●{% else %}{% endif %}
+          </span>
+          <span class="lp-step-label">{{ e.nome }}</span>
+        </button>
+        {% endfor %}
+      </section>
+      <p class="muted lp-step-hint">Clique na etapa para ver os campos · clique 3 vezes para voltar o card para ela</p>
+
+      <nav class="lp-tabs" aria-label="Seções do card">
+        <button type="button" class="lp-tab active" data-tab="etapa">Fase atual</button>
+        <button type="button" class="lp-tab" data-tab="info">Cadastro</button>
+        <button type="button" class="lp-tab" data-tab="activity">Notas</button>
+      </nav>
+
+      <section class="deal-panel active lp-panel" data-panel="etapa">
+        <div class="lp-section-card">
+          <div class="lp-section-head">
+            <h4>Campos da fase</h4>
+            <span class="fase-pill js-fase-pill {% if card_ativo.etapa %}{{ card_ativo.etapa.coluna_css|default:'' }}{% endif %}">{% if card_ativo.etapa %}{{ card_ativo.etapa.nome }}{% else %}—{% endif %}</span>
+          </div>
+          {% for e in etapas %}
+          <div class="fase-panel js-fase-panel{% if card_ativo.etapa_id == e.pk %} is-active{% endif %}" data-etapa-id="{{ e.pk }}" data-fase="{{ e.fase_key }}" {% if card_ativo.etapa_id != e.pk %}hidden{% endif %}>
+            <form method="post" class="com-form empresa-form deal-edit-form">
+              {% csrf_token %}
+              <input type="hidden" name="acao" value="salvar_etapa_campos">
+              <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+              <input type="hidden" name="fase_salvar" value="{{ e.fase_key }}">
+              <div class="empresa-grid">
+                {% include "crm/_pre_vendas_fase_campos.html" with fase=e.fase_key card_form=card_form %}
+              </div>
+              <div class="empresa-form-actions">
+                <button class="btn" type="submit">Salvar fase</button>
+              </div>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <form method="post" id="formVoltarEtapa" class="is-hidden" aria-hidden="true">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="voltar_etapa">
+        <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+        <input type="hidden" name="etapa_id" id="voltarEtapaId" value="">
+      </form>
+
+      <section class="deal-panel lp-panel" data-panel="info">
+        <div class="lp-section-card">
+          <div class="lp-section-head"><h4>Cadastro</h4></div>
+          <form method="post" class="com-form empresa-form deal-edit-form js-card-form">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_card">
+            <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+            {{ card_form.non_field_errors }}
+            <div class="empresa-grid">
+              <div class="field">
+                <label for="{{ card_form.empresa.id_for_label }}">Empresa</label>
+                {{ card_form.empresa }}{{ card_form.empresa.errors }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.contato.id_for_label }}">Contato</label>
+                {{ card_form.contato }}{{ card_form.contato.errors }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.contato_sucesso.id_for_label }}">{{ card_form.contato_sucesso.label }}</label>
+                {{ card_form.contato_sucesso }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.existe_demanda.id_for_label }}">{{ card_form.existe_demanda.label }}</label>
+                {{ card_form.existe_demanda }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.data_retorno_envio.id_for_label }}">{{ card_form.data_retorno_envio.label }}</label>
+                {{ card_form.data_retorno_envio }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.etapa.id_for_label }}">Etapa</label>
+                {{ card_form.etapa }}
+              </div>
+              <div class="field">
+                <label for="{{ card_form.responsavel.id_for_label }}">{{ card_form.responsavel.label }}</label>
+                {{ card_form.responsavel }}
+              </div>
+              <div class="field span-2">
+                <label for="{{ card_form.dores_identificadas.id_for_label }}">{{ card_form.dores_identificadas.label }}</label>
+                {{ card_form.dores_identificadas }}
+              </div>
+              <div class="field span-2">
+                <label for="{{ card_form.observacoes.id_for_label }}">{{ card_form.observacoes.label }}</label>
+                {{ card_form.observacoes }}
+              </div>
+            </div>
+            <div class="empresa-form-actions">
+              <button class="btn" type="submit">Salvar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="deal-panel lp-panel" data-panel="activity">
+        <div class="lp-section-card">
+          <div class="lp-section-head">
+            <h4>Notas</h4>
+          </div>
+          <form method="post" class="deal-note-form">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="nota">
+            <input type="hidden" name="card_id" value="{{ card_ativo.pk }}">
+            <textarea id="notaField" name="nota" rows="2" placeholder="Adicionar nota…"></textarea>
+            <button class="btn" type="submit">Adicionar nota</button>
+          </form>
+          <ul class="lp-notes">
+            {% for h in historico %}
+            <li class="lp-note">
+              <div class="lp-note-meta">
+                <strong>{% if h.autor %}{{ h.autor.nome_completo }}{% else %}Sistema{% endif %}</strong>
+                <span class="muted">{{ h.criado_em|date:"d/m/Y H:i" }} · {{ h.get_tipo_display }}</span>
+              </div>
+              <p>{{ h.descricao }}</p>
+            </li>
+            {% empty %}
+            <li class="muted">Nenhuma nota ainda.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<dialog class="com-dialog" id="dialogEmpresa" {% if abrir_popup_empresa %}open{% endif %}>
+  <form method="post" class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="criar_empresa">
+    <div class="com-dialog-head">
+      <h3>Cadastrar empresa</h3>
+      <button type="button" class="btn ghost" id="btnFecharEmpresa">Fechar</button>
+    </div>
+    {{ empresa_form.non_field_errors }}
+    <div class="form-section" style="margin-top:0;">
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="{{ empresa_form.nome.id_for_label }}">{{ empresa_form.nome.label }}</label>
+          {{ empresa_form.nome }}{{ empresa_form.nome.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.cidade.id_for_label }}">{{ empresa_form.cidade.label }}</label>
+          {{ empresa_form.cidade }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.estado.id_for_label }}">{{ empresa_form.estado.label }}</label>
+          {{ empresa_form.estado }}
+        </div>
+      </div>
+    </div>
+    <div class="empresa-form-actions">
+      <button class="btn" type="submit">Criar empresa</button>
+    </div>
+  </form>
+</dialog>
+
+<script id="contatos-data" type="application/json">{{ contatos_json|safe }}</script>
+<script>
+(function () {
+  const dialog = document.getElementById('dialogEmpresa');
+  document.getElementById('btnAbrirEmpresa')?.addEventListener('click', () => dialog.showModal());
+  document.getElementById('btnFecharEmpresa')?.addEventListener('click', () => dialog.close());
+  if (location.hash === '#novo-card') {
+    document.getElementById('novo-card')?.setAttribute('open', '');
+  }
+
+  const contatos = JSON.parse(document.getElementById('contatos-data')?.textContent || '[]');
+  function filtrarContatos(form) {
+    const emp = form.querySelector('[name=empresa]');
+    const ctt = form.querySelector('[name=contato]');
+    if (!emp || !ctt) return;
+    const empresaId = emp.value;
+    const atual = ctt.value;
+    ctt.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = 'Selecione o contato cadastrado';
+    ctt.appendChild(opt0);
+    contatos
+      .filter((c) => !empresaId || String(c.empresa_id) === String(empresaId))
+      .forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        if (String(c.id) === String(atual)) opt.selected = true;
+        ctt.appendChild(opt);
+      });
+  }
+  document.querySelectorAll('.js-card-form').forEach((form) => {
+    const emp = form.querySelector('[name=empresa]');
+    emp?.addEventListener('change', () => filtrarContatos(form));
+    filtrarContatos(form);
+  });
+
+  document.querySelectorAll('.js-marcar-todos-formas').forEach((master) => {
+    const box = master.closest('.formas-contato-field');
+    const inputs = () => box.querySelectorAll('.formas-contato-checks input[type=checkbox]');
+    const syncMaster = () => {
+      const all = [...inputs()];
+      const checked = all.filter((i) => i.checked).length;
+      master.checked = checked === all.length && all.length > 0;
+      master.indeterminate = checked > 0 && checked < all.length;
+    };
+    master.addEventListener('change', () => {
+      inputs().forEach((i) => { i.checked = master.checked; });
+      master.indeterminate = false;
+    });
+    inputs().forEach((i) => i.addEventListener('change', syncMaster));
+    syncMaster();
+  });
+
+  document.querySelectorAll('.lp-tab, .deal-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const root = tab.closest('.deal-drawer') || document;
+      root.querySelectorAll('.lp-tab, .deal-tab').forEach((t) => t.classList.remove('active'));
+      root.querySelectorAll('.deal-panel').forEach((p) => p.classList.remove('active'));
+      tab.classList.add('active');
+      root.querySelector(`[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
+    });
+  });
+
+  const board = document.getElementById('kanbanBoard');
+  if (!board) return;
+  const moverUrl = board.dataset.moverUrl;
+  const csrf = board.querySelector('[name=csrfmiddlewaretoken]')?.value
+    || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  let dragged = null;
+  let suppressClick = false;
+
+  board.querySelectorAll('.kanban-card').forEach((card) => {
+    card.addEventListener('dragstart', (e) => {
+      dragged = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.dataset.oppId);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      board.querySelectorAll('.kanban-drop').forEach((z) => z.classList.remove('drag-over'));
+      dragged = null;
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 150);
+    });
+    card.addEventListener('click', () => {
+      if (suppressClick) return;
+      location.href = card.dataset.href;
+    });
+  });
+
+  board.querySelectorAll('.kanban-drop').forEach((zone) => {
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (!dragged) return;
+      const oppId = dragged.dataset.oppId;
+      const etapaId = zone.dataset.etapaId;
+      const fromZone = dragged.parentElement;
+      if (fromZone === zone) return;
+
+      const empty = zone.querySelector('.kanban-empty');
+      if (empty) empty.remove();
+      zone.prepend(dragged);
+
+      if (fromZone && !fromZone.querySelector('.kanban-card')) {
+        const p = document.createElement('p');
+        p.className = 'muted kanban-empty';
+        p.textContent = 'Solte cards aqui';
+        fromZone.appendChild(p);
+      }
+      refreshCounts();
+
+      const body = new FormData();
+      body.append('oportunidade_id', oppId);
+      body.append('etapa_id', etapaId);
+      body.append('csrfmiddlewaretoken', csrf);
+      try {
+        const res = await fetch(moverUrl, { method: 'POST', body, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!res.ok) throw new Error('Falha ao mover');
+        const data = await res.json();
+        if (data.promovido && data.redirect_url) {
+          location.href = data.redirect_url;
+          return;
+        }
+      } catch (err) {
+        location.reload();
+      }
+    });
+  });
+
+  function refreshCounts() {
+    board.querySelectorAll('.kanban-column').forEach((col) => {
+      const n = col.querySelectorAll('.kanban-card').length;
+      const el = col.querySelector('.kanban-count');
+      if (el) el.textContent = n;
+    });
+  }
+})();
+</script>
+{% include "crm/_etapa_stepper_js.html" %}
+{% endblock %}

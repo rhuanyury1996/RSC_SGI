@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Calendário · SGI RSC{% endblock %}
+{% block breadcrumb %}Calendário{% endblock %}
+{% block page_title %}Calendário{% endblock %}
+{% block page_actions %}
+  {% if google_conectado %}
+    <span class="status-pill running">Google · espelhamento ativo</span>
+  {% endif %}
+  <button class="btn" type="button" id="btnNovoEvento">+ Novo evento</button>
+{% endblock %}
+
+{% block content %}
+<div class="cal-page" id="calPage" style="--cal-side-w: 240px">
+  <aside class="cal-side" id="calSide">
+    <div class="cal-mini">
+      <div class="cal-mini-head">
+        <strong>{{ mes_nome }} {{ ano }}</strong>
+        <div class="navs">
+          <a href="?ano={{ mes_anterior.0 }}&mes={{ mes_anterior.1 }}">‹</a>
+          <a href="?ano={{ mes_seguinte.0 }}&mes={{ mes_seguinte.1 }}">›</a>
+        </div>
+      </div>
+      <div class="cal-mini-grid">
+        <span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span><span>D</span>
+        {% for semana in mini %}
+          {% for cel in semana %}
+            {% if cel %}
+              <span class="{% if cel.is_today %}is-today{% endif %} {% if cel.eventos %}has-ev{% endif %}">{{ cel.day }}</span>
+            {% else %}
+              <span class="empty"></span>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <form method="get" class="cal-filters">
+      <input type="hidden" name="ano" value="{{ ano }}">
+      <input type="hidden" name="mes" value="{{ mes }}">
+      <p class="label">Categorias</p>
+      {% for value, label in tipos.choices %}
+        <label class="chip tipo-{{ value }}">
+          <input type="checkbox" name="tipo" value="{{ value }}" {% if value in tipos_filtro %}checked{% endif %} onchange="this.form.submit()">
+          <i></i> {{ label }}
+        </label>
+      {% endfor %}
+      <label class="chip tipo-atividade">
+        <input type="checkbox" name="tipo" value="atividade" {% if "atividade" in tipos_filtro %}checked{% endif %} onchange="this.form.submit()">
+        <i></i> Atividades
+      </label>
+    </form>
+
+    <div class="cal-today">
+      <h3>Hoje</h3>
+      {% if hoje_eventos %}
+        <ul class="cal-agenda">
+          {% for ev in hoje_eventos %}
+          <li>
+            <div class="time">
+              {% if ev.dia_inteiro %}Dia{% else %}{{ ev.inicio|date:"H:i" }}{% endif %}
+            </div>
+            <div class="item" style="--ev: {{ ev.cor }}">
+              {% if ev.href %}
+                <a href="{{ ev.href }}"><strong>{{ ev.titulo }}</strong></a>
+              {% else %}
+                <strong>{{ ev.titulo }}</strong>
+              {% endif %}
+              <span>{{ ev.get_tipo_display }}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nenhum evento ou atividade hoje.</p>
+      {% endif %}
+      <a class="link-demandas" href="{% url 'apontamentos' %}#recuperacao">Ver horas a recuperar →</a>
+
+      <div class="google-box">
+        <h3>Google Calendar</h3>
+        {% if google_conectado %}
+          <p class="google-status ok">Conectado — novos eventos são espelhados automaticamente.</p>
+          <a class="btn-google ghost" href="{% url 'google_calendar_desconectar' %}">Desconectar conta</a>
+        {% else %}
+          <p class="muted" style="margin:0 0 0.65rem;">
+            Conecte sua conta para espelhar férias, day-off, reuniões e recuperações na sua agenda.
+          </p>
+          <a class="btn-google" href="{% url 'google_calendar_conectar' %}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Conectar com o Google Calendar
+          </a>
+          {% if not google_configurado %}
+            <p class="muted google-hint">
+              Ainda falta configurar as chaves no servidor (`.env`:
+              <code>GOOGLE_CLIENT_ID</code> e <code>GOOGLE_CLIENT_SECRET</code>).
+            </p>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
+  <div
+    class="cal-resizer"
+    id="calResizer"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Arraste para ajustar a largura do painel"
+    aria-controls="calSide"
+    tabindex="0"
+  ></div>
+
+  <section class="cal-main">
+    <div class="cal-main-head">
+      <div>
+        <h2>{{ mes_nome }} {{ ano }}</h2>
+        <p class="muted">Férias, day-off, reuniões, recuperação e atividades do planner.</p>
+      </div>
+      <div class="view-toggle">
+        <span class="active">Mês</span>
+      </div>
+    </div>
+
+    <div class="cal-weekdays">
+      <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+    </div>
+    <div class="cal-grid">
+      {% for semana in semanas %}
+        {% for cel in semana %}
+          {% if cel %}
+          <div class="cal-cell {% if cel.is_today %}is-today{% endif %}">
+            <div class="daynum">{{ cel.day }}</div>
+            {% for ev in cel.visiveis %}
+              {% if ev.tipo == 'ferias' or ev.tipo == 'day_off' %}
+                <div class="ev-bar" style="background:{{ ev.cor }}" title="{{ ev.titulo }}">{{ ev.titulo }}</div>
+              {% elif ev.tipo == 'atividade' %}
+                <a class="ev-dot ev-atividade {% if ev.status %}st-{{ ev.status }}{% endif %}" style="--ev:{{ ev.cor }}" href="{{ ev.href }}" title="{{ ev.titulo }} · {{ ev.get_tipo_display }}">
+                  <i></i><span>{{ ev.titulo }}</span>
+                </a>
+              {% else %}
+                <div class="ev-dot" style="--ev:{{ ev.cor }}" title="{{ ev.titulo }}">
+                  <i></i><span>{{ ev.titulo }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+            {% if cel.extra %}
+              <div class="more">+{{ cel.extra }} mais</div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="cal-cell muted-cell"></div>
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<dialog class="cal-dialog" id="dialogEvento">
+  <form method="post" class="cal-dialog-form">
+    {% csrf_token %}
+    <div class="dialog-head">
+      <h3>Novo evento</h3>
+      <button type="button" class="btn ghost" id="btnFecharDialog">Fechar</button>
+    </div>
+
+    <label for="id_tipo">Tipo</label>
+    {{ form.tipo }}
+    {{ form.tipo.errors }}
+
+    <label for="id_titulo">Título</label>
+    {{ form.titulo }}
+    {{ form.titulo.errors }}
+
+    <label for="id_motivo">Motivo / descrição</label>
+    {{ form.motivo }}
+    {{ form.motivo.errors }}
+
+    <div class="grid-2">
+      <div>
+        <label for="id_inicio">Início</label>
+        {{ form.inicio }}
+        {{ form.inicio.errors }}
+      </div>
+      <div>
+        <label for="id_fim">Fim</label>
+        {{ form.fim }}
+        {{ form.fim.errors }}
+      </div>
+    </div>
+
+    <label class="check-line">{{ form.dia_inteiro }} Dia inteiro</label>
+
+    <div id="blocoDayOff" class="dayoff-box">
+      <p class="muted" style="margin-top:0;">
+        Recuperação em no máximo <strong>2h por dia</strong>.
+        Escolha o período — o sistema reparte as horas em Apontamentos.
+      </p>
+      <label for="id_horas_recuperar">Total de horas a recuperar</label>
+      {{ form.horas_recuperar }}
+      {{ form.horas_recuperar.errors }}
+      <div class="grid-2" style="margin-top:0.65rem;">
+        <div>
+          <label for="id_recuperacao_inicio">Recuperar de</label>
+          {{ form.recuperacao_inicio }}
+          {{ form.recuperacao_inicio.errors }}
+        </div>
+        <div>
+          <label for="id_recuperacao_fim">até</label>
+          {{ form.recuperacao_fim }}
+          {{ form.recuperacao_fim.errors }}
+        </div>
+      </div>
+      <p class="muted" id="dicaCapacidade" style="margin:0.65rem 0 0;"></p>
+    </div>
+
+    {% if google_conectado %}
+      <p class="google-inline-ok">Será espelhado automaticamente no Google Calendar.</p>
+    {% else %}
+      <p class="muted" style="margin:1rem 0 0;">
+        Para espelhar na sua agenda,
+        <a href="{% url 'google_calendar_conectar' %}">conecte o Google Calendar</a>.
+      </p>
+    {% endif %}
+
+    {{ form.non_field_errors }}
+    <div class="actions" style="margin-top:1rem;">
+      <button class="btn" type="submit">Salvar no calendário</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const dialog = document.getElementById('dialogEvento');
+  const btnOpen = document.getElementById('btnNovoEvento');
+  const btnClose = document.getElementById('btnFecharDialog');
+  const tipo = document.getElementById('id_tipo');
+  const bloco = document.getElementById('blocoDayOff');
+  const horas = document.getElementById('id_horas_recuperar');
+  const recIni = document.getElementById('id_recuperacao_inicio');
+  const recFim = document.getElementById('id_recuperacao_fim');
+  const dica = document.getElementById('dicaCapacidade');
+  const MAX_H = 2;
+
+  function syncDayOff() {
+    bloco.style.display = tipo.value === 'day_off' ? 'block' : 'none';
+    atualizarCapacidade();
+  }
+
+  function atualizarCapacidade() {
+    if (!dica || tipo.value !== 'day_off') return;
+    const h = parseFloat(horas.value || '0');
+    if (!recIni.value || !recFim.value || !h) {
+      dica.textContent = `Máximo ${MAX_H}h por dia no período selecionado.`;
+      return;
+    }
+    const a = new Date(recIni.value + 'T00:00:00');
+    const b = new Date(recFim.value + 'T00:00:00');
+    const dias = Math.floor((b - a) / 86400000) + 1;
+    if (dias < 1) {
+      dica.textContent = 'Ajuste o período de recuperação.';
+      return;
+    }
+    const cap = dias * MAX_H;
+    const minDias = Math.ceil(h / MAX_H);
+    dica.textContent = dias >= minDias
+      ? `Período: ${dias} dia(s) · capacidade ${cap}h · ${h}h serão repartidas (até ${MAX_H}h/dia).`
+      : `Período insuficiente: ${h}h exigem pelo menos ${minDias} dia(s) (máx. ${MAX_H}h/dia).`;
+  }
+
+  tipo.addEventListener('change', syncDayOff);
+  [horas, recIni, recFim].forEach((el) => el && el.addEventListener('input', atualizarCapacidade));
+  syncDayOff();
+
+  btnOpen.addEventListener('click', () => dialog.showModal());
+  btnClose.addEventListener('click', () => dialog.close());
+
+  {% if form.errors %}
+  dialog.showModal();
+  {% endif %}
+
+  (function () {
+    const page = document.getElementById('calPage');
+    const handle = document.getElementById('calResizer');
+    if (!page || !handle) return;
+
+    const KEY = 'sgi-cal-side-w';
+    const MIN = 200;
+    const MAX = 420;
+    const DEFAULT = 240;
+
+    function clamp(w) {
+      return Math.max(MIN, Math.min(MAX, Math.round(w)));
+    }
+
+    function apply(w) {
+      page.style.setProperty('--cal-side-w', clamp(w) + 'px');
+    }
+
+    try {
+      const saved = parseInt(localStorage.getItem(KEY) || '', 10);
+      apply(Number.isFinite(saved) ? saved : DEFAULT);
+    } catch (e) {
+      apply(DEFAULT);
+    }
+
+    let dragging = false;
+    let startX = 0;
+    let startW = 0;
+
+    function currentW() {
+      return parseInt(getComputedStyle(page).getPropertyValue('--cal-side-w'), 10) || DEFAULT;
+    }
+
+    function onMove(clientX) {
+      if (!dragging) return;
+      apply(startW + (clientX - startX));
+    }
+
+    function stop() {
+      if (!dragging) return;
+      dragging = false;
+      page.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try {
+        localStorage.setItem(KEY, String(currentW()));
+      } catch (e) {}
+    }
+
+    handle.addEventListener('pointerdown', (e) => {
+      if (window.matchMedia('(max-width: 900px)').matches) return;
+      dragging = true;
+      startX = e.clientX;
+      startW = currentW();
+      page.classList.add('is-resizing');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', (e) => onMove(e.clientX));
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+
+    handle.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 24 : 12;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        apply(currentW() - step);
+        try { localStorage.setItem(KEY, String(currentW())); } catch (err) {}
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        apply(currentW() + step);
+        try { localStorage.setItem(KEY, String(currentW())); } catch (err) {}
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Empresas · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Empresas{% endblock %}
+{% block page_title %}Empresas{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'crm_listas' %}?tipo=nicho_mercadologico">Nichos</a>
+  <a class="btn ghost" href="{% url 'crm' %}">Visão geral</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Criar registro</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Identificação</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+              {{ form.nome }}{{ form.nome.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.site.id_for_label }}">{{ form.site.label }}</label>
+              {{ form.site }}{{ form.site.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.nicho.id_for_label }}">{{ form.nicho.label }}</label>
+              {{ form.nicho }}{{ form.nicho.errors }}
+              <p class="field-hint muted">Gerencie em <a href="{% url 'crm_listas' %}?tipo=nicho_mercadologico">Listas → Nicho</a></p>
+            </div>
+            <div class="field">
+              <label for="{{ form.classificacao_unidade.id_for_label }}">{{ form.classificacao_unidade.label }}</label>
+              {{ form.classificacao_unidade }}{{ form.classificacao_unidade.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Contato</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.telefone_portaria.id_for_label }}">{{ form.telefone_portaria.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_portaria }}
+              </div>
+              {{ form.telefone_portaria.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.telefone_portaria_2.id_for_label }}">{{ form.telefone_portaria_2.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_portaria_2 }}
+              </div>
+              {{ form.telefone_portaria_2.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.email_geral.id_for_label }}">{{ form.email_geral.label }}</label>
+              {{ form.email_geral }}{{ form.email_geral.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Localização</h3>
+          <div class="empresa-grid">
+            <div class="field span-2-1">
+              <label for="{{ form.cidade.id_for_label }}">{{ form.cidade.label }}</label>
+              {{ form.cidade }}{{ form.cidade.errors }}
+            </div>
+            <div class="field span-2-2">
+              <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+              {{ form.estado }}{{ form.estado.errors }}
+            </div>
+          </div>
+        </div>
+
+        <details class="form-section form-section-collapse"{% if form.clientes_rsc.errors %} open{% endif %}>
+          <summary class="form-section-summary">
+            <span class="form-section-title">Visibilidade — clientes RSC</span>
+            <span class="apont-lista-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="form-section-body">
+            <p class="muted" style="margin:0 0 0.75rem;">
+              Funcionários RSC sempre veem todas as empresas. Marque abaixo apenas os
+              <strong>clientes externos</strong> que poderão ver este registro.
+              Cadastre-os em <a href="{% url 'crm_listas' %}?tipo=clientes_rsc">Listas → Clientes RSC</a>.
+            </p>
+            {% if form.clientes_rsc.field.queryset.exists %}
+            <div class="check-grid">
+              {{ form.clientes_rsc }}
+            </div>
+            {{ form.clientes_rsc.errors }}
+            {% else %}
+            <p class="muted" style="margin:0;">Nenhum cliente RSC cadastrado ainda.</p>
+            {% endif %}
+          </div>
+        </details>
+
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Criar registro</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Empresas cadastradas</h2>
+        <span class="muted">{{ itens|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Empresa</th>
+              <th>Nicho</th>
+              <th>Classificação</th>
+              <th>Cidade/UF</th>
+              <th>Clientes RSC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in itens %}
+            <tr>
+              <td>
+                <strong>{{ item.nome }}</strong>
+                {% if item.site %}<div class="muted"><a href="{{ item.site }}" target="_blank" rel="noopener">{{ item.site }}</a></div>{% endif %}
+              </td>
+              <td>{% if item.nicho %}{{ item.nicho.nome }}{% else %}—{% endif %}</td>
+              <td>{% if item.classificacao_unidade %}{{ item.get_classificacao_unidade_display }}{% else %}—{% endif %}</td>
+              <td>
+                {% if item.cidade or item.estado %}
+                  {{ item.cidade }}{% if item.cidade and item.estado %}/{% endif %}{{ item.estado }}
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% for c in item.clientes_rsc.all %}
+                  <span class="badge info">{{ c.nome }}</span>
+                {% empty %}
+                  <span class="muted">—</span>
+                {% endfor %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">Nenhuma empresa cadastrada.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+  function maskPhone(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 10) {
+      return digits
+        .replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*/, (_, a, b, c) => {
+          let out = '';
+          if (a) out += `(${a}`;
+          if (a.length === 2) out += ') ';
+          if (b) out += b;
+          if (c) out += `-${c}`;
+          return out;
+        });
+    }
+    return digits.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+  }
+  document.querySelectorAll('.js-phone-mask').forEach((input) => {
+    input.addEventListener('input', () => {
+      input.value = maskPhone(input.value);
+    });
+  });
+</script>
+{% endblock %}

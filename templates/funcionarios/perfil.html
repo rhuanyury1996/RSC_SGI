@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Meu perfil · SGI RSC{% endblock %}
+{% block breadcrumb %}Meu perfil{% endblock %}
+{% block page_title %}Meu perfil{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'alterar_senha' %}">Alterar senha</a>
+  <a class="btn" href="{% url 'editar_perfil' %}">Editar dados</a>
+{% endblock %}
+{% block content %}
+<div class="pf-page">
+  <section class="pf-hero">
+    <div class="pf-hero-copy">
+      {% if funcionario.foto_perfil %}
+        <img class="pf-hero-avatar" src="{{ funcionario.foto_perfil.url }}" alt="Foto de {{ funcionario.nome_completo }}">
+      {% else %}
+        <div class="pf-hero-avatar placeholder">{{ funcionario.nome|slice:":1" }}{{ funcionario.sobrenome|slice:":1" }}</div>
+      {% endif %}
+      <div>
+        <p class="pf-hero-kicker">Perfil do colaborador</p>
+        <h2>{{ funcionario.nome_completo }}</h2>
+        <p>
+          {{ funcionario.get_cargo_display }} · {{ funcionario.get_setor_display }}
+          {% if funcionario.signo_solar %} · Signo {{ funcionario.get_signo_solar_display }}{% endif %}
+        </p>
+        <div class="pf-hero-actions">
+          <a class="btn pf-hero-btn" href="{% url 'editar_perfil' %}">Editar perfil</a>
+          <a class="btn ghost pf-hero-btn-ghost" href="{% url 'alterar_senha' %}">Alterar senha</a>
+        </div>
+      </div>
+    </div>
+    <div class="pf-hero-cards">
+      <article>
+        <strong>{{ funcionario.get_cargo_display }}</strong>
+        <span>Cargo</span>
+      </article>
+      <article>
+        <strong>{{ funcionario.get_setor_display }}</strong>
+        <span>Setor</span>
+      </article>
+      <article>
+        <strong>{% if funcionario.signo_solar %}{{ funcionario.get_signo_solar_display }}{% else %}—{% endif %}</strong>
+        <span>Signo solar</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="pf-section">
+    <div class="pf-section-head">
+      <div>
+        <h3>Sobre você</h3>
+        <p class="muted">Dados pessoais e preferências do perfil.</p>
+      </div>
+    </div>
+    <div class="pf-grid">
+      <article class="pf-card">
+        <span class="pf-card-icon tom-blue" aria-hidden="true"></span>
+        <h4>Dados pessoais</h4>
+        <dl class="pf-dl">
+          <div><dt>Nome</dt><dd>{{ funcionario.nome }}</dd></div>
+          <div><dt>Sobrenome</dt><dd>{{ funcionario.sobrenome }}</dd></div>
+          <div><dt>Nascimento</dt><dd>{{ funcionario.data_nascimento|date:"d/m/Y" }}</dd></div>
+          <div>
+            <dt>Signo solar</dt>
+            <dd>
+              {% if funcionario.signo_solar %}
+                <span class="badge info">{{ funcionario.get_signo_solar_display }}</span>
+              {% else %}
+                <a href="{% url 'editar_perfil' %}">Selecionar</a>
+              {% endif %}
+            </dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="pf-card">
+        <span class="pf-card-icon tom-violet" aria-hidden="true"></span>
+        <h4>Organização</h4>
+        <dl class="pf-dl">
+          <div><dt>Cargo</dt><dd><span class="badge info">{{ funcionario.get_cargo_display }}</span></dd></div>
+          <div><dt>Setor</dt><dd><span class="badge">{{ funcionario.get_setor_display }}</span></dd></div>
+          <div><dt>Centro de custo</dt><dd><span class="badge">{{ funcionario.get_centro_custo_display }}</span></dd></div>
+          <div><dt>A quem responde</dt><dd>{% if funcionario.responde_a %}{{ funcionario.responde_a }}{% else %}—{% endif %}</dd></div>
+        </dl>
+      </article>
+
+      <article class="pf-card">
+        <span class="pf-card-icon tom-cyan" aria-hidden="true"></span>
+        <h4>Acesso</h4>
+        <dl class="pf-dl">
+          <div><dt>Usuário</dt><dd>{{ user.username }}</dd></div>
+          <div><dt>Status</dt><dd>{% if funcionario.ativo %}<span class="badge ok">Ativo</span>{% else %}<span class="badge warn">Inativo</span>{% endif %}</dd></div>
+          <div><dt>Senha</dt><dd><a href="{% url 'alterar_senha' %}">Alterar senha</a></dd></div>
+        </dl>
+      </article>
+
+      <article class="pf-card">
+        <span class="pf-card-icon tom-amber" aria-hidden="true"></span>
+        <h4>Jornada</h4>
+        <p class="pf-card-text">{{ funcionario.resumo_jornada }}</p>
+        <a class="btn secondary pf-card-cta" href="{% url 'editar_perfil' %}">Ajustar jornada</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="pf-section">
+    <div class="pf-section-head">
+      <div>
+        <h3>Resumo da conta</h3>
+        <p class="muted">Informações definidas pela gestão e pelo próprio colaborador.</p>
+      </div>
+    </div>
+    <ul class="pf-list">
+      <li>
+        <span class="pf-list-mark tom-blue">C</span>
+        <span class="pf-list-body">
+          <strong>Cargo e setor</strong>
+          <small>{{ funcionario.get_cargo_display }} · {{ funcionario.get_setor_display }}</small>
+        </span>
+        <span class="pf-list-meta">Gestão</span>
+      </li>
+      <li>
+        <span class="pf-list-mark tom-violet">S</span>
+        <span class="pf-list-body">
+          <strong>Signo solar</strong>
+          <small>{% if funcionario.signo_solar %}{{ funcionario.get_signo_solar_display }}{% else %}Ainda não selecionado{% endif %}</small>
+        </span>
+        <a class="btn secondary" href="{% url 'editar_perfil' %}">Editar</a>
+      </li>
+      <li>
+        <span class="pf-list-mark tom-cyan">J</span>
+        <span class="pf-list-body">
+          <strong>Jornada de trabalho</strong>
+          <small>{{ funcionario.resumo_jornada }}</small>
+        </span>
+        <a class="btn secondary" href="{% url 'editar_perfil' %}">Editar</a>
+      </li>
+    </ul>
+    <p class="muted pf-note">
+      Cargo, setor, superior e centro de custo são definidos pela gestão.
+      Nome, foto, signo solar e jornada você ajusta em Editar dados.
+    </p>
+  </section>
+</div>
+{% endblock %}

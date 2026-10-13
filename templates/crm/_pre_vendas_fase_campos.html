@@ -1,0 +1,39 @@
+{# Espera: fase, card_form #}
+{% if fase == "primeiro_contato" %}
+<div class="field span-2 formas-contato-field">
+  <span class="form-section-title" style="display:block;margin-bottom:0.5rem;">Formas de contato</span>
+  <label class="formas-marcar-todos">
+    <input type="checkbox" class="js-marcar-todos-formas"> Marcar todos
+  </label>
+  <div class="formas-contato-checks">
+    {{ card_form.formas_contato }}
+  </div>
+</div>
+{% elif fase == "retornar_contato" %}
+<div class="field span-2">
+  <label for="{{ card_form.motivo_falta_retorno.id_for_label }}">Motivo da falta de retorno</label>
+  {{ card_form.motivo_falta_retorno }}
+</div>
+<div class="field">
+  <label for="{{ card_form.data_retorno.id_for_label }}">Data de retorno</label>
+  {{ card_form.data_retorno }}
+</div>
+{% elif fase == "sem_oportunidade" %}
+<div class="field span-2">
+  <label for="{{ card_form.motivo_sem_oportunidade.id_for_label }}">Motivo da falta de oportunidade</label>
+  {{ card_form.motivo_sem_oportunidade }}
+</div>
+{% elif fase == "concluido" %}
+<div class="field span-2">
+  <label for="{{ card_form.escopo_solicitado.id_for_label }}">Escopo solicitado</label>
+  {{ card_form.escopo_solicitado }}
+</div>
+<div class="field span-2">
+  <label for="{{ card_form.funil_venda.id_for_label }}">{{ card_form.funil_venda.label }}</label>
+  {{ card_form.funil_venda }}
+</div>
+{% else %}
+<div class="field span-2">
+  <p class="muted" style="margin:0;">Esta fase não exige campos extras — use Cadastro ou avance o card no kanban.</p>
+</div>
+{% endif %}

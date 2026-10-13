@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Listas · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Listas{% endblock %}
+{% block page_title %}Listas do sistema{% endblock %}
+{% block page_actions %}
+  <a class="btn ghost" href="{% url 'crm_empresas' %}">Empresas</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <nav class="info-filters" aria-label="Tipo de lista">
+    {% for value, label in tipos.choices %}
+      <a class="info-filter {% if tipo_atual == value %}active{% endif %}" href="?tipo={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Adicionar item</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin-top:0;">
+        Nichos alimentam o cadastro de empresas.
+        Clientes RSC são os clientes externos com acesso à base — ao cadastrar um, o sistema cria automaticamente os subfunis Pré-vendas, Negociações e Pós-vendas.
+        Os checkboxes de visibilidade controlam o que cada um vê; funcionários RSC sempre veem tudo.
+      </p>
+      <form method="post" class="com-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="com-form-grid">
+          <div>
+            <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
+            {{ form.tipo }}{{ form.tipo.errors }}
+          </div>
+          <div>
+            <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+            {{ form.nome }}{{ form.nome.errors }}
+          </div>
+          <div>
+            <label for="{{ form.ordem.id_for_label }}">{{ form.ordem.label }}</label>
+            {{ form.ordem }}{{ form.ordem.errors }}
+          </div>
+          <div style="display:flex;align-items:end;gap:0.5rem;padding-bottom:0.35rem;">
+            <label style="display:flex;align-items:center;gap:0.45rem;margin:0;">
+              {{ form.ativo }} {{ form.ativo.label }}
+            </label>
+          </div>
+        </div>
+        <div class="actions" style="margin-top:0.85rem;">
+          <button class="btn" type="submit">Salvar item</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Itens</h2>
+        <span class="muted">{{ itens|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Ordem</th>
+              <th>Status</th>
+              {% if eh_clientes_rsc %}<th>Funil</th>{% endif %}
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in itens %}
+            <tr>
+              <td><strong>{{ item.nome }}</strong></td>
+              <td>{{ item.ordem }}</td>
+              <td>
+                {% if item.ativo %}
+                  <span class="badge ok">Ativo</span>
+                {% else %}
+                  <span class="badge">Inativo</span>
+                {% endif %}
+              </td>
+              {% if eh_clientes_rsc %}
+              <td>
+                {% with funil=item.funil_principal %}
+                  {% if funil %}
+                    <a href="{% url 'crm_funil_detalhe' funil.pk %}">Abrir funis</a>
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+              {% endif %}
+              <td>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="acao" value="toggle">
+                  <input type="hidden" name="item_id" value="{{ item.pk }}">
+                  {% if item.ativo %}
+                    <button class="link-btn danger" type="submit">Desativar</button>
+                  {% else %}
+                    <button class="link-btn" type="submit">Reativar</button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if eh_clientes_rsc %}5{% else %}4{% endif %}" class="muted">Nenhum item nesta lista ainda. Adicione o primeiro acima.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}

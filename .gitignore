@@ -1,0 +1,13 @@
+.venv/
+.pgdata/
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+.pgpass_init
+media/
+staticfiles/
+*.log
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}Planner · SGI RSC{% endblock %}
+{% block breadcrumb %}Atividades · Planner{% endblock %}
+{% block page_title %}Daily Productivity Planner{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">{{ dia|date:"l, d \d\e F Y" }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="pp-page">
+
+  <header class="pp-top">
+    <div class="pp-top-bar">
+      <div class="cu-views" role="tablist" aria-label="Organização">
+        <a class="cu-view" href="?org=status&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Lista</a>
+        <a class="cu-view" href="?org=prioridade&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Prioridade</a>
+        <a class="cu-view active" href="?org=planner&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Planner</a>
+      </div>
+      <div class="cu-nav">
+        <a class="btn secondary" href="?org=planner&data={{ dia_anterior|date:'Y-m-d' }}">‹</a>
+        <form method="get" class="cu-date-form">
+          <input type="hidden" name="org" value="planner">
+          <input type="date" name="data" value="{{ dia|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Dia">
+        </form>
+        <a class="btn secondary" href="?org=planner&data={{ dia_seguinte|date:'Y-m-d' }}">›</a>
+        {% if not eh_hoje %}
+        <a class="btn ghost" href="?org=planner&data={{ hoje|date:'Y-m-d' }}">Hoje</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <section class="pp-times" aria-label="Tempos e métricas do dia">
+      <div class="pp-time-card is-focus">
+        <span class="muted">Tempo de foco</span>
+        <strong>{{ metricas.focus_time }}</strong>
+        <small>cronômetros do dia</small>
+      </div>
+      <div class="pp-time-card">
+        <span class="muted">Focus Score</span>
+        <strong>{{ metricas.focus_score }} <em>/ 10</em></strong>
+      </div>
+      <div class="pp-time-card">
+        <span class="muted">Tarefas</span>
+        <strong>{{ metricas.feitos }} <em>/ {{ metricas.total }}</em></strong>
+      </div>
+      <div class="pp-time-card">
+        <span class="muted">Produtividade</span>
+        <strong>{{ metricas.percentual }}%</strong>
+        <span class="cu-bar"><i style="width:{{ metricas.percentual }}%"></i></span>
+      </div>
+    </section>
+  </header>
+
+  {# Linha 1: priorizar · agenda · foco #}
+  <div class="pp-row pp-row-main">
+    <section class="pp-card pp-zone-matrix">
+      <header class="pp-card-head">
+        <h2>Matriz de prioridade</h2>
+        <span class="muted">Eisenhower</span>
+      </header>
+      <div class="pp-matrix">
+        {% for q in matriz %}
+        <div class="pp-quad q-{{ q.chave }}">
+          <h3>{{ q.titulo }}</h3>
+          <p class="muted">{{ q.subtitulo }}</p>
+          <ul>
+            {% for item in q.itens %}
+            <li {% if item.status == status_realizado %}class="done"{% endif %}>{{ item.titulo }}</li>
+            {% empty %}
+            <li class="muted">—</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="pp-card pp-zone-agenda">
+      <header class="pp-card-head">
+        <h2>Agenda do dia</h2>
+        <span class="muted">06:00 – 22:00</span>
+      </header>
+      <div class="pp-timeline">
+        {% for slot in agenda_horas %}
+        <div class="pp-hour {% if slot.blocos %}has-block{% endif %}">
+          <span class="pp-hour-label">{{ slot.hora }}</span>
+          <div class="pp-hour-track">
+            {% for b in slot.blocos %}
+            <div class="pp-block">{{ b.titulo }}{% if b.fim %} · {{ b.fim|time:"H:i" }}{% endif %}</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="muted pp-hint">Tarefas com horário na Lista aparecem aqui.</p>
+    </section>
+
+    <section class="pp-card pp-pomodoro pp-zone-pomo" id="pomodoro-card">
+      <header class="pp-card-head">
+        <h2>Pomodoro</h2>
+        <span class="muted">25 · 5 · 15</span>
+      </header>
+      <div class="pp-pomo-ring" id="pomo-ring" style="--pomo-pct: 100;">
+        <strong id="pomo-display">25:00</strong>
+        <span id="pomo-mode">Foco</span>
+      </div>
+      <div class="pp-pomo-actions">
+        <button type="button" class="btn" id="pomo-toggle">▶ Iniciar</button>
+        <button type="button" class="btn secondary" id="pomo-reset">Reset</button>
+      </div>
+      <div class="pp-pomo-dots" id="pomo-dots" aria-label="Sessões">
+        {% for i in "1234" %}
+        <i class="{% if forloop.counter0 < dia_planner.pomodoros %}on{% endif %}"></i>
+        {% endfor %}
+      </div>
+      <form method="post" action="{% url 'planner_nota' %}" id="pomo-save" class="pp-pomo-save">
+        {% csrf_token %}
+        <input type="hidden" name="origem" value="pomodoro">
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <input type="hidden" name="pomodoros" id="pomo-count" value="{{ dia_planner.pomodoros }}">
+        <span class="muted">Sessões: <strong id="pomo-count-label">{{ dia_planner.pomodoros }}</strong></span>
+        <button class="btn ghost" type="submit">Salvar</button>
+      </form>
+    </section>
+  </div>
+
+  {# Linha 2: checklist · metas/hábitos · água/resumo #}
+  <div class="pp-row pp-row-secondary">
+    <section class="pp-card pp-zone-check">
+      <header class="pp-card-head">
+        <h2>Checklist de hoje</h2>
+        <span class="muted">{{ metricas.feitos }}/{{ metricas.total }}</span>
+      </header>
+      <ul class="pp-check">
+        {% for item in checklist %}
+        <li class="{% if item.status == status_realizado %}is-done{% endif %}">
+          <form method="post" action="{% url 'planner_checklist' item.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+            <button type="submit" class="pp-check-btn" aria-label="Alternar">
+              {% if item.status == status_realizado %}✓{% endif %}
+            </button>
+          </form>
+            <span class="pp-check-main">
+              <form method="post" action="{% url 'planner_quadrante' item.pk %}" class="eisen-form">
+                {% csrf_token %}
+                <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+                <button type="submit" class="eisen-badge q-{{ item.quadrante }}" title="{{ item.get_quadrante_display }} — clique para alterar">
+                  {% if item.quadrante == "fazer" %}Q1{% elif item.quadrante == "agendar" %}Q2{% elif item.quadrante == "delegar" %}Q3{% else %}Q4{% endif %}
+                </button>
+              </form>
+              <span class="pp-check-title">{{ item.titulo }}</span>
+              {% if item.hora_inicio %}
+              <small class="pp-check-hora">{{ item.hora_inicio|time:"H:i" }}{% if item.hora_fim %}–{{ item.hora_fim|time:"H:i" }}{% endif %}</small>
+              {% endif %}
+            </span>
+          <em class="muted">{{ item.tempo_fmt }}</em>
+        </li>
+        {% empty %}
+        <li class="muted">Nenhuma tarefa planejada para este dia.</li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{% url 'planner_tarefa' %}" class="pp-inline-add pp-add-timed">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <input type="text" name="titulo" placeholder="+ Nova tarefa do dia" required autocomplete="off">
+        <select name="quadrante" aria-label="Eisenhower" title="Matriz Eisenhower">
+          <option value="fazer">Q1 Fazer</option>
+          <option value="agendar" selected>Q2 Agendar</option>
+          <option value="delegar">Q3 Delegar</option>
+          <option value="eliminar">Q4 Eliminar</option>
+        </select>
+        <input type="time" name="hora_inicio" aria-label="Início" title="Início">
+        <input type="time" name="hora_fim" aria-label="Fim" title="Fim">
+        <button class="btn ghost" type="submit">Add</button>
+      </form>
+    </section>
+
+    <div class="pp-stack">
+      <section class="pp-card">
+        <header class="pp-card-head"><h2>Metas de foco</h2></header>
+        <ol class="pp-goals">
+          {% for m in metas %}
+          <li class="{% if m.concluida %}is-done{% endif %}">
+            <form method="post" action="{% url 'planner_meta_toggle' m.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="pp-goal-num">{% if m.concluida %}✓{% else %}{{ forloop.counter|stringformat:"02d" }}{% endif %}</button>
+            </form>
+            <span>{{ m.texto }}</span>
+          </li>
+          {% empty %}
+          <li class="muted">Defina até 4 metas para o dia.</li>
+          {% endfor %}
+        </ol>
+        {% if metas|length < 4 %}
+        <form method="post" action="{% url 'planner_meta_add' %}" class="pp-inline-add">
+          {% csrf_token %}
+          <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+          <input type="text" name="texto" placeholder="Nova meta de foco" required maxlength="200">
+          <button class="btn ghost" type="submit">Add</button>
+        </form>
+        {% endif %}
+      </section>
+
+      <section class="pp-card">
+        <header class="pp-card-head"><h2>Hábitos da semana</h2></header>
+        <div class="pp-habits">
+          <div class="pp-habits-head">
+            <span></span>
+            {% for c in habitos_semana.cols %}
+            <span class="{% if c.eh_hoje %}is-today{% endif %}">{{ c.label }}</span>
+            {% endfor %}
+          </div>
+          {% for linha in habitos_semana.linhas %}
+          <div class="pp-habits-row">
+            <span class="pp-habit-name">{{ linha.nome }}</span>
+            {% for d in linha.dias %}
+            <form method="post" action="{% url 'planner_habito' %}">
+              {% csrf_token %}
+              <input type="hidden" name="data" value="{{ d.data|date:'Y-m-d' }}">
+              <input type="hidden" name="voltar" value="{{ dia|date:'Y-m-d' }}">
+              <input type="hidden" name="chave" value="{{ linha.chave }}">
+              <button type="submit" class="pp-habit-cell {% if d.feito %}is-on{% endif %}">
+                {% if d.feito %}✓{% endif %}
+              </button>
+            </form>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="pp-stack">
+      <section class="pp-card">
+        <header class="pp-card-head">
+          <h2>Água</h2>
+          <span class="muted">{{ dia_planner.agua_copos }}/{{ agua_meta_copos }} · {{ agua_ml }} mL</span>
+        </header>
+        <div class="pp-water-scale" style="--agua-steps: {{ agua_meta_copos }}; --agua-done: {{ dia_planner.agua_copos }};" role="group" aria-label="Escala de ingestão de água">
+          <div class="pp-water-rail" aria-hidden="true">
+            <i style="width:{% widthratio dia_planner.agua_copos agua_meta_copos 100 %}%"></i>
+          </div>
+          <div class="pp-water">
+            {% for c in agua_copos %}
+            <form method="post" action="{% url 'planner_agua' %}" class="pp-drop-form">
+              {% csrf_token %}
+              <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+              <input type="hidden" name="copos" value="{{ c.definir }}">
+              <button type="submit" class="pp-drop {% if c.cheio %}is-full{% endif %}" title="{{ c.n }} × {{ ml_por_copo }} mL" aria-pressed="{% if c.cheio %}true{% else %}false{% endif %}">
+                <span class="pp-drop-node" aria-hidden="true"></span>
+                {% include "partials/icon_gota.html" %}
+                <small>{{ c.n }}</small>
+              </button>
+            </form>
+            {% endfor %}
+          </div>
+          <div class="pp-water-ends muted" aria-hidden="true">
+            <span>0 mL</span>
+            <span>{{ agua_meta_ml }} mL</span>
+          </div>
+        </div>
+        <p class="pp-water-meta muted">{{ agua_meta_copos }} × {{ ml_por_copo }} mL = {{ agua_meta_ml }} mL · escala do dia</p>
+      </section>
+
+      <section class="pp-card pp-analytics-compact">
+        <header class="pp-card-head"><h2>Resumo</h2></header>
+        <div class="pp-resumo-row">
+          <div class="pp-donut" style="--a:{{ metricas.pct_feitos }};--b:{{ metricas.pct_andamento }};">
+            <div class="pp-donut-center">
+              <strong>{{ metricas.percentual }}%</strong>
+              <span>feito</span>
+            </div>
+          </div>
+          <ul class="pp-legend">
+            <li><i class="c-done"></i> Concluídas {{ metricas.pct_feitos }}%</li>
+            <li><i class="c-run"></i> Em andamento {{ metricas.pct_andamento }}%</li>
+            <li><i class="c-pend"></i> Pendentes {{ metricas.pct_pendentes }}%</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  {# Linha 3: notas + citação #}
+  <div class="pp-row pp-row-notes">
+    <section class="pp-card">
+      <header class="pp-card-head"><h2>Notas</h2></header>
+      <form method="post" action="{% url 'planner_nota' %}">
+        {% csrf_token %}
+        <input type="hidden" name="origem" value="notas">
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <textarea name="notas" rows="3" placeholder="Anotações do dia…">{{ dia_planner.notas }}</textarea>
+        <div class="pp-inline-add">
+          <button class="btn secondary" type="submit">Salvar notas</button>
+        </div>
+      </form>
+    </section>
+    <section class="pp-card pp-quote">
+      <header class="pp-card-head"><h2>Citação do dia</h2></header>
+      <form method="post" action="{% url 'planner_nota' %}" class="pp-inline-add">
+        {% csrf_token %}
+        <input type="hidden" name="origem" value="citacao">
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <input type="text" name="citacao" value="{{ dia_planner.citacao }}" placeholder="Progresso, não perfeição." maxlength="280">
+        <button class="btn ghost" type="submit">Salvar</button>
+      </form>
+    </section>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var FOCUS = 25 * 60, BREAK = 5 * 60, LONG = 15 * 60;
+  var total = FOCUS, left = FOCUS, mode = "focus", running = false, timer = null;
+  var display = document.getElementById("pomo-display");
+  var modeEl = document.getElementById("pomo-mode");
+  var ring = document.getElementById("pomo-ring");
+  var toggle = document.getElementById("pomo-toggle");
+  var reset = document.getElementById("pomo-reset");
+  var countInput = document.getElementById("pomo-count");
+  var countLabel = document.getElementById("pomo-count-label");
+  var dots = document.querySelectorAll("#pomo-dots i");
+  var sessions = parseInt(countInput.value || "0", 10) || 0;
+
+  function fmt(s) {
+    var m = Math.floor(s / 60), sec = s % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  function paint() {
+    display.textContent = fmt(left);
+    modeEl.textContent = mode === "focus" ? "Foco" : (mode === "long" ? "Pausa longa" : "Pausa");
+    toggle.textContent = running ? "❚❚ Pausar" : "▶ Iniciar";
+    var pct = total ? Math.max(0, Math.min(100, (left / total) * 100)) : 0;
+    if (ring) ring.style.setProperty("--pomo-pct", String(pct));
+    var shown = sessions % 4;
+    if (sessions > 0 && shown === 0) shown = 4;
+    dots.forEach(function (d, i) { d.classList.toggle("on", i < shown); });
+    countInput.value = String(sessions);
+    countLabel.textContent = String(sessions);
+  }
+  function tick() {
+    if (!running) return;
+    if (left <= 0) {
+      if (mode === "focus") {
+        sessions += 1;
+        mode = (sessions % 4 === 0) ? "long" : "break";
+        total = mode === "long" ? LONG : BREAK;
+        left = total;
+      } else {
+        mode = "focus";
+        total = FOCUS;
+        left = FOCUS;
+      }
+      running = false;
+      clearInterval(timer);
+      paint();
+      return;
+    }
+    left -= 1;
+    paint();
+  }
+  toggle.addEventListener("click", function () {
+    running = !running;
+    if (running) timer = setInterval(tick, 1000);
+    else clearInterval(timer);
+    paint();
+  });
+  reset.addEventListener("click", function () {
+    running = false;
+    clearInterval(timer);
+    mode = "focus";
+    total = FOCUS;
+    left = FOCUS;
+    paint();
+  });
+  paint();
+})();
+</script>
+{% endblock %}

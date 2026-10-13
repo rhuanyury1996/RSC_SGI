@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Contatos · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Contatos{% endblock %}
+{% block page_title %}Contatos{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'crm_empresas' %}">Empresas</a>
+  <a class="btn ghost" href="{% url 'crm' %}">Visão geral</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Criar registro</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form contato-form" id="formContato">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Pessoa</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+              {{ form.nome }}{{ form.nome.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.sobrenome.id_for_label }}">{{ form.sobrenome.label }}</label>
+              {{ form.sobrenome }}{{ form.sobrenome.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+              {{ form.email }}{{ form.email.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Telefones</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.telefone_ramal.id_for_label }}">{{ form.telefone_ramal.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_ramal }}
+              </div>
+              {{ form.telefone_ramal.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.telefone_whatsapp.id_for_label }}">{{ form.telefone_whatsapp.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_whatsapp }}
+              </div>
+              {{ form.telefone_whatsapp.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Responsável</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.responsavel.id_for_label }}">{{ form.responsavel.label }}</label>
+              {{ form.responsavel }}{{ form.responsavel.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Empresa</h3>
+          <p class="muted" style="margin:0 0 0.75rem;">Empresa na qual o contato trabalha.</p>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.empresa.id_for_label }}">Selecionar empresa</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+            </div>
+          </div>
+          <button type="button" class="link-action" id="btnAbrirEmpresa">
+            + Empresa não cadastrada — cadastrar
+          </button>
+        </div>
+
+        <details class="form-section form-section-collapse"{% if form.clientes_rsc.errors %} open{% endif %}>
+          <summary class="form-section-summary">
+            <span class="form-section-title">Visibilidade — clientes RSC</span>
+            <span class="apont-lista-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="form-section-body">
+            <p class="muted" style="margin:0 0 0.75rem;">
+              Funcionários RSC sempre veem todos os contatos. Marque abaixo apenas os
+              <strong>clientes externos</strong> que poderão ver este registro.
+              Cadastre-os em <a href="{% url 'crm_listas' %}?tipo=clientes_rsc">Listas → Clientes RSC</a>.
+            </p>
+            {% if form.clientes_rsc.field.queryset.exists %}
+            <div class="check-grid">
+              {{ form.clientes_rsc }}
+            </div>
+            {{ form.clientes_rsc.errors }}
+            {% else %}
+            <p class="muted" style="margin:0;">Nenhum cliente RSC cadastrado ainda.</p>
+            {% endif %}
+          </div>
+        </details>
+
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Criar registro</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Contatos</h2>
+        <span class="muted">{{ itens|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Empresa</th>
+              <th>E-mail</th>
+              <th>Responsável</th>
+              <th>Clientes RSC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in itens %}
+            <tr>
+              <td><strong>{{ item.nome_completo }}</strong></td>
+              <td>{{ item.empresa }}</td>
+              <td>{{ item.email|default:"—" }}</td>
+              <td>{% if item.responsavel %}{{ item.responsavel.nome_completo }}{% else %}—{% endif %}</td>
+              <td>
+                {% for c in item.clientes_rsc.all %}
+                  <span class="badge info">{{ c.nome }}</span>
+                {% empty %}
+                  <span class="muted">—</span>
+                {% endfor %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">Nenhum contato cadastrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+
+<dialog class="com-dialog" id="dialogEmpresa" {% if abrir_popup_empresa %}open{% endif %}>
+  <form method="post" class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="criar_empresa">
+    <div class="com-dialog-head">
+      <h3>Cadastrar empresa</h3>
+      <button type="button" class="btn ghost" id="btnFecharEmpresa">Fechar</button>
+    </div>
+    <p class="muted" style="margin-top:0;">
+      Cadastre a empresa agora e ela já ficará disponível para vincular ao contato.
+    </p>
+    {{ empresa_form.non_field_errors }}
+
+    <div class="form-section" style="margin-top:0;">
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="{{ empresa_form.nome.id_for_label }}">{{ empresa_form.nome.label }}</label>
+          {{ empresa_form.nome }}{{ empresa_form.nome.errors }}
+        </div>
+        <div class="field span-2">
+          <label for="{{ empresa_form.site.id_for_label }}">{{ empresa_form.site.label }}</label>
+          {{ empresa_form.site }}{{ empresa_form.site.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.nicho.id_for_label }}">{{ empresa_form.nicho.label }}</label>
+          {{ empresa_form.nicho }}{{ empresa_form.nicho.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.classificacao_unidade.id_for_label }}">{{ empresa_form.classificacao_unidade.label }}</label>
+          {{ empresa_form.classificacao_unidade }}{{ empresa_form.classificacao_unidade.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.telefone_portaria.id_for_label }}">{{ empresa_form.telefone_portaria.label }}</label>
+          <div class="phone-field">
+            <span class="phone-flag">🇧🇷</span>
+            {{ empresa_form.telefone_portaria }}
+          </div>
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.telefone_portaria_2.id_for_label }}">{{ empresa_form.telefone_portaria_2.label }}</label>
+          <div class="phone-field">
+            <span class="phone-flag">🇧🇷</span>
+            {{ empresa_form.telefone_portaria_2 }}
+          </div>
+        </div>
+        <div class="field span-2">
+          <label for="{{ empresa_form.email_geral.id_for_label }}">{{ empresa_form.email_geral.label }}</label>
+          {{ empresa_form.email_geral }}{{ empresa_form.email_geral.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.cidade.id_for_label }}">{{ empresa_form.cidade.label }}</label>
+          {{ empresa_form.cidade }}{{ empresa_form.cidade.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.estado.id_for_label }}">{{ empresa_form.estado.label }}</label>
+          {{ empresa_form.estado }}{{ empresa_form.estado.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="empresa-form-actions">
+      <button class="btn" type="submit">Criar empresa</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  function maskPhone(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 10) {
+      return digits.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*/, (_, a, b, c) => {
+        let out = '';
+        if (a) out += `(${a}`;
+        if (a.length === 2) out += ') ';
+        if (b) out += b;
+        if (c) out += `-${c}`;
+        return out;
+      });
+    }
+    return digits.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+  }
+  document.querySelectorAll('.js-phone-mask').forEach((input) => {
+    input.addEventListener('input', () => { input.value = maskPhone(input.value); });
+  });
+
+  const dialog = document.getElementById('dialogEmpresa');
+  document.getElementById('btnAbrirEmpresa')?.addEventListener('click', () => dialog.showModal());
+  document.getElementById('btnFecharEmpresa')?.addEventListener('click', () => dialog.close());
+</script>
+{% endblock %}

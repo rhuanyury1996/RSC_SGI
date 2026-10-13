@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Resumo de horas · SGI RSC{% endblock %}
+{% block breadcrumb %}Resumo de horas{% endblock %}
+{% block page_title %}Resumo de horas{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="muted" style="margin-top:0;">
+    Visão de aproveitamento do trabalho (horas por atividade, distribuição no período, etc.).
+    Por enquanto, o detalhe diário das marcações — a dashboard completa vem em seguida.
+  </p>
+  <form method="get" class="actions" style="align-items:end;">
+    <div>
+      <label for="inicio">Início</label>
+      <input type="date" id="inicio" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
+    </div>
+    <div>
+      <label for="fim">Fim</label>
+      <input type="date" id="fim" name="fim" value="{{ fim|date:'Y-m-d' }}">
+    </div>
+    <button type="submit">Filtrar</button>
+  </form>
+  <p style="margin-top:1rem;"><strong>Total no período:</strong> {{ total_horas }}</p>
+</section>
+<section class="card">
+  <table>
+    <thead><tr><th>Dia</th><th>Marcações</th><th>Horas</th></tr></thead>
+    <tbody>
+      {% for item in resumo %}
+      <tr>
+        <td>{{ item.dia|date:"d/m/Y" }}</td>
+        <td>
+          {% for m in item.marcacoes %}
+            {{ m.data_hora|date:"H:i" }} {{ m.get_tipo_display }}{% if not forloop.last %}; {% endif %}
+          {% endfor %}
+        </td>
+        <td>{{ item.horas }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">Sem marcações no período.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

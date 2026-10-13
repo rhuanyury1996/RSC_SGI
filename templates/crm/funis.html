@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Funis · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Funis{% endblock %}
+{% block page_title %}Funis por cliente{% endblock %}
+{% block page_actions %}
+  <a class="btn" href="{% url 'crm_listas' %}?tipo=clientes_rsc">+ Cliente RSC</a>
+  <a class="btn secondary" href="{% url 'crm_empresas' %}">Empresas</a>
+  <a class="btn ghost" href="{% url 'crm' %}">Visão geral</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Áreas de controle</h2>
+        <span class="muted">{{ grupos|length }} cliente(s)</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin:0 0 1rem;">
+        Cada <strong>Cliente RSC</strong> tem três subfunis:
+        <strong>Pré-vendas</strong>, <strong>Negociações</strong> e <strong>Pós-vendas</strong>.
+        Eles também aparecem na barra lateral para acesso rápido.
+      </p>
+      {% if grupos %}
+        {% for grupo in grupos %}
+        <section class="funil-cliente-bloco">
+          <h3 class="funil-cliente-titulo">{{ grupo.cliente.nome }}</h3>
+          <div class="funil-cards">
+            {% for item in grupo.funis %}
+            <a class="funil-card" href="{% url 'crm_funil_detalhe' item.pk %}">
+              <div class="funil-card-top">
+                <strong>{{ item.get_tipo_display }}</strong>
+                <span class="badge info">{{ item.total_ops }} opp.</span>
+              </div>
+              <div class="funil-card-meta">
+                <span>{{ item.total_etapas }} etapas</span>
+                <span class="com-value">R$ {{ item.pipeline|default:0|floatformat:2 }}</span>
+              </div>
+              <div class="funil-etapas-preview">
+                {% for e in item.etapas.all %}
+                  <span>{{ e.nome }}</span>{% if not forloop.last %} · {% endif %}
+                {% endfor %}
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      {% else %}
+      <p class="muted" style="margin:0;">
+        Nenhum funil ainda.
+        <a href="{% url 'crm_listas' %}?tipo=clientes_rsc">Cadastre um Cliente RSC</a>
+        para abrir a área de controle automaticamente.
+      </p>
+      {% endif %}
+    </div>
+  </details>
+</div>
+{% endblock %}

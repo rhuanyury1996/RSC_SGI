@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ item.titulo }} · SGI RSC{% endblock %}
+{% block breadcrumb %}Informativos <span>/</span> Post{% endblock %}
+{% block page_title %}Informativo{% endblock %}
+{% block page_actions %}
+  {% if pode_editar %}
+    <a class="btn secondary" href="{% url 'informativo_editar' item.pk %}">Editar</a>
+  {% endif %}
+  {% if pode_deletar %}
+    <form method="post" action="{% url 'informativo_deletar' item.pk %}" style="display:inline;" onsubmit="return confirm('Excluir este informativo?');">
+      {% csrf_token %}
+      <button class="btn secondary" type="submit" style="color:#b42318;">Excluir</button>
+    </form>
+  {% endif %}
+  <a class="btn ghost" href="{% url 'informativos' %}">Voltar ao feed</a>
+{% endblock %}
+
+{% block content %}
+<article class="info-post info-post-detail apont-panel">
+  <div class="info-post-main" style="display:flex;gap:0.85rem;">
+    <div class="info-post-side">
+      {% if item.autor and item.autor.funcionario and item.autor.funcionario.foto_perfil %}
+        <img class="info-avatar" src="{{ item.autor.funcionario.foto_perfil.url }}" alt="">
+      {% else %}
+        <div class="info-avatar placeholder">
+          {% if item.autor and item.autor.funcionario %}
+            {{ item.autor.funcionario.nome|slice:":1" }}{{ item.autor.funcionario.sobrenome|slice:":1" }}
+          {% elif item.autor %}
+            {{ item.autor.username|slice:":2"|upper }}
+          {% else %}
+            ?
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="info-post-body">
+      <header class="info-post-meta">
+        <strong>
+          {% if item.autor and item.autor.funcionario %}
+            {{ item.autor.funcionario.nome_completo }}
+          {% elif item.autor %}
+            {{ item.autor.get_full_name|default:item.autor.username }}
+          {% else %}
+            RSC
+          {% endif %}
+        </strong>
+        <span class="muted">· {{ item.publicado_em|date:"d/m/Y H:i" }}</span>
+        {% if item.atualizado_em|date:"YmdHis" != item.publicado_em|date:"YmdHis" %}
+          <span class="muted">· editado</span>
+        {% endif %}
+        <span class="info-badge" style="--cat:{{ item.cor_categoria }}">{{ item.get_categoria_display }}</span>
+      </header>
+      <p class="info-post-text detail">{{ item.conteudo|linebreaksbr }}</p>
+    </div>
+  </div>
+</article>
+{% endblock %}

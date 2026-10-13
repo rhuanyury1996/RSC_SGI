@@ -1,0 +1,89 @@
+{# Campos da fase de Negociações. Espera: fase, card_ativo, fatores_comissionamento #}
+{% if fase == "proposta_enviada" %}
+<div class="field span-2">
+  <label for="proposta_arquivo_{{ fase }}">Proposta enviada</label>
+  <input id="proposta_arquivo_{{ fase }}" type="file" name="proposta_arquivo" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg">
+  {% if card_ativo.proposta_arquivo %}
+  <p class="field-hint"><a href="{{ card_ativo.proposta_arquivo.url }}" target="_blank" rel="noopener">Arquivo atual</a></p>
+  {% else %}
+  <p class="field-hint muted">Clique para adicionar o arquivo da proposta.</p>
+  {% endif %}
+</div>
+<div class="field">
+  <span class="form-section-title" style="display:block;margin-bottom:0.45rem;">Proposta internacional?</span>
+  <label class="radio-inline"><input type="radio" name="proposta_internacional" value="sim" {% if card_ativo.proposta_internacional == True %}checked{% endif %}> Sim</label>
+  <label class="radio-inline"><input type="radio" name="proposta_internacional" value="nao" {% if card_ativo.proposta_internacional == False %}checked{% endif %}> Não</label>
+</div>
+<div class="field">
+  <label for="valor_proposta_{{ fase }}">Valor da proposta</label>
+  <input id="valor_proposta_{{ fase }}" type="number" name="valor" step="0.01" min="0" value="{% if card_ativo.valor %}{{ card_ativo.valor }}{% endif %}" placeholder="0,00">
+</div>
+
+{% elif fase == "follow_up" %}
+<div class="field span-2">
+  <label for="data_contato_follow_up_{{ fase }}">Nova data de contato</label>
+  <input id="data_contato_follow_up_{{ fase }}" type="date" name="data_contato_follow_up" value="{% if card_ativo.data_contato_follow_up %}{{ card_ativo.data_contato_follow_up|date:'Y-m-d' }}{% endif %}">
+  <p class="field-hint muted">Alerta de vencimento 1 dia antes desta data.</p>
+</div>
+{% if card_ativo.valor %}
+<div class="field">
+  <span class="com-escopo-label">Valor da proposta</span>
+  <strong class="com-value">R$ {{ card_ativo.valor|floatformat:2 }}</strong>
+</div>
+{% endif %}
+
+{% elif fase == "ganha" %}
+<div class="field">
+  <label for="valor_final_fechado_{{ fase }}">Valor final fechado</label>
+  <input id="valor_final_fechado_{{ fase }}" type="number" name="valor_final_fechado" step="0.01" min="0" value="{% if card_ativo.valor_final_fechado %}{{ card_ativo.valor_final_fechado }}{% elif card_ativo.valor %}{{ card_ativo.valor }}{% endif %}" placeholder="0,00">
+  <p class="field-hint muted">Este é o valor do negócio.</p>
+</div>
+<div class="field">
+  <label for="desconto_concedido_{{ fase }}">Desconto concedido</label>
+  <input id="desconto_concedido_{{ fase }}" type="number" name="desconto_concedido" step="0.01" min="0" value="{% if card_ativo.desconto_concedido %}{{ card_ativo.desconto_concedido }}{% endif %}" placeholder="0,00">
+</div>
+<div class="field span-2">
+  <span class="form-section-title">Fator de comissionamento</span>
+  <p class="field-hint muted" style="margin:0 0 0.55rem;">Percentuais de comissão de acordo com a situação.</p>
+  <div class="radio-stack">
+    {% for value, label in fatores_comissionamento.choices %}
+    <label class="radio-block">
+      <input type="radio" name="fator_comissionamento" value="{{ value }}" {% if card_ativo.fator_comissionamento == value %}checked{% endif %}>
+      <span>{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+<div class="field">
+  <label for="comissao_{{ fase }}">Comissão</label>
+  <input id="comissao_{{ fase }}" type="number" name="comissao" step="0.01" min="0" value="{% if card_ativo.comissao %}{{ card_ativo.comissao }}{% endif %}" placeholder="Digite aqui…">
+</div>
+<div class="field">
+  <label for="bonus_agente_{{ fase }}">Bônus para agente</label>
+  <input id="bonus_agente_{{ fase }}" type="number" name="bonus_agente" step="0.01" min="0" value="{% if card_ativo.bonus_agente %}{{ card_ativo.bonus_agente }}{% endif %}" placeholder="Digite aqui…">
+  <p class="field-hint muted">Valor destinado ao agente responsável pela oportunidade.</p>
+</div>
+
+{% elif fase == "perdida" %}
+<div class="field span-2">
+  <label for="obs_perdida">Observações / motivo</label>
+  <textarea id="obs_perdida" name="observacoes" rows="3" placeholder="Registre o motivo da perda">{{ card_ativo.observacoes }}</textarea>
+</div>
+{% if card_ativo.valor %}
+<div class="field">
+  <span class="com-escopo-label">Valor da proposta</span>
+  <strong class="com-value">R$ {{ card_ativo.valor|floatformat:2 }}</strong>
+</div>
+{% endif %}
+
+{% else %}
+{# oportunidade_confirmada, elaborando, aguardando, etc. #}
+<div class="field span-2">
+  <label for="escopo_solicitado_{{ fase }}">Escopo solicitado</label>
+  <textarea id="escopo_solicitado_{{ fase }}" name="escopo_solicitado" rows="3" placeholder="Escopo trazido de pré-vendas">{{ card_ativo.escopo_solicitado }}</textarea>
+</div>
+<div class="field">
+  <label for="valor_proposta_{{ fase }}">Valor da proposta</label>
+  <input id="valor_proposta_{{ fase }}" type="number" name="valor" step="0.01" min="0" value="{% if card_ativo.valor %}{{ card_ativo.valor }}{% endif %}" placeholder="0,00">
+</div>
+{% endif %}

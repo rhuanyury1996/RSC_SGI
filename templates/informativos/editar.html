@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Editar informativo · SGI RSC{% endblock %}
+{% block breadcrumb %}Informativos <span>/</span> Editar{% endblock %}
+{% block page_title %}Editar informativo{% endblock %}
+{% block page_actions %}
+  <a class="btn ghost" href="{% url 'informativo_detalhe' item.pk %}">Cancelar</a>
+{% endblock %}
+
+{% block content %}
+<section class="info-composer apont-panel" style="max-width:720px;">
+  <p class="muted" style="margin-top:0;">
+    Ajuste a mensagem ou a categoria. Exclusão só o Rhuan pode fazer.
+  </p>
+  <form method="post" class="info-composer-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.conteudo.errors }}
+    {{ form.conteudo }}
+
+    <div class="info-cats" role="radiogroup" aria-label="Categoria">
+      {% for value, label in form.categoria.field.choices %}
+      <label class="info-cat {% if form.categoria.value == value %}is-active{% endif %}">
+        <input type="radio" name="{{ form.categoria.html_name }}" value="{{ value }}"
+          {% if form.categoria.value == value %}checked{% endif %}>
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {{ form.categoria.errors }}
+
+    <div class="info-composer-actions">
+      <a class="btn ghost" href="{% url 'informativo_detalhe' item.pk %}">Voltar</a>
+      <button class="btn" type="submit">Salvar alterações</button>
+    </div>
+  </form>
+</section>
+
+<script>
+  document.querySelectorAll('.info-cat input').forEach((input) => {
+    input.addEventListener('change', () => {
+      document.querySelectorAll('.info-cat').forEach((el) => el.classList.remove('is-active'));
+      input.closest('.info-cat')?.classList.add('is-active');
+    });
+  });
+</script>
+{% endblock %}

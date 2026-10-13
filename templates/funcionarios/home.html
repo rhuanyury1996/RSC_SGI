@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% block title %}Início · SGI RSC{% endblock %}
+{% block breadcrumb %}Início{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'apontamentos' %}">Apontar horas</a>
+  <a class="btn" href="{% url 'atividades' %}?org=planner">Abrir planner</a>
+{% endblock %}
+{% block content %}
+{% if funcionario %}
+<div class="db-page">
+  <div class="db-main">
+    <section class="db-hero">
+      <div class="db-hero-copy">
+        <p class="db-hero-kicker">{{ hoje|date:"l, d \d\e F" }}</p>
+        <h2>{{ saudacao }}, {{ nome_curto }}</h2>
+        <p>
+          {% if produtividade.total %}
+            Você tem <strong>{{ produtividade.pendentes }}</strong> pendente{{ produtividade.pendentes|pluralize }} e
+            <strong>{{ produtividade.em_andamento }}</strong> em execução hoje
+            ({{ produtividade.percentual }}% concluído).
+          {% else %}
+            Nenhuma tarefa planejada para hoje — comece pelo planner ou registre o ponto.
+          {% endif %}
+        </p>
+        <div class="db-hero-actions">
+          <a class="btn db-hero-btn" href="{% url 'atividades' %}?org=planner&data={{ hoje|date:'Y-m-d' }}">Revisar o dia</a>
+          <a class="btn ghost db-hero-btn-ghost" href="{% url 'atividades' %}?org=status&data={{ hoje|date:'Y-m-d' }}">Lista de tarefas</a>
+        </div>
+      </div>
+      <div class="db-hero-stats">
+        <div class="db-hero-ring" style="--pct:{{ produtividade.percentual|default:0 }}">
+          <strong>{{ produtividade.percentual|default:0 }}%</strong>
+          <span>do dia</span>
+        </div>
+        <div class="db-hero-meta">
+          <span><b>{{ produtividade.feitos|default:0 }}</b> feitas</span>
+          <span><b>{{ produtividade.focus_time|default:"00:00" }}</b> em foco</span>
+          {% if em_timer %}<span class="db-live">Timer em {{ em_timer.titulo|truncatechars:28 }}</span>{% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="db-countdowns" aria-label="Próximos afastamentos">
+      <article class="db-countdown tom-dayoff" {% if countdown_dayoff %}data-countdown data-target="{{ countdown_dayoff.inicio_iso }}"{% endif %}>
+        <div class="db-countdown-head">
+          <span class="db-countdown-badge">Day-off</span>
+          <a href="{% url 'calendario' %}">Agenda</a>
+        </div>
+        {% if countdown_dayoff %}
+        <p class="db-countdown-title">{{ countdown_dayoff.titulo }}</p>
+        <p class="db-countdown-date">{{ countdown_dayoff.data_label }}</p>
+        <div class="db-countdown-clock" aria-live="polite">
+          <div><strong data-unit="dias">{{ countdown_dayoff.dias }}</strong><span>dias</span></div>
+          <div><strong data-unit="horas">{{ countdown_dayoff.horas|stringformat:"02d" }}</strong><span>horas</span></div>
+          <div><strong data-unit="minutos">{{ countdown_dayoff.minutos|stringformat:"02d" }}</strong><span>min</span></div>
+          <div><strong data-unit="segundos">{{ countdown_dayoff.segundos|stringformat:"02d" }}</strong><span>seg</span></div>
+        </div>
+        {% else %}
+        <p class="db-countdown-empty">Nenhum day-off agendado.</p>
+        <a class="btn secondary db-countdown-cta" href="{% url 'calendario' %}">Agendar day-off</a>
+        {% endif %}
+      </article>
+
+      <article class="db-countdown tom-ferias" {% if countdown_ferias %}data-countdown data-target="{{ countdown_ferias.inicio_iso }}"{% endif %}>
+        <div class="db-countdown-head">
+          <span class="db-countdown-badge">Férias</span>
+          <a href="{% url 'calendario' %}">Agenda</a>
+        </div>
+        {% if countdown_ferias %}
+        <p class="db-countdown-title">{{ countdown_ferias.titulo }}</p>
+        <p class="db-countdown-date">{{ countdown_ferias.data_label }}</p>
+        <div class="db-countdown-clock" aria-live="polite">
+          <div><strong data-unit="dias">{{ countdown_ferias.dias }}</strong><span>dias</span></div>
+          <div><strong data-unit="horas">{{ countdown_ferias.horas|stringformat:"02d" }}</strong><span>horas</span></div>
+          <div><strong data-unit="minutos">{{ countdown_ferias.minutos|stringformat:"02d" }}</strong><span>min</span></div>
+          <div><strong data-unit="segundos">{{ countdown_ferias.segundos|stringformat:"02d" }}</strong><span>seg</span></div>
+        </div>
+        {% else %}
+        <p class="db-countdown-empty">Nenhuma férias agendada.</p>
+        <a class="btn secondary db-countdown-cta" href="{% url 'calendario' %}">Agendar férias</a>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="db-cards" aria-label="Resumo do dia">
+      {% for card in status_cards %}
+      <article class="db-card tom-{{ card.tom }}">
+        <span class="db-card-icon" aria-hidden="true"></span>
+        <strong>{{ card.valor }}</strong>
+        <span>{{ card.rotulo }}</span>
+        <small>{{ card.hint }}</small>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="db-wellness" aria-label="Água e hábitos">
+      <article class="db-panel db-wellness-card">
+        <div class="db-panel-head">
+          <h3>Água</h3>
+          <a href="{% url 'atividades' %}?org=planner&data={{ hoje|date:'Y-m-d' }}">Registrar</a>
+        </div>
+        <div class="db-water-head">
+          <strong>{{ bemestar.agua_hoje_copos }}/{{ bemestar.agua_meta_copos }}</strong>
+          <span>{{ bemestar.agua_hoje_ml }} mL de {{ bemestar.agua_meta_ml }} mL</span>
+        </div>
+        <div class="db-water-scale" role="progressbar" aria-valuenow="{{ bemestar.agua_pct }}" aria-valuemin="0" aria-valuemax="100" aria-label="Escala de água">
+          <div class="db-water-rail" aria-hidden="true">
+            <i style="width:{{ bemestar.agua_pct }}%"></i>
+          </div>
+          <div class="db-water-drops">
+            {% for c in bemestar.agua_copos_ui %}
+            <span class="db-drop {% if c.cheio %}is-full{% endif %}">
+              <span class="db-drop-node"></span>
+              {% include "partials/icon_gota.html" %}
+            </span>
+            {% endfor %}
+          </div>
+          <div class="db-water-ends muted">
+            <span>0</span>
+            <span>{{ bemestar.agua_meta_ml }} mL</span>
+          </div>
+        </div>
+        <p class="db-wellness-meta muted">
+          Semana: {{ bemestar.agua_semana_copos }} copos · {{ bemestar.agua_semana_ml }} mL
+          {% if bemestar.agua_dias_com_registro %} · {{ bemestar.agua_dias_com_registro }} dia{{ bemestar.agua_dias_com_registro|pluralize }} com registro{% endif %}
+        </p>
+      </article>
+
+      <article class="db-panel db-wellness-card">
+        <div class="db-panel-head">
+          <h3>Hábitos da semana</h3>
+          <a href="{% url 'atividades' %}?org=planner&data={{ hoje|date:'Y-m-d' }}">Marcar</a>
+        </div>
+        <div class="db-habit-summary">
+          <strong>{{ bemestar.habitos_feitos_semana }}/{{ bemestar.habitos_meta_semana }}</strong>
+          <span>{{ bemestar.habitos_pct_semana }}% · hoje {{ bemestar.habitos_feitos_hoje }}/{{ bemestar.habitos_meta_hoje }}</span>
+        </div>
+        <ul class="db-habit-list">
+          {% for h in bemestar.habitos %}
+          <li>
+            <div class="db-habit-row">
+              <span class="db-habit-name">{{ h.nome }}</span>
+              <span class="db-habit-count">{{ h.feitos }}/{{ h.meta }}</span>
+            </div>
+            <div class="db-habit-dots" aria-label="{{ h.nome }}: {{ h.feitos }} de {{ h.meta }}">
+              {% for d in h.dias %}
+              <i class="{% if d.feito %}on{% endif %}{% if d.eh_hoje %} today{% endif %}" title="{{ d.data|date:'D d/m' }}"></i>
+              {% endfor %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
+    </section>
+
+    <section class="db-panel">
+      <div class="db-panel-head">
+        <h3>Progresso das atividades</h3>
+        <a href="{% url 'atividades' %}?org=status&data={{ hoje|date:'Y-m-d' }}">Ver todas</a>
+      </div>
+      {% if atividades_hoje %}
+      <div class="db-table-wrap">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th>Tarefa</th>
+              <th>Prioridade</th>
+              <th>Horário</th>
+              <th>Tempo</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in atividades_hoje %}
+            <tr class="{% if item.cronometro_ativo %}is-active{% endif %}">
+              <td>
+                <strong>{{ item.titulo }}</strong>
+                {% if item.descricao %}<small class="muted">{{ item.descricao|truncatechars:60 }}</small>{% endif %}
+              </td>
+              <td><span class="db-prio prio-{{ item.prioridade }}">{{ item.get_prioridade_display }}</span></td>
+              <td>
+                {% if item.hora_inicio or item.hora_fim %}
+                  {{ item.hora_inicio|time:"H:i"|default:"—" }}–{{ item.hora_fim|time:"H:i"|default:"—" }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ item.tempo_fmt }}</td>
+              <td>
+                <span class="db-status st-{{ item.status }}">
+                  <i></i>{{ item.get_status_display }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if atividades_total_hoje > atividades_hoje|length %}
+      <p class="db-more muted">Mostrando {{ atividades_hoje|length }} de {{ atividades_total_hoje }} tarefas de hoje.</p>
+      {% endif %}
+      {% else %}
+      <div class="db-empty">
+        <p>Nenhuma atividade para hoje.</p>
+        <a class="btn" href="{% url 'atividades' %}?org=planner">Planejar o dia</a>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="db-side">
+    <section class="db-panel db-side-card">
+      <div class="db-panel-head">
+        <h3>Demandas da semana</h3>
+        <a href="{% url 'calendario' %}">Agenda</a>
+      </div>
+      <p class="db-side-range muted">{{ inicio_semana|date:"d/m" }} – {{ fim_semana|date:"d/m" }}</p>
+      <ul class="db-demand-list">
+        {% for d in demandas_semana %}
+        <li>
+          <a href="{% url 'calendario' %}?ano={{ d.data_prevista.year }}&mes={{ d.data_prevista.month }}">
+            <span class="db-demand-when">
+              <strong>{{ d.data_prevista|date:"d/m" }}</strong>
+              {% if d.horas %}<small>{{ d.horas }}h</small>{% endif %}
+            </span>
+            <span class="db-demand-body">
+              <strong>{{ d.titulo }}</strong>
+              <small>
+                <span class="db-demand-status st-{{ d.status }}">{{ d.get_status_display }}</span>
+                {% if d.origem_day_off %} · Day-off{% endif %}
+              </small>
+            </span>
+          </a>
+        </li>
+        {% empty %}
+        <li class="muted db-side-note">Nenhuma demanda prevista nesta semana.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="db-panel db-side-card">
+      <div class="db-panel-head">
+        <h3>Rastreio de tempo</h3>
+        <a href="{% url 'apontamentos' %}">Apontar</a>
+      </div>
+      <div class="db-time-block">
+        <div class="db-time-main">
+          <strong>{{ horas_hoje }}</strong>
+          <span>trabalhadas hoje{% if em_andamento %} · <em class="db-live">em andamento</em>{% endif %}</span>
+        </div>
+        <div class="db-time-bar" aria-hidden="true"><i style="width:{{ pct_jornada }}%"></i></div>
+        <div class="db-time-meta">
+          <span>{{ pct_jornada }}% da jornada ({{ jornada_alvo }})</span>
+        </div>
+        <dl class="db-time-kpis">
+          <div>
+            <dt>No mês</dt>
+            <dd>{{ horas_periodo.horas_trabalhadas }}</dd>
+          </div>
+          <div>
+            <dt>Extras</dt>
+            <dd class="value-extras">{{ horas_periodo.horas_extras }}</dd>
+          </div>
+          <div>
+            <dt>A quitar</dt>
+            <dd class="value-quitar">{{ horas_periodo.horas_a_quitar }}</dd>
+          </div>
+        </dl>
+        {% if marcacoes_hoje %}
+        <ul class="db-punches">
+          {% for m in marcacoes_hoje %}
+          <li>
+            <span>{{ m.get_tipo_display }}</span>
+            <time>{{ m.data_hora|time:"H:i" }}</time>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted db-side-note">Sem marcações hoje.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="db-panel db-side-card">
+      <div class="db-panel-head">
+        <h3>Avisos do chefe</h3>
+        <a href="{% url 'informativos' %}">Ver todos</a>
+      </div>
+      <ul class="db-info-list">
+        {% for info in avisos_chefe %}
+        <li>
+          <a href="{% url 'informativo_detalhe' info.pk %}">
+            <span class="db-info-avatar" style="background:{{ info.cor_categoria }}">
+              {{ info.get_categoria_display|slice:":1" }}
+            </span>
+            <span class="db-info-body">
+              <strong>{{ info.titulo|default:info.conteudo|truncatechars:48 }}</strong>
+              <small>
+                {% if info.autor %}{{ info.autor.get_full_name|default:info.autor.username }} · {% endif %}
+                {{ info.publicado_em|date:"d/m H:i" }}
+              </small>
+            </span>
+          </a>
+        </li>
+        {% empty %}
+        <li class="muted db-side-note">Nenhum aviso da liderança por enquanto.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </aside>
+</div>
+<script>
+(function () {
+  const pads = (n) => String(Math.max(0, n)).padStart(2, "0");
+  function tick(el) {
+    const target = new Date(el.dataset.target).getTime();
+    let total = Math.max(0, Math.floor((target - Date.now()) / 1000));
+    const dias = Math.floor(total / 86400);
+    total %= 86400;
+    const horas = Math.floor(total / 3600);
+    total %= 3600;
+    const minutos = Math.floor(total / 60);
+    const segundos = total % 60;
+    const set = (unit, val) => {
+      const node = el.querySelector(`[data-unit="${unit}"]`);
+      if (node) node.textContent = unit === "dias" ? String(val) : pads(val);
+    };
+    set("dias", dias);
+    set("horas", horas);
+    set("minutos", minutos);
+    set("segundos", segundos);
+  }
+  const nodes = document.querySelectorAll("[data-countdown]");
+  if (!nodes.length) return;
+  nodes.forEach(tick);
+  setInterval(() => nodes.forEach(tick), 1000);
+})();
+</script>
+{% else %}
+<section class="card">
+  <p class="muted" style="margin:0;">{{ saudacao }}{% if nome_curto %}, {{ nome_curto }}{% endif %}. Vincule um perfil de funcionário para ver a dashboard.</p>
+</section>
+{% endif %}
+{% endblock %}

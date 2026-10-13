@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Pagamentos · SGI RSC{% endblock %}
+{% block breadcrumb %}Pagamentos{% endblock %}
+{% block page_title %}Pagamentos{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Pagamentos</h1>
+  <div class="actions" style="margin-top:0;">
+    <a class="btn ghost" href="{% url 'pagamentos' %}">Todos</a>
+    {% for value, label in status_opcoes.choices %}
+      <a class="btn ghost" href="?status={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <table style="margin-top:1rem;">
+    <thead>
+      <tr>
+        <th>Descrição</th>
+        <th>Tipo</th>
+        <th>Valor</th>
+        <th>Vencimento</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in itens %}
+      <tr>
+        <td>{{ item.descricao }}</td>
+        <td>{{ item.get_tipo_display }}</td>
+        <td>R$ {{ item.valor }}</td>
+        <td>{{ item.data_vencimento|date:"d/m/Y" }}</td>
+        <td>{{ item.get_status_display }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="muted">Nenhum pagamento. Cadastre no admin.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

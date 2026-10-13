@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Informativos · SGI RSC{% endblock %}
+{% block breadcrumb %}Informativos{% endblock %}
+{% block page_title %}Informativos{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">Feed interno</span>
+{% endblock %}
+
+{% block content %}
+<div class="info-page">
+
+  <section class="info-composer apont-panel">
+    <div class="info-composer-head">
+      {% if funcionario and funcionario.foto_perfil %}
+        <img class="info-avatar" src="{{ funcionario.foto_perfil.url }}" alt="">
+      {% else %}
+        <div class="info-avatar placeholder">
+          {% if funcionario %}{{ funcionario.nome|slice:":1" }}{{ funcionario.sobrenome|slice:":1" }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}
+        </div>
+      {% endif %}
+      <div>
+        <strong>{% if funcionario %}{{ funcionario.nome_completo }}{% else %}{{ user.get_full_name|default:user.username }}{% endif %}</strong>
+        <div class="muted">Publique um aviso para o time</div>
+      </div>
+    </div>
+
+    <form method="post" class="info-composer-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.conteudo.errors }}
+      {{ form.conteudo }}
+
+      <div class="info-cats" role="radiogroup" aria-label="Categoria">
+        {% for value, label in form.categoria.field.choices %}
+        <label class="info-cat {% if form.categoria.value == value or form.initial.categoria == value and not form.is_bound %}is-active{% endif %}">
+          <input type="radio" name="{{ form.categoria.html_name }}" value="{{ value }}"
+            {% if form.categoria.value == value %}checked{% elif form.initial.categoria == value and not form.is_bound %}checked{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      {{ form.categoria.errors }}
+
+      <div class="info-composer-actions">
+        <span class="muted">Máx. 2000 caracteres</span>
+        <button class="btn" type="submit">Publicar</button>
+      </div>
+    </form>
+  </section>
+
+  <nav class="info-filters" aria-label="Filtrar categorias">
+    <a class="info-filter {% if not categoria_atual %}active{% endif %}" href="{% url 'informativos' %}">Todos</a>
+    {% for value, label in categorias.choices %}
+      <a class="info-filter {% if categoria_atual == value %}active{% endif %}" href="?categoria={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <section class="info-feed">
+    {% for row in feed %}
+    {% with item=row.item %}
+    <article class="info-post">
+      <div class="info-post-main">
+        <div class="info-post-side">
+          {% if item.autor and item.autor.funcionario and item.autor.funcionario.foto_perfil %}
+            <img class="info-avatar" src="{{ item.autor.funcionario.foto_perfil.url }}" alt="">
+          {% else %}
+            <div class="info-avatar placeholder">
+              {% if item.autor and item.autor.funcionario %}
+                {{ item.autor.funcionario.nome|slice:":1" }}{{ item.autor.funcionario.sobrenome|slice:":1" }}
+              {% elif item.autor %}
+                {{ item.autor.username|slice:":2"|upper }}
+              {% else %}
+                ?
+              {% endif %}
+            </div>
+          {% endif %}
+          {% if not forloop.last %}<span class="info-thread-line" aria-hidden="true"></span>{% endif %}
+        </div>
+        <div class="info-post-body">
+          <header class="info-post-meta">
+            <a href="{% url 'informativo_detalhe' item.pk %}" class="info-author-link">
+              <strong>
+                {% if item.autor and item.autor.funcionario %}
+                  {{ item.autor.funcionario.nome_completo }}
+                {% elif item.autor %}
+                  {{ item.autor.get_full_name|default:item.autor.username }}
+                {% else %}
+                  RSC
+                {% endif %}
+              </strong>
+            </a>
+            <span class="muted">· {{ item.publicado_em|date:"d/m/Y H:i" }}</span>
+            {% if item.atualizado_em|date:"YmdHis" != item.publicado_em|date:"YmdHis" %}
+              <span class="muted">· editado</span>
+            {% endif %}
+            <span class="info-badge" style="--cat:{{ item.cor_categoria }}">{{ item.get_categoria_display }}</span>
+          </header>
+          <a href="{% url 'informativo_detalhe' item.pk %}" class="info-post-text-link">
+            <p class="info-post-text">{{ item.conteudo|linebreaksbr }}</p>
+          </a>
+          {% if row.pode_editar or row.pode_deletar %}
+          <div class="info-post-actions">
+            {% if row.pode_editar %}
+              <a href="{% url 'informativo_editar' item.pk %}">Editar</a>
+            {% endif %}
+            {% if row.pode_deletar %}
+              <form method="post" action="{% url 'informativo_deletar' item.pk %}" onsubmit="return confirm('Excluir este informativo?');">
+                {% csrf_token %}
+                <button type="submit" class="link-btn danger">Excluir</button>
+              </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endwith %}
+    {% empty %}
+    <div class="apont-panel">
+      <p class="muted" style="margin:0;">
+        {% if categoria_atual %}
+          Nenhum informativo nesta categoria ainda.
+        {% else %}
+          Nenhum informativo ainda. Seja o primeiro a publicar um aviso.
+        {% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </section>
+
+</div>
+
+<script>
+  document.querySelectorAll('.info-cat input').forEach((input) => {
+    input.addEventListener('change', () => {
+      document.querySelectorAll('.info-cat').forEach((el) => el.classList.remove('is-active'));
+      input.closest('.info-cat')?.classList.add('is-active');
+    });
+  });
+</script>
+{% endblock %}

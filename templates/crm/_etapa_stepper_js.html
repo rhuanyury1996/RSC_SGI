@@ -1,0 +1,64 @@
+<script>
+(function () {
+  // 1 clique = ver campos da etapa; 3 cliques = mover o card
+  document.querySelectorAll('.js-etapa-stepper').forEach((stepper) => {
+    const drawer = stepper.closest('.deal-drawer') || document;
+    const clickState = { id: null, count: 0, timer: null };
+
+    function mostrarFase(step) {
+      const etapaId = step.dataset.etapaId;
+      const panels = drawer.querySelectorAll('.js-fase-panel');
+      if (panels.length) {
+        panels.forEach((panel) => {
+          const ativo = panel.dataset.etapaId === etapaId;
+          panel.hidden = !ativo;
+          panel.classList.toggle('is-active', ativo);
+        });
+      }
+      drawer.querySelectorAll('.js-etapa-step').forEach((s) => {
+        s.classList.toggle('viewing', s === step);
+      });
+      const pill = drawer.querySelector('.js-fase-pill');
+      if (pill) {
+        pill.textContent = step.dataset.nome || '—';
+        pill.className = 'fase-pill js-fase-pill ' + (step.dataset.css || '');
+      }
+      const tabEtapa = drawer.querySelector('.lp-tab[data-tab="etapa"]');
+      if (tabEtapa && !tabEtapa.classList.contains('active')) tabEtapa.click();
+    }
+
+    function moverParaEtapa(step) {
+      const form = document.getElementById('formVoltarEtapa');
+      const input = document.getElementById('voltarEtapaId');
+      if (!form || !input) return;
+      input.value = step.dataset.etapaId;
+      form.submit();
+    }
+
+    stepper.querySelectorAll('.js-etapa-step').forEach((step) => {
+      step.addEventListener('click', () => {
+        const id = step.dataset.etapaId;
+        if (clickState.id !== id) {
+          clickState.id = id;
+          clickState.count = 0;
+        }
+        clickState.count += 1;
+        clearTimeout(clickState.timer);
+
+        if (clickState.count >= 3) {
+          clickState.count = 0;
+          clickState.id = null;
+          moverParaEtapa(step);
+          return;
+        }
+
+        mostrarFase(step);
+        clickState.timer = setTimeout(() => {
+          clickState.count = 0;
+          clickState.id = null;
+        }, 700);
+      });
+    });
+  });
+})();
+</script>

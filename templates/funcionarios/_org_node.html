@@ -1,0 +1,32 @@
+<li class="org-item org-setor-{{ no.funcionario.setor }}">
+  <div class="org-node">
+    <div class="org-avatar" aria-hidden="true">
+      {% if no.funcionario.foto_perfil %}
+        <img src="{{ no.funcionario.foto_perfil.url }}" alt="">
+      {% else %}
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.2"/><path d="M5.5 19.2c1.1-3.2 3.4-4.8 6.5-4.8s5.4 1.6 6.5 4.8"/></svg>
+      {% endif %}
+    </div>
+    <strong class="org-name">{{ no.funcionario.nome_completo }}</strong>
+    <span class="org-role">{{ no.funcionario.get_cargo_display }}</span>
+    <span class="org-meta">{{ no.funcionario.get_setor_display }} · {{ no.funcionario.get_centro_custo_display }}</span>
+    <span class="org-mark" aria-hidden="true">
+      {% if no.funcionario.setor == "comercial" %}
+      <svg viewBox="0 0 24 24"><path d="M4 18V6l7 4 9-5v13"/><path d="M11 10v8"/></svg>
+      {% elif no.funcionario.setor == "financeiro" %}
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 7.5v9M9.5 9.8c.7-.8 1.7-1.2 2.7-1.2 1.6 0 2.8.9 2.8 2.2S13.8 13 12.2 13c-1.5 0-2.7.8-2.7 2.1 0 1.2 1.1 2.1 2.7 2.1 1.1 0 2-.4 2.6-1.1"/></svg>
+      {% elif no.funcionario.setor == "desenvolvimento" %}
+      <svg viewBox="0 0 24 24"><path d="M8 8 4.5 12 8 16"/><path d="M16 8l3.5 4L16 16"/><path d="M13.2 6.5 10.8 17.5"/></svg>
+      {% else %}
+      <svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M6 19V9l6-4 6 4v10"/><path d="M10 19v-5h4v5"/></svg>
+      {% endif %}
+    </span>
+  </div>
+  {% if no.filhos %}
+  <ul>
+    {% for filho in no.filhos %}
+      {% include "funcionarios/_org_node.html" with no=filho %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>

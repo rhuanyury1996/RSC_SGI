@@ -1,0 +1,102 @@
+<script>
+(function () {
+  const dialog = document.getElementById('dialogEmpresa');
+  document.getElementById('btnAbrirEmpresa')?.addEventListener('click', () => dialog?.showModal());
+  document.getElementById('btnFecharEmpresa')?.addEventListener('click', () => dialog?.close());
+
+  document.querySelectorAll('.lp-tab, .deal-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const root = tab.closest('.deal-drawer') || document;
+      root.querySelectorAll('.lp-tab, .deal-tab').forEach((t) => t.classList.remove('active'));
+      root.querySelectorAll('.deal-panel').forEach((p) => p.classList.remove('active'));
+      tab.classList.add('active');
+      root.querySelector(`[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
+    });
+  });
+
+  const board = document.getElementById('kanbanBoard');
+  if (!board) return;
+  const moverUrl = board.dataset.moverUrl;
+  const csrf = board.querySelector('[name=csrfmiddlewaretoken]')?.value
+    || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  let dragged = null;
+  let suppressClick = false;
+
+  board.querySelectorAll('.kanban-card').forEach((card) => {
+    card.addEventListener('dragstart', (e) => {
+      dragged = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.dataset.oppId || '');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      board.querySelectorAll('.kanban-drop').forEach((z) => z.classList.remove('drag-over'));
+      dragged = null;
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 150);
+    });
+    card.addEventListener('click', () => {
+      if (suppressClick) return;
+      if (card.dataset.href) location.href = card.dataset.href;
+    });
+  });
+
+  board.querySelectorAll('.kanban-drop').forEach((zone) => {
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (!dragged) return;
+      const oppId = dragged.dataset.oppId;
+      const etapaId = zone.dataset.etapaId;
+      const fromZone = dragged.parentElement;
+      if (fromZone === zone) return;
+
+      const empty = zone.querySelector('.kanban-empty');
+      if (empty) empty.remove();
+      zone.prepend(dragged);
+
+      if (fromZone && !fromZone.querySelector('.kanban-card')) {
+        const p = document.createElement('p');
+        p.className = 'muted kanban-empty';
+        p.textContent = 'Solte cards aqui';
+        fromZone.appendChild(p);
+      }
+      refreshCounts();
+
+      const body = new FormData();
+      body.append('oportunidade_id', oppId);
+      body.append('etapa_id', etapaId);
+      body.append('csrfmiddlewaretoken', csrf);
+      try {
+        const res = await fetch(moverUrl, {
+          method: 'POST',
+          body,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!res.ok) throw new Error('Falha ao mover');
+        const data = await res.json().catch(() => ({}));
+        if (data.promovido && data.redirect_url) {
+          location.href = data.redirect_url;
+        }
+      } catch (err) {
+        location.reload();
+      }
+    });
+  });
+
+  function refreshCounts() {
+    board.querySelectorAll('.kanban-column').forEach((col) => {
+      const n = col.querySelectorAll('.kanban-card').length;
+      const el = col.querySelector('.kanban-count');
+      if (el) el.textContent = n;
+    });
+  }
+})();
+</script>
+{% include "crm/_etapa_stepper_js.html" %}

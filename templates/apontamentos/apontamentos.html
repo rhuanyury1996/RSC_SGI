@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+{% block title %}Apontamentos · SGI RSC{% endblock %}
+{% block breadcrumb %}Apontamentos{% endblock %}
+{% block page_title %}Apontamentos de hora{% endblock %}
+{% block page_actions %}
+  {% if em_andamento %}
+    <span class="status-pill running"><span class="dot-live"></span> Em andamento</span>
+  {% else %}
+    <span class="status-pill">Fora do expediente</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="apont-page">
+
+  <div class="apont-period">
+    <form method="get">
+      <input type="date" name="inicio" value="{{ inicio|date:'Y-m-d' }}" aria-label="Data início">
+      <span class="sep">→</span>
+      <input type="date" name="fim" value="{{ fim|date:'Y-m-d' }}" aria-label="Data fim">
+      <button class="btn secondary" type="submit" style="padding:0.45rem 0.8rem;">Filtrar</button>
+    </form>
+    <p class="hint">
+      Hoje {{ horas_hoje }} · jornada {{ dashboard.jornada_diaria }}/dia ({{ dashboard.horario_padrao }})
+      · <a href="{% url 'editar_perfil' %}">ajustar no perfil</a>
+    </p>
+  </div>
+
+  <section class="apont-summary">
+    <div class="apont-summary-main">
+      <div class="kicker">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/></svg>
+        </div>
+        <span>Total no período</span>
+      </div>
+      <div class="big">
+        {{ dashboard.horas_trabalhadas_decimal }}
+        <small>{{ dashboard.horas_trabalhadas }} trabalhadas · {{ dashboard.horas_previstas }} previstas</small>
+      </div>
+    </div>
+    <div class="apont-summary-side">
+      <div class="apont-metric">
+        <div class="label">Horas extras</div>
+        <div class="value value-extras">{{ dashboard.horas_extras }}</div>
+        <div class="note">Acima de {{ dashboard.jornada_diaria }}/dia</div>
+      </div>
+      <div class="apont-metric">
+        <div class="label">Horas a quitar</div>
+        <div class="value value-quitar">{{ dashboard.horas_a_quitar }}</div>
+        <div class="note">Déficit vs. {{ dashboard.dias_uteis }} dias da sua jornada</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="apont-charts">
+    <article class="apont-panel">
+      <div class="panel-head">
+        <h2>Horas por dia</h2>
+        <a href="{% url 'resumo_horas' %}?inicio={{ inicio|date:'Y-m-d' }}&fim={{ fim|date:'Y-m-d' }}">Detalhes</a>
+      </div>
+      <div class="apont-chart">
+        <canvas id="chartDias"></canvas>
+      </div>
+    </article>
+
+    <article class="apont-panel">
+      <div class="panel-head">
+        <h2>Períodos do dia</h2>
+        <span class="status-pill">{{ dashboard.periodo_destaque }}</span>
+      </div>
+      <div class="apont-doughnut-wrap">
+        <div class="apont-doughnut">
+          <canvas id="chartPeriodos"></canvas>
+          <div class="center">
+            <strong>{{ dashboard.horas_trabalhadas_decimal }}</strong>
+            <span>total</span>
+          </div>
+        </div>
+        <ul class="apont-legend">
+          {% for item in dashboard.chart_periodos.itens %}
+          <li>
+            <span class="name"><i style="background:{{ item.cor }}"></i>{{ item.label }}</span>
+            <strong>{{ item.texto }}</strong>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </article>
+  </section>
+
+  <section class="apont-work">
+    <article class="apont-panel punch-panel">
+      <div class="panel-head">
+        <h2>Bater ponto</h2>
+      </div>
+      <p class="muted punch-help">Toque no tipo de marcação — registra com o horário atual.</p>
+
+      <div class="punch-pad">
+        <div class="punch-group">
+          <span class="punch-label">Jornada</span>
+          <div class="punch-row">
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="entrada">
+              <button class="punch-btn punch-in" type="submit">
+                <span class="punch-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4v10M8 10l4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span class="punch-txt">Entrada</span>
+              </button>
+            </form>
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="saida">
+              <button class="punch-btn punch-out" type="submit">
+                <span class="punch-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 14V4M8 8l4-4 4 4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span class="punch-txt">Saída</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div class="punch-group">
+          <span class="punch-label">Pausas</span>
+          <div class="punch-row punch-row-pauses">
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="cafe_inicio">
+              <button class="punch-btn" type="submit">
+                <span class="punch-txt">Café</span>
+                <small>início</small>
+              </button>
+            </form>
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="cafe_fim">
+              <button class="punch-btn" type="submit">
+                <span class="punch-txt">Café</span>
+                <small>fim</small>
+              </button>
+            </form>
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="almoco_inicio">
+              <button class="punch-btn" type="submit">
+                <span class="punch-txt">Almoço</span>
+                <small>início</small>
+              </button>
+            </form>
+            <form method="post" class="punch-form">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_rapido" value="almoco_fim">
+              <button class="punch-btn" type="submit">
+                <span class="punch-txt">Almoço</span>
+                <small>volta</small>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <details class="manual-toggle">
+        <summary>Ajuste manual (data/hora)</summary>
+        <div class="manual-box">
+          <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            {% for field in form %}
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {{ field.errors }}
+            {% endfor %}
+            <div class="actions" style="margin-top:0.85rem;">
+              <button class="btn" type="submit">Salvar marcação</button>
+            </div>
+          </form>
+        </div>
+      </details>
+    </article>
+
+    <details class="apont-panel apont-lista" open>
+      <summary class="apont-lista-summary">
+        <div class="panel-head">
+          <h2>Hoje</h2>
+          <span class="muted">{{ horas_hoje }}</span>
+        </div>
+        <span class="apont-lista-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="apont-lista-body">
+        {% if marcacoes_hoje %}
+        <div class="apont-lista-scroll short">
+          <ul class="timeline" style="padding:0.65rem;">
+            {% for m in marcacoes_hoje %}
+            <li>
+              <div class="time">{{ m.data_hora|date:"H:i" }}</div>
+              <div class="body">
+                <strong>{{ m.get_tipo_display }}</strong>
+                <span>{{ m.observacao|default:"Sem observação" }}</span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="muted" style="margin:0;">Nenhuma marcação hoje. Use os botões ao lado para começar.</p>
+        {% endif %}
+      </div>
+    </details>
+  </section>
+
+  {% if pode_aprovar_edicoes %}
+  <details class="apont-panel apont-lista apont-aprovacoes" id="aprovacoes" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Aprovar alterações</h2>
+        <span class="recup-chip pendente">{{ aprovacoes_pendentes|length }} pendente(s)</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin:0 0 0.85rem;">
+        Pedidos de correção ou exclusão. Se aprovar, aplica; se recusar, a marcação permanece.
+      </p>
+      {% if aprovacoes_pendentes %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Colaborador</th>
+              <th>Pedido</th>
+              <th>Marcação</th>
+              <th>Motivo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in aprovacoes_pendentes %}
+            <tr>
+              <td>
+                <strong>{{ s.solicitado_por.nome_completo }}</strong>
+                <div class="muted">{{ s.criado_em|date:"d/m/Y H:i" }}</div>
+              </td>
+              <td>
+                {% if s.is_exclusao %}
+                  <span class="badge danger">Exclusão</span>
+                {% else %}
+                  <span class="badge warn">Edição</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.is_exclusao %}
+                  {{ s.get_tipo_original_display }}<br>
+                  <span class="muted">{{ s.data_hora_original|date:"d/m/Y H:i" }}</span>
+                {% else %}
+                  <span class="muted">{{ s.get_tipo_original_display }} · {{ s.data_hora_original|date:"d/m H:i" }}</span><br>
+                  → <strong>{{ s.get_tipo_proposto_display }}</strong>
+                  <span class="muted">{{ s.data_hora_proposta|date:"d/m/Y H:i" }}</span>
+                {% endif %}
+              </td>
+              <td>{{ s.motivo|truncatechars:90 }}</td>
+              <td>
+                <form method="post" action="{% url 'revisar_edicao_marcacao' s.pk %}" class="aprov-actions">
+                  {% csrf_token %}
+                  <input type="text" name="nota_revisao" placeholder="Nota (opcional)" maxlength="255">
+                  <button class="btn" type="submit" name="decisao" value="aprovar" style="padding:0.4rem 0.7rem;">Aprovar</button>
+                  <button class="btn secondary" type="submit" name="decisao" value="recusar" style="padding:0.4rem 0.7rem;">Recusar</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0;">Nenhuma solicitação aguardando aprovação.</p>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  <details class="apont-panel apont-lista apont-log" id="log-marcacoes" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Log de marcações</h2>
+        <span class="muted">{{ inicio|date:"d/m" }} → {{ fim|date:"d/m/Y" }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin:0 0 0.85rem;">
+        Histórico do período. Correções e exclusões passam pela aprovação do Rhuan — até lá a marcação vale.
+      </p>
+      {% if log_marcacoes %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Data/hora</th>
+              <th>Tipo</th>
+              <th>Observação</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in log_marcacoes %}
+            <tr>
+              <td>{{ item.marcacao.data_hora|date:"d/m/Y H:i" }}</td>
+              <td><strong>{{ item.marcacao.get_tipo_display }}</strong></td>
+              <td>{{ item.marcacao.observacao|default:"—" }}</td>
+              <td>
+                {% if item.pendente %}
+                  <span class="badge warn">Aguardando Rhuan</span>
+                {% else %}
+                  <span class="badge ok">Registrada</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.pendente %}
+                  <span class="muted">Em análise</span>
+                {% else %}
+                  <div class="log-actions">
+                    <details class="edit-marcacao">
+                      <summary>Corrigir</summary>
+                      <form method="post" action="{% url 'solicitar_edicao_marcacao' item.marcacao.pk %}" class="edit-marcacao-form">
+                        {% csrf_token %}
+                        {{ item.edit_form.non_field_errors }}
+                        <label for="{{ item.edit_form.tipo_proposto.id_for_label }}">{{ item.edit_form.tipo_proposto.label }}</label>
+                        {{ item.edit_form.tipo_proposto }}
+                        <label for="{{ item.edit_form.data_hora_proposta.id_for_label }}">{{ item.edit_form.data_hora_proposta.label }}</label>
+                        {{ item.edit_form.data_hora_proposta }}
+                        <label for="{{ item.edit_form.observacao_proposta.id_for_label }}">{{ item.edit_form.observacao_proposta.label }}</label>
+                        {{ item.edit_form.observacao_proposta }}
+                        <label for="{{ item.edit_form.motivo.id_for_label }}">{{ item.edit_form.motivo.label }}</label>
+                        {{ item.edit_form.motivo }}
+                        <div class="actions" style="margin-top:0.65rem;">
+                          <button class="btn secondary" type="submit" style="padding:0.45rem 0.8rem;">
+                            {% if pode_aprovar_edicoes %}Salvar correção{% else %}Enviar ao Rhuan{% endif %}
+                          </button>
+                        </div>
+                      </form>
+                    </details>
+                    {% if pode_aprovar_edicoes %}
+                    <form method="post" action="{% url 'solicitar_exclusao_marcacao' item.marcacao.pk %}" class="delete-direto">
+                      {% csrf_token %}
+                      <button class="link-btn danger" type="submit">Excluir</button>
+                    </form>
+                    {% else %}
+                    <details class="edit-marcacao">
+                      <summary class="danger-link">Excluir</summary>
+                      <form method="post" action="{% url 'solicitar_exclusao_marcacao' item.marcacao.pk %}" class="edit-marcacao-form">
+                        {% csrf_token %}
+                        <label for="{{ item.delete_form.motivo.id_for_label }}">{{ item.delete_form.motivo.label }}</label>
+                        {{ item.delete_form.motivo }}
+                        <div class="actions" style="margin-top:0.65rem;">
+                          <button class="btn secondary" type="submit" style="padding:0.45rem 0.8rem;">
+                            Pedir exclusão ao Rhuan
+                          </button>
+                        </div>
+                      </form>
+                    </details>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0;">Nenhuma marcação no período filtrado.</p>
+      {% endif %}
+
+      {% if minhas_solicitacoes %}
+      <details class="apont-sublista" open>
+        <summary class="apont-sublista-summary">
+          <strong>Minhas solicitações</strong>
+          <span class="muted">{{ minhas_solicitacoes|length }}</span>
+          <span class="apont-lista-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="apont-lista-scroll short">
+          <ul class="solicitacoes-lista">
+            {% for s in minhas_solicitacoes %}
+            <li>
+              <div>
+                <span class="badge {% if s.is_exclusao %}danger{% else %}warn{% endif %}">{{ s.get_tipo_solicitacao_display }}</span>
+                <strong>{{ s.get_tipo_original_display }}</strong>
+                {{ s.data_hora_original|date:"d/m H:i" }}
+                {% if not s.is_exclusao %}
+                →
+                <strong>{{ s.get_tipo_proposto_display }}</strong>
+                {{ s.data_hora_proposta|date:"d/m H:i" }}
+                {% endif %}
+              </div>
+              <div class="muted">{{ s.motivo|truncatechars:70 }}</div>
+              <div>
+                {% if s.status == 'pendente' %}
+                  <span class="badge warn">{{ s.get_status_display }}</span>
+                {% elif s.status == 'aprovada' %}
+                  <span class="badge ok">{{ s.get_status_display }}</span>
+                {% elif s.status == 'recusada' %}
+                  <span class="badge danger">{{ s.get_status_display }}</span>
+                {% else %}
+                  <span class="badge">{{ s.get_status_display }}</span>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista apont-recuperacao" id="recuperacao" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Horas a recuperar</h2>
+        <div class="recup-totals">
+          <span class="recup-chip pendente">{{ horas_recuperar_pendentes }}h pendentes</span>
+          <span class="recup-chip ok">{{ horas_recuperar_concluidas }}h concluídas</span>
+        </div>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <p class="muted" style="margin:0 0 0.85rem;">
+        Geradas automaticamente ao registrar day-off no calendário (máx. 2h por dia no período de recuperação).
+      </p>
+      {% if recuperacoes %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Previsto</th>
+              <th>Horas</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recuperacoes %}
+            <tr>
+              <td>
+                <strong>{{ item.titulo }}</strong>
+                {% if item.evento_origem %}
+                <div class="muted">Origem: {{ item.evento_origem.titulo }}</div>
+                {% endif %}
+              </td>
+              <td>{{ item.data_prevista|date:"d/m/Y" }}</td>
+              <td>{% if item.horas %}{{ item.horas }}h{% else %}—{% endif %}</td>
+              <td>
+                {% if item.status == 'concluida' %}
+                  <span class="badge ok">{{ item.get_status_display }}</span>
+                {% elif item.status == 'cancelada' %}
+                  <span class="badge danger">{{ item.get_status_display }}</span>
+                {% elif item.status == 'em_andamento' %}
+                  <span class="badge warn">{{ item.get_status_display }}</span>
+                {% else %}
+                  <span class="badge info">{{ item.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" class="recup-status-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="demanda_id" value="{{ item.pk }}">
+                  <select name="demanda_status" aria-label="Status">
+                    {% for value, label in status_recuperacao.choices %}
+                      <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn secondary" type="submit" style="padding:0.4rem 0.7rem;">OK</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted" style="margin:0;">
+        Nenhuma hora a recuperar. Ao marcar um day-off no
+        <a href="{% url 'calendario' %}">calendário</a> com período de recuperação, as parcelas aparecem aqui.
+      </p>
+      {% endif %}
+    </div>
+  </details>
+
+</div>
+
+{{ dashboard.chart_dias|json_script:"data-dias" }}
+{{ dashboard.chart_periodos|json_script:"data-periodos" }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const dias = JSON.parse(document.getElementById('data-dias').textContent);
+  const periodos = JSON.parse(document.getElementById('data-periodos').textContent);
+  const font = { family: 'Manrope, sans-serif' };
+
+  new Chart(document.getElementById('chartDias'), {
+    type: 'bar',
+    data: {
+      labels: dias.labels,
+      datasets: [{
+        data: dias.values,
+        backgroundColor: (ctx) => ctx.raw > 0 ? '#ff6b4a' : '#eceff3',
+        borderRadius: 10,
+        borderSkipped: false,
+        maxBarThickness: 26,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(2)}h` }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font, color: '#9aa1ad', maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          suggestedMax: 10,
+          grid: { color: '#f0f2f5', drawBorder: false },
+          ticks: { font, color: '#9aa1ad', callback: (v) => v + 'h' }
+        }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chartPeriodos'), {
+    type: 'doughnut',
+    data: {
+      labels: periodos.labels,
+      datasets: [{
+        data: periodos.values.some(v => v > 0) ? periodos.values : [1],
+        backgroundColor: periodos.values.some(v => v > 0) ? periodos.colors : ['#eef0f4'],
+        borderWidth: 0,
+        hoverOffset: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '74%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: periodos.values.some(v => v > 0),
+          callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(2)}h` }
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

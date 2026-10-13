@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Day off · SGI RSC{% endblock %}
+{% block breadcrumb %}Solicitação de day off{% endblock %}
+{% block page_title %}Solicitação de day off{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Solicitar day off</h1>
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+    {% endfor %}
+    <button type="submit">Enviar</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Minhas solicitações</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Status</th><th>Motivo</th></tr></thead>
+    <tbody>
+      {% for item in minhas %}
+      <tr>
+        <td>{{ item.data|date:"d/m/Y" }}</td>
+        <td>{{ item.get_status_display }}</td>
+        <td>{{ item.motivo|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">Nenhuma solicitação.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

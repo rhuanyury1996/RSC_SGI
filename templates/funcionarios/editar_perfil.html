@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Editar perfil · SGI RSC{% endblock %}
+{% block breadcrumb %}Meu perfil <span>/</span> Editar{% endblock %}
+{% block page_title %}Editar perfil{% endblock %}
+{% block content %}
+<div class="pf-page">
+  <section class="card pf-edit-card">
+    <p class="muted" style="margin-top:0;">Atualize seus dados pessoais, signo solar e a jornada de trabalho. Campos organizacionais não podem ser alterados aqui.</p>
+    <form method="post" enctype="multipart/form-data" class="perfil-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <h3 class="form-section-title">Dados pessoais</h3>
+      <div class="pf-edit-grid">
+        <div>
+          <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+          {{ form.nome }}
+          {{ form.nome.errors }}
+        </div>
+        <div>
+          <label for="{{ form.sobrenome.id_for_label }}">{{ form.sobrenome.label }}</label>
+          {{ form.sobrenome }}
+          {{ form.sobrenome.errors }}
+        </div>
+        <div>
+          <label for="{{ form.data_nascimento.id_for_label }}">{{ form.data_nascimento.label }}</label>
+          {{ form.data_nascimento }}
+          {{ form.data_nascimento.errors }}
+        </div>
+        <div>
+          <label for="{{ form.foto_perfil.id_for_label }}">{{ form.foto_perfil.label }}</label>
+          {{ form.foto_perfil }}
+          {{ form.foto_perfil.errors }}
+        </div>
+      </div>
+
+      <h3 class="form-section-title">Signo solar</h3>
+      <p class="muted" style="margin-top:0;">
+        Selecione o seu signo.
+        {% if form.signo_solar.help_text %}{{ form.signo_solar.help_text }}{% endif %}
+      </p>
+      <div class="signo-picker">
+        {% for radio in form.signo_solar %}
+          <label class="signo-chip {% if radio.data.selected %}is-selected{% endif %}">
+            {{ radio.tag }}
+            <span>{{ radio.choice_label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {{ form.signo_solar.errors }}
+
+      <h3 class="form-section-title">Jornada de trabalho</h3>
+      <p class="muted" style="margin-top:0;">
+        Dias e horários padrão usados nos apontamentos (extras, previstas e a quitar).
+      </p>
+
+      <div class="jornada-dias">
+        <label class="jornada-dia">{{ form.trabalha_segunda }} <span>Seg</span></label>
+        <label class="jornada-dia">{{ form.trabalha_terca }} <span>Ter</span></label>
+        <label class="jornada-dia">{{ form.trabalha_quarta }} <span>Qua</span></label>
+        <label class="jornada-dia">{{ form.trabalha_quinta }} <span>Qui</span></label>
+        <label class="jornada-dia">{{ form.trabalha_sexta }} <span>Sex</span></label>
+      </div>
+      {{ form.trabalha_segunda.errors }}
+      {{ form.trabalha_terca.errors }}
+      {{ form.trabalha_quarta.errors }}
+      {{ form.trabalha_quinta.errors }}
+      {{ form.trabalha_sexta.errors }}
+
+      <div class="jornada-horarios">
+        <div>
+          <label for="{{ form.hora_entrada.id_for_label }}">{{ form.hora_entrada.label }}</label>
+          {{ form.hora_entrada }}
+          {{ form.hora_entrada.errors }}
+        </div>
+        <div>
+          <label for="{{ form.hora_saida.id_for_label }}">{{ form.hora_saida.label }}</label>
+          {{ form.hora_saida }}
+          {{ form.hora_saida.errors }}
+        </div>
+        <div>
+          <label for="{{ form.intervalo_almoco_minutos.id_for_label }}">{{ form.intervalo_almoco_minutos.label }}</label>
+          {{ form.intervalo_almoco_minutos }}
+          {{ form.intervalo_almoco_minutos.errors }}
+          {% if form.intervalo_almoco_minutos.help_text %}
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">{{ form.intervalo_almoco_minutos.help_text }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:1.25rem;">
+        <button type="submit">Salvar</button>
+        <a class="btn ghost" href="{% url 'meu_perfil' %}">Cancelar</a>
+      </div>
+    </form>
+  </section>
+</div>
+<script>
+(function () {
+  document.querySelectorAll(".signo-chip").forEach(function (chip) {
+    var input = chip.querySelector('input[type="radio"]');
+    if (!input) return;
+    input.addEventListener("change", function () {
+      document.querySelectorAll(".signo-chip").forEach(function (c) {
+        c.classList.toggle("is-selected", c.querySelector("input")?.checked);
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

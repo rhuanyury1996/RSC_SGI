@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ funil.get_tipo_display }} · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Funis</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
+{% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %}{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">Pipeline R$ {{ pipeline|floatformat:2 }}</span>
+  <a class="btn secondary" href="{% url 'crm_funis' %}">Todos os funis</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if subfunis_irmaos %}
+  <nav class="subfunil-tabs" aria-label="Subfunis do cliente">
+    {% for s in subfunis_irmaos %}
+      <a class="subfunil-tab {% if s.pk == funil.pk %}active{% endif %}" href="{% url 'crm_funil_detalhe' s.pk %}">{{ s.get_tipo_display }}</a>
+    {% endfor %}
+  </nav>
+  {% elif funil.descricao %}
+  <p class="muted" style="margin:0 0 0.35rem;">{{ funil.descricao }}</p>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" id="nova-oportunidade"{% if abrir_nova_opp %} open{% endif %}>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Nova oportunidade</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form">
+        {% csrf_token %}
+        {{ form.funil }}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Oportunidade</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.titulo.id_for_label }}">{{ form.titulo.label }}</label>
+              {{ form.titulo }}{{ form.titulo.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+              <button type="button" class="link-action" id="btnAbrirEmpresa">
+                + Empresa não cadastrada — cadastrar
+              </button>
+            </div>
+            <div class="field">
+              <label for="{{ form.etapa.id_for_label }}">{{ form.etapa.label }}</label>
+              {{ form.etapa }}{{ form.etapa.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.valor.id_for_label }}">{{ form.valor.label }}</label>
+              {{ form.valor }}{{ form.valor.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.responsavel.id_for_label }}">{{ form.responsavel.label }}</label>
+              {{ form.responsavel }}{{ form.responsavel.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Adicionar ao funil</button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista form-section-collapse">
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Etapas do funil</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form" style="max-width:560px;">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="adicionar_etapa">
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="{{ etapa_form.nome.id_for_label }}">Nova etapa</label>
+            {{ etapa_form.nome }}{{ etapa_form.nome.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ etapa_form.ordem.id_for_label }}">Ordem</label>
+            {{ etapa_form.ordem }}{{ etapa_form.ordem.errors }}
+          </div>
+        </div>
+        <div class="actions" style="margin-top:0.75rem;">
+          <button class="btn secondary" type="submit">Adicionar etapa</button>
+        </div>
+      </form>
+      <ol class="funil-etapas-lista">
+        {% for e in etapas %}
+        <li><strong>{{ e.nome }}</strong> <span class="muted">· ordem {{ e.ordem }}</span></li>
+        {% endfor %}
+      </ol>
+    </div>
+  </details>
+
+  {% if card_destaque and mostrar_escopo %}
+  <div class="com-escopo-destaque" id="card-{{ card_destaque.pk }}">
+    <div class="com-escopo-destaque-head">
+      <strong>{{ card_destaque.titulo }}</strong>
+      <span class="muted">· {{ card_destaque.etapa.nome }}</span>
+    </div>
+    <div class="com-escopo-label">Escopo solicitado</div>
+    {% if card_destaque.escopo_solicitado %}
+    <p class="com-escopo-texto">{{ card_destaque.escopo_solicitado }}</p>
+    {% else %}
+    <p class="muted">Nenhum escopo informado em pré-vendas.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="com-board{% if mostrar_escopo %} com-board-negociacoes{% endif %}">
+    {% for etapa in etapas %}
+    <section class="com-column{% if forloop.first and mostrar_escopo %} com-column-proposta{% endif %}">
+      <header>
+        <div>
+          <strong>{{ etapa.nome }}</strong>
+          <div class="muted">{{ etapa.oportunidades.all|length }} · R$ {{ etapa.valor_total|default:0|floatformat:2 }}</div>
+        </div>
+      </header>
+      <div class="com-column-scroll">
+        {% for opp in etapa.oportunidades.all %}
+        <article class="com-card{% if card_destaque and opp.pk == card_destaque.pk %} com-card-destaque{% endif %}" id="opp-{{ opp.pk }}">
+          <strong>{{ opp.titulo }}</strong>
+          <div class="muted">{{ opp.empresa }}</div>
+          {% if mostrar_escopo %}
+          <div class="com-escopo-card">
+            <span class="com-escopo-label">Escopo solicitado</span>
+            {% if opp.escopo_solicitado %}
+            <p>{{ opp.escopo_solicitado|truncatechars:220 }}</p>
+            {% else %}
+            <p class="muted">—</p>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if opp.valor %}<div class="com-value">R$ {{ opp.valor|floatformat:2 }}</div>{% endif %}
+          {% if opp.responsavel %}<div class="muted">{{ opp.responsavel.nome_completo }}</div>{% endif %}
+          <form method="post" class="com-move">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="mover">
+            <input type="hidden" name="oportunidade_id" value="{{ opp.pk }}">
+            <select name="etapa_id" aria-label="Mover etapa" onchange="this.form.submit()">
+              {% for e in etapas %}
+                <option value="{{ e.pk }}" {% if e.pk == etapa.pk %}selected{% endif %}>{{ e.nome }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </article>
+        {% empty %}
+        <p class="muted com-empty">Vazio</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  {% if sem_etapa %}
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Sem etapa</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <ul class="com-list">
+        {% for opp in sem_etapa %}
+        <li>
+          <strong>{{ opp.titulo }}</strong>
+          <span class="muted">{{ opp.empresa }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<dialog class="com-dialog" id="dialogEmpresa" {% if abrir_popup_empresa %}open{% endif %}>
+  <form method="post" class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="criar_empresa">
+    <div class="com-dialog-head">
+      <h3>Cadastrar empresa</h3>
+      <button type="button" class="btn ghost" id="btnFecharEmpresa">Fechar</button>
+    </div>
+    <p class="muted" style="margin-top:0;">A empresa ficará disponível para vincular à oportunidade.</p>
+    {{ empresa_form.non_field_errors }}
+    <div class="form-section" style="margin-top:0;">
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="{{ empresa_form.nome.id_for_label }}">{{ empresa_form.nome.label }}</label>
+          {{ empresa_form.nome }}{{ empresa_form.nome.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.nicho.id_for_label }}">{{ empresa_form.nicho.label }}</label>
+          {{ empresa_form.nicho }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.classificacao_unidade.id_for_label }}">{{ empresa_form.classificacao_unidade.label }}</label>
+          {{ empresa_form.classificacao_unidade }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.cidade.id_for_label }}">{{ empresa_form.cidade.label }}</label>
+          {{ empresa_form.cidade }}
+        </div>
+        <div class="field">
+          <label for="{{ empresa_form.estado.id_for_label }}">{{ empresa_form.estado.label }}</label>
+          {{ empresa_form.estado }}
+        </div>
+      </div>
+    </div>
+    <div class="empresa-form-actions">
+      <button class="btn" type="submit">Criar empresa</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const dialog = document.getElementById('dialogEmpresa');
+  document.getElementById('btnAbrirEmpresa')?.addEventListener('click', () => dialog.showModal());
+  document.getElementById('btnFecharEmpresa')?.addEventListener('click', () => dialog.close());
+  if (location.hash === '#nova-oportunidade') {
+    document.getElementById('nova-oportunidade')?.setAttribute('open', '');
+  }
+  const destaque = document.querySelector('.com-escopo-destaque, .com-card-destaque');
+  if (destaque) {
+    destaque.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+</script>
+{% endblock %}

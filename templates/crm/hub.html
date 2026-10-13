@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Área Comercial · SGI RSC{% endblock %}
+{% block breadcrumb %}Área Comercial{% endblock %}
+{% block page_title %}Área Comercial{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'crm_empresas' %}">+ Empresa</a>
+  <a class="btn" href="{% url 'crm_funis' %}">Funis</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <section class="apont-summary">
+    <div class="apont-summary-main">
+      <div class="kicker">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M8 7V5h8v2"/></svg>
+        </div>
+        <span>Pipeline ativo</span>
+      </div>
+      <div class="big">
+        R$ {{ pipeline_valor|floatformat:2 }}
+        <small>{{ total_oportunidades }} oportunidade(s) em andamento</small>
+      </div>
+    </div>
+    <div class="apont-summary-side">
+      <div class="apont-metric">
+        <div class="label">Empresas</div>
+        <div class="value">{{ total_empresas }}</div>
+        <div class="note">Contas ativas</div>
+      </div>
+      <div class="apont-metric">
+        <div class="label">Contatos</div>
+        <div class="value">{{ total_contatos }}</div>
+        <div class="note">Pessoas de relacionamento</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="com-grid">
+    <a class="com-tile" href="{% url 'crm_empresas' %}">
+      <strong>Empresas</strong>
+      <span class="muted">Cadastro de contas e clientes potenciais</span>
+    </a>
+    <a class="com-tile" href="{% url 'crm_contatos' %}">
+      <strong>Contatos</strong>
+      <span class="muted">Pessoas-chave nas empresas</span>
+    </a>
+    <a class="com-tile" href="{% url 'crm_funis' %}">
+      <strong>Funis & oportunidades</strong>
+      <span class="muted">Área de controle por Cliente RSC</span>
+    </a>
+  </section>
+
+  <div class="com-columns">
+    <details class="apont-panel apont-lista" open>
+      <summary class="apont-lista-summary">
+        <div class="panel-head">
+          <h2>Funis</h2>
+          <span class="muted">{{ total_funis }} ativo(s)</span>
+        </div>
+        <span class="apont-lista-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="apont-lista-body">
+        {% if grupos_funis %}
+        <div class="apont-lista-scroll">
+          <ul class="com-list">
+            {% for grupo in grupos_funis %}
+            <li>
+              <strong>{{ grupo.cliente.nome }}</strong>
+              <span class="muted" style="display:block;margin:0.25rem 0 0.35rem;">
+                {% for f in grupo.funis %}
+                  <a href="{% url 'crm_funil_detalhe' f.pk %}">{{ f.get_tipo_display }}</a>{% if not forloop.last %} · {% endif %}
+                {% endfor %}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="muted" style="margin:0;">
+          Nenhum funil ainda.
+          <a href="{% url 'crm_listas' %}?tipo=clientes_rsc">Cadastre um Cliente RSC</a>
+          para abrir a área de controle.
+        </p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="apont-panel apont-lista" open>
+      <summary class="apont-lista-summary">
+        <div class="panel-head">
+          <h2>Oportunidades recentes</h2>
+        </div>
+        <span class="apont-lista-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="apont-lista-body">
+        {% if recentes %}
+        <div class="apont-lista-scroll">
+          <ul class="com-list">
+            {% for o in recentes %}
+            <li>
+              <a href="{% url 'crm_funil_detalhe' o.funil_id %}">
+                <strong>{{ o.titulo }}</strong>
+                <span class="muted">
+                  {{ o.empresa }}
+                  {% if o.etapa %} · {{ o.etapa.nome }}{% endif %}
+                  {% if o.valor %} · R$ {{ o.valor|floatformat:2 }}{% endif %}
+                </span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="muted" style="margin:0;">Ainda não há oportunidades no pipeline.</p>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% block title %}Atividades · SGI RSC{% endblock %}
+{% block breadcrumb %}Atividades{% endblock %}
+{% block page_title %}Atividades{% endblock %}
+{% block page_actions %}
+  <span class="status-pill">{{ resumo.realizados }}/{{ resumo.total }} realizado(s)</span>
+  {% if resumo.executando %}<span class="status-pill running">{{ resumo.executando }} em execução</span>{% endif %}
+  <button type="button" class="btn" id="btnAbrirTarefa">+ Nova tarefa</button>
+{% endblock %}
+
+{% block content %}
+<div class="cu-page" id="atividades-app"
+     data-hoje="{{ hoje|date:'Y-m-d' }}">
+
+  <div class="cu-toolbar">
+    <div class="cu-views" role="tablist" aria-label="Organização">
+      <a class="cu-view {% if organizacao == 'status' %}active{% endif %}"
+         href="?org=status&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Lista</a>
+      <a class="cu-view {% if organizacao == 'prioridade' %}active{% endif %}"
+         href="?org=prioridade&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Prioridade</a>
+      <a class="cu-view {% if organizacao == 'planner' %}active{% endif %}"
+         href="?org=planner&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Planner</a>
+    </div>
+
+    <div class="cu-toolbar-right">
+      {% if pode_dirigir %}
+      <div class="cu-escopo">
+        <a class="{% if escopo == 'minhas' %}active{% endif %}"
+           href="?org={{ organizacao }}&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Minhas</a>
+        <a class="{% if escopo == 'equipe' %}active{% endif %}"
+           href="?org={{ organizacao }}&escopo=equipe&data={{ dia|date:'Y-m-d' }}">Equipe</a>
+      </div>
+      {% if escopo == 'equipe' %}
+      <form method="get" class="cu-resp-form">
+        <input type="hidden" name="org" value="{{ organizacao }}">
+        <input type="hidden" name="escopo" value="equipe">
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <select name="resp" onchange="this.form.submit()" aria-label="Filtrar responsável">
+          <option value="">Todos</option>
+          {% for f in equipe %}
+          <option value="{{ f.pk }}" {% if responsavel_id == f.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      {% endif %}
+
+      <div class="cu-nav">
+        <a class="btn secondary" href="?org={{ organizacao }}&escopo={{ escopo }}&data={{ dia_anterior|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">‹</a>
+        <form method="get" class="cu-date-form">
+          <input type="hidden" name="org" value="{{ organizacao }}">
+          <input type="hidden" name="escopo" value="{{ escopo }}">
+          {% if responsavel_id %}<input type="hidden" name="resp" value="{{ responsavel_id }}">{% endif %}
+          <input type="date" name="data" value="{{ dia|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Dia">
+        </form>
+        <a class="btn secondary" href="?org={{ organizacao }}&escopo={{ escopo }}&data={{ dia_seguinte|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">›</a>
+        {% if not eh_hoje %}
+        <a class="btn ghost" href="?org={{ organizacao }}&escopo={{ escopo }}&data={{ hoje|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Hoje</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <section class="cu-summary">
+    <div class="cu-metric"><span class="muted">Total</span><strong>{{ resumo.total }}</strong></div>
+    <div class="cu-metric"><span class="muted">Realizados</span><strong>{{ resumo.realizados }}</strong></div>
+    <div class="cu-metric"><span class="muted">Executando</span><strong>{{ resumo.executando }}</strong></div>
+    <div class="cu-metric"><span class="muted">Urgentes</span><strong>{{ resumo.urgentes }}</strong></div>
+    <div class="cu-metric cu-metric-pct">
+      <span class="muted">Progresso</span>
+      <strong>{{ resumo.percentual }}%</strong>
+      <span class="cu-bar"><i style="width:{{ resumo.percentual }}%"></i></span>
+    </div>
+  </section>
+
+  <div class="cu-board">
+    <div class="cu-cols-head">
+      <div class="cu-col-nome">Nome</div>
+      <div class="cu-col-quando">Data / horário</div>
+      <div class="cu-col-resp">Responsável</div>
+      <div class="cu-col-prio">Prioridade</div>
+      <div class="cu-col-status">Status</div>
+      <div class="cu-col-timer">Cronômetro</div>
+      <div class="cu-col-more"></div>
+    </div>
+
+    {% for grupo in grupos %}
+    <details class="cu-group status-{{ grupo.status }}"{% if grupo.count %} open{% endif %}>
+      <summary class="cu-group-head">
+        <span class="cu-group-caret" aria-hidden="true"></span>
+        <span class="cu-group-label">{{ grupo.label }}</span>
+        <span class="cu-group-count">{{ grupo.count }}</span>
+      </summary>
+
+      <form method="post" class="cu-add-row">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="criar_rapida">
+        <input type="hidden" name="org" value="{{ organizacao }}">
+        <input type="hidden" name="escopo" value="{{ escopo }}">
+        <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+        <input type="hidden" name="status" value="{% if grupo.kind == 'prioridade' %}nao_iniciado{% else %}{{ grupo.status }}{% endif %}">
+        {% if grupo.kind == 'prioridade' %}
+        <input type="hidden" name="prioridade" value="{{ grupo.status }}">
+        {% endif %}
+        <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa" autocomplete="off" required>
+        <input type="date" name="planejado_para" value="{{ dia|date:'Y-m-d' }}" aria-label="Data" title="Data">
+        <input type="time" name="hora_inicio" aria-label="Início" title="Horário início">
+        <input type="time" name="hora_fim" aria-label="Fim" title="Horário fim">
+        {% if pode_dirigir %}
+        <select name="responsavel" class="cu-select-resp" aria-label="Responsável" required>
+          <option value="">Responsável…</option>
+          {% for f in equipe %}
+          <option value="{{ f.pk }}" {% if responsavel_id == f.pk or not responsavel_id and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        <button class="btn ghost" type="submit">Adicionar</button>
+      </form>
+
+      <ul class="cu-list">
+        {% for item in grupo.itens %}
+        <li class="cu-row {% if item.status == 'realizado' %}is-done{% endif %}" data-id="{{ item.pk }}">
+          <div class="cu-col-nome">
+            <span class="cu-dot status-{{ item.status }}" aria-hidden="true"></span>
+            <span class="eisen-badge q-{{ item.quadrante }}" title="{{ item.get_quadrante_display }}">
+              {% if item.quadrante == "fazer" %}Q1 · Fazer{% elif item.quadrante == "agendar" %}Q2 · Agendar{% elif item.quadrante == "delegar" %}Q3 · Delegar{% else %}Q4 · Eliminar{% endif %}
+            </span>
+            <details class="cu-task">
+              <summary>
+                <span class="cu-title">{{ item.titulo }}</span>
+                {% if item.descricao %}<span class="cu-has-desc" title="Tem descrição">≡</span>{% endif %}
+              </summary>
+              <div class="cu-task-body">
+                <form method="post" action="{% url 'atividade_editar' item.pk %}" class="com-form empresa-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="org" value="{{ organizacao }}">
+                  <input type="hidden" name="escopo" value="{{ escopo }}">
+                  <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+                  {% if responsavel_id %}<input type="hidden" name="resp" value="{{ responsavel_id }}">{% endif %}
+                  <div class="empresa-grid">
+                    <div class="field span-2">
+                      <label>Título</label>
+                      <input type="text" name="titulo" value="{{ item.titulo }}" required>
+                    </div>
+                    <div class="field">
+                      <label>Status</label>
+                      <select name="status">
+                        {% for val, lab in status_choices %}
+                        <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ lab }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Prioridade</label>
+                      <select name="prioridade">
+                        {% for val, lab in prioridade_choices %}
+                        <option value="{{ val }}" {% if item.prioridade == val %}selected{% endif %}>{{ lab }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Responsável</label>
+                      {% if pode_dirigir %}
+                      <select name="responsavel" class="cu-select-resp" required>
+                        {% for f in equipe %}
+                        <option value="{{ f.pk }}" {% if item.responsavel_id == f.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+                        {% endfor %}
+                      </select>
+                      {% else %}
+                      <input type="hidden" name="responsavel" value="{{ item.responsavel_id }}">
+                      <span>{{ item.responsavel.nome_completo }}</span>
+                      {% endif %}
+                    </div>
+                    <div class="field">
+                      <label>Data</label>
+                      <input type="date" name="planejado_para" value="{% if item.planejado_para %}{{ item.planejado_para|date:'Y-m-d' }}{% endif %}" required>
+                    </div>
+                    <div class="field">
+                      <label>Início</label>
+                      <input type="time" name="hora_inicio" value="{% if item.hora_inicio %}{{ item.hora_inicio|time:'H:i' }}{% endif %}">
+                    </div>
+                    <div class="field">
+                      <label>Fim</label>
+                      <input type="time" name="hora_fim" value="{% if item.hora_fim %}{{ item.hora_fim|time:'H:i' }}{% endif %}">
+                    </div>
+                    <div class="field">
+                      <label>Vencimento</label>
+                      <input type="date" name="data_vencimento" value="{% if item.data_vencimento %}{{ item.data_vencimento|date:'Y-m-d' }}{% endif %}">
+                    </div>
+                    <div class="field">
+                      <label>Eisenhower</label>
+                      <select name="quadrante">
+                        <option value="fazer" {% if item.quadrante == "fazer" %}selected{% endif %}>Fazer primeiro</option>
+                        <option value="agendar" {% if item.quadrante == "agendar" %}selected{% endif %}>Agendar</option>
+                        <option value="delegar" {% if item.quadrante == "delegar" %}selected{% endif %}>Delegar</option>
+                        <option value="eliminar" {% if item.quadrante == "eliminar" %}selected{% endif %}>Eliminar</option>
+                      </select>
+                    </div>
+                    <div class="field span-2">
+                      <label>Descrição</label>
+                      <textarea name="descricao" rows="2">{{ item.descricao }}</textarea>
+                    </div>
+                  </div>
+                  <div class="cu-task-actions">
+                    <button class="btn secondary" type="submit">Salvar</button>
+                  </div>
+                </form>
+                <form method="post" action="{% url 'atividade_excluir' item.pk %}" onsubmit="return confirm('Remover esta tarefa?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="org" value="{{ organizacao }}">
+                  <input type="hidden" name="escopo" value="{{ escopo }}">
+                  <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+                  <button class="btn ghost" type="submit">Excluir</button>
+                </form>
+              </div>
+            </details>
+          </div>
+
+          <div class="cu-col-quando">
+            <div class="cu-quando">
+              <strong>{% if item.planejado_para %}{{ item.planejado_para|date:"d/m" }}{% else %}—{% endif %}</strong>
+              {% if item.hora_inicio %}
+              <span class="cu-hora">
+                {{ item.hora_inicio|time:"H:i" }}{% if item.hora_fim %}–{{ item.hora_fim|time:"H:i" }}{% endif %}
+              </span>
+              {% else %}
+              <span class="muted">sem horário</span>
+              {% endif %}
+              {% if item.data_vencimento %}
+              <small class="{% if item.atrasada %}is-late{% endif %}">venc. {{ item.data_vencimento|date:"d/m" }}</small>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="cu-col-resp">
+            <span class="cu-avatar" title="{{ item.responsavel.nome_completo }}">
+              {{ item.responsavel.nome|slice:":1" }}{{ item.responsavel.sobrenome|slice:":1" }}
+            </span>
+          </div>
+
+          <div class="cu-col-prio">
+            <span class="cu-flag prio-{{ item.prioridade }}">{{ item.get_prioridade_display }}</span>
+          </div>
+
+          <div class="cu-col-status">
+            <form method="post" action="{% url 'atividade_status' item.pk %}" class="cu-status-form">
+              {% csrf_token %}
+              <input type="hidden" name="org" value="{{ organizacao }}">
+              <input type="hidden" name="escopo" value="{{ escopo }}">
+              <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+              <select name="status" class="cu-status-select status-{{ item.status }}" onchange="this.form.submit()" aria-label="Status">
+                {% for val, lab in status_choices %}
+                <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+
+          <div class="cu-col-timer">
+            <form method="post" action="{% url 'atividade_cronometro' item.pk %}" class="cu-timer-form">
+              {% csrf_token %}
+              <input type="hidden" name="org" value="{{ organizacao }}">
+              <input type="hidden" name="escopo" value="{{ escopo }}">
+              <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+              <button type="submit"
+                      class="cu-timer-btn {% if item.cronometro_ativo %}is-running{% endif %}"
+                      title="{% if item.cronometro_ativo %}Pausar{% else %}Iniciar{% endif %}"
+                      data-segundos="{{ item.tempo_atual_segundos }}"
+                      data-inicio="{% if item.cronometro_inicio %}{{ item.cronometro_inicio|date:'c' }}{% endif %}">
+                <span class="cu-timer-icon">{% if item.cronometro_ativo %}❚❚{% else %}▶{% endif %}</span>
+                <span class="cu-timer-text">{{ item.tempo_fmt }}</span>
+              </button>
+            </form>
+          </div>
+
+          <div class="cu-col-more"></div>
+        </li>
+        {% empty %}
+        <li class="cu-empty muted">Nenhuma tarefa neste grupo.</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endfor %}
+  </div>
+
+  <dialog class="com-dialog" id="dialogTarefa" {% if abrir_popup_tarefa %}data-auto-open="1"{% endif %}>
+    <form method="post" class="com-dialog-form empresa-form">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="criar">
+      <input type="hidden" name="org" value="{{ organizacao }}">
+      <input type="hidden" name="escopo" value="{{ escopo }}">
+      <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+      <div class="com-dialog-head">
+        <h3>Nova tarefa</h3>
+        <button type="button" class="btn ghost" id="btnFecharTarefa">Fechar</button>
+      </div>
+      <p class="muted" style="margin-top:0;">Preencha os detalhes com calma — o foco fica no formulário.</p>
+      {{ form.non_field_errors }}
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="{{ form.titulo.id_for_label }}">Nome</label>
+          {{ form.titulo }}{{ form.titulo.errors }}
+        </div>
+        <div class="field">
+          <label for="id_responsavel_manual">Responsável</label>
+          {% if pode_dirigir %}
+          <select name="responsavel" id="id_responsavel_manual" class="cu-select-resp" required>
+            <option value="">Selecione o responsável…</option>
+            {% for f in equipe %}
+            <option value="{{ f.pk }}" {% if form.responsavel.value|stringformat:"s" == f.pk|stringformat:"s" or not form.responsavel.value and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="hidden" name="responsavel" value="{{ eu.pk }}">
+          <span class="cu-avatar" title="{{ eu.nome_completo }}">{{ eu.nome|slice:":1" }}{{ eu.sobrenome|slice:":1" }}</span>
+          <span>{{ eu.nome_completo }}</span>
+          {% endif %}
+        </div>
+        <div class="field">
+          <label for="{{ form.status.id_for_label }}">Status</label>
+          {{ form.status }}{{ form.status.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.prioridade.id_for_label }}">Prioridade</label>
+          {{ form.prioridade }}{{ form.prioridade.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.planejado_para.id_for_label }}">Data</label>
+          {{ form.planejado_para }}{{ form.planejado_para.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.hora_inicio.id_for_label }}">Início</label>
+          {{ form.hora_inicio }}{{ form.hora_inicio.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.hora_fim.id_for_label }}">Fim</label>
+          {{ form.hora_fim }}{{ form.hora_fim.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.data_vencimento.id_for_label }}">Vencimento</label>
+          {{ form.data_vencimento }}{{ form.data_vencimento.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.quadrante.id_for_label }}">Eisenhower</label>
+          {{ form.quadrante }}{{ form.quadrante.errors }}
+        </div>
+        <div class="field span-2">
+          <label for="{{ form.descricao.id_for_label }}">Descrição</label>
+          {{ form.descricao }}{{ form.descricao.errors }}
+        </div>
+      </div>
+      <div class="empresa-form-actions">
+        <button class="btn" type="submit">Criar tarefa</button>
+      </div>
+    </form>
+  </dialog>
+
+  {% if historico %}
+  <section class="cu-hist-wrap">
+    <h2>Últimos dias no planner</h2>
+    <div class="cu-hist">
+      {% for h in historico %}
+      <a class="cu-hist-item {% if h.data == dia %}active{% endif %}"
+         href="?org=planner&escopo={{ escopo }}&data={{ h.data|date:'Y-m-d' }}">
+        <strong>{{ h.data|date:"d/m" }}</strong>
+        <span>{{ h.concluidas }}/{{ h.total }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  var dialog = document.getElementById("dialogTarefa");
+  var btnOpen = document.getElementById("btnAbrirTarefa");
+  var btnClose = document.getElementById("btnFecharTarefa");
+  if (dialog && btnOpen) {
+    btnOpen.addEventListener("click", function () { dialog.showModal(); });
+  }
+  if (dialog && btnClose) {
+    btnClose.addEventListener("click", function () { dialog.close(); });
+  }
+  if (dialog && dialog.getAttribute("data-auto-open") === "1") {
+    try { dialog.showModal(); } catch (e) {}
+  }
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return h ? h + ":" + pad(m) + ":" + pad(s) : pad(m) + ":" + pad(s);
+  }
+  function tick() {
+    document.querySelectorAll(".cu-timer-btn.is-running").forEach(function (btn) {
+      var base = parseInt(btn.getAttribute("data-segundos") || "0", 10);
+      var inicio = btn.getAttribute("data-inicio");
+      if (!inicio) return;
+      var start = Date.parse(inicio);
+      if (isNaN(start)) return;
+      var agora = Date.now();
+      var total = base; // data-segundos already includes live when rendered; for running we use inicio+acumulado sem o live
+      // Prefer: if data-inicio set, compute from server accumulated stored in data-base-acumulado
+      var acum = btn.getAttribute("data-acumulado");
+      if (acum !== null) {
+        total = parseInt(acum, 10) + Math.floor((agora - start) / 1000);
+      } else {
+        // fallback: freeze base at page load and add delta from page load
+        if (!btn._pageLoad) btn._pageLoad = agora;
+        total = base + Math.floor((agora - btn._pageLoad) / 1000);
+      }
+      var el = btn.querySelector(".cu-timer-text");
+      if (el) el.textContent = fmt(total);
+    });
+  }
+  document.querySelectorAll(".cu-timer-btn.is-running").forEach(function (btn) {
+    var inicio = btn.getAttribute("data-inicio");
+    var base = parseInt(btn.getAttribute("data-segundos") || "0", 10);
+    if (inicio) {
+      var start = Date.parse(inicio);
+      var live = Math.floor((Date.now() - start) / 1000);
+      btn.setAttribute("data-acumulado", String(Math.max(0, base - live)));
+    }
+  });
+  setInterval(tick, 1000);
+})();
+</script>
+{% endblock %}
