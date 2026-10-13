@@ -93,6 +93,12 @@ class Funcionario(models.Model):
         blank=True,
         null=True,
     )
+    # Data URI persistente (Render não mantém arquivos em disco entre deploys)
+    foto_perfil_data = models.TextField(
+        "Foto de perfil (dados)",
+        blank=True,
+        default="",
+    )
     cargo = models.CharField("Cargo", max_length=20, choices=Cargo.choices)
     setor = models.CharField(
         "Setor",
@@ -149,6 +155,22 @@ class Funcionario(models.Model):
     @property
     def nome_completo(self) -> str:
         return f"{self.nome} {self.sobrenome}"
+
+    @property
+    def tem_foto(self) -> bool:
+        return bool(self.foto_perfil_data or self.foto_perfil)
+
+    @property
+    def foto_url(self) -> str:
+        """URL da foto: data URI no banco (produção) ou arquivo em MEDIA."""
+        if self.foto_perfil_data:
+            return self.foto_perfil_data
+        if self.foto_perfil:
+            try:
+                return self.foto_perfil.url
+            except ValueError:
+                return ""
+        return ""
 
     @property
     def signo_sugerido(self) -> str:

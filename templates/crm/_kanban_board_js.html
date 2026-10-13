@@ -90,13 +90,30 @@
     });
   });
 
-  function refreshCounts() {
-    board.querySelectorAll('.kanban-column').forEach((col) => {
-      const n = col.querySelectorAll('.kanban-card').length;
-      const el = col.querySelector('.kanban-count');
-      if (el) el.textContent = n;
+  function formatBRL(value) {
+    return Number(value || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     });
   }
+
+  function refreshCounts() {
+    board.querySelectorAll('.kanban-column').forEach((col) => {
+      const cards = col.querySelectorAll('.kanban-card');
+      const el = col.querySelector('.kanban-count');
+      if (el) el.textContent = cards.length;
+      const valorEl = col.querySelector('.kanban-valor-total');
+      if (valorEl) {
+        let total = 0;
+        cards.forEach((card) => {
+          const v = parseFloat(card.dataset.valor || '0');
+          if (!Number.isNaN(v)) total += v;
+        });
+        valorEl.textContent = formatBRL(total);
+      }
+    });
+  }
+  refreshCounts();
 })();
 </script>
 {% include "crm/_etapa_stepper_js.html" %}

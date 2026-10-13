@@ -88,19 +88,19 @@ class FuncionarioAdmin(admin.ModelAdmin):
 
     @admin.display(description="Foto")
     def foto_miniatura(self, obj: Funcionario):
-        if obj.foto_perfil:
+        if obj.tem_foto:
             return format_html(
                 '<img src="{}" style="width:40px;height:40px;object-fit:cover;border-radius:50%;" />',
-                obj.foto_perfil.url,
+                obj.foto_url,
             )
         return "—"
 
     @admin.display(description="Pré-visualização")
     def foto_preview(self, obj: Funcionario):
-        if obj.pk and obj.foto_perfil:
+        if obj.pk and obj.tem_foto:
             return format_html(
                 '<img src="{}" style="max-width:180px;max-height:180px;object-fit:cover;border-radius:8px;" />',
-                obj.foto_perfil.url,
+                obj.foto_url,
             )
         return "Nenhuma foto enviada"
 
@@ -108,6 +108,18 @@ class FuncionarioAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("usuario", "responde_a")
 
     def save_model(self, request, obj, form, change):
+        from .avatar import encode_avatar
+
+        foto = form.cleaned_data.get("foto_perfil") if form is not None else None
+        if foto is False:
+            obj.foto_perfil = None
+            obj.foto_perfil_data = ""
+        elif foto:
+            try:
+                obj.foto_perfil_data = encode_avatar(foto)
+            except Exception:
+                pass
+
         super().save_model(request, obj, form, change)
 
         if obj.usuario_id:

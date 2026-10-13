@@ -74,7 +74,9 @@
       <header class="kanban-column-head">
         <div>
           <strong>{{ etapa.nome }}</strong>
-          <div class="muted"><span class="kanban-count">{{ etapa.oportunidades.all|length }}</span> card(s)</div>
+          <div class="kanban-col-stats">
+            <span class="kanban-stat"><span class="kanban-count">{{ etapa.cards_count|default:0 }}</span> cards</span>
+          </div>
           {% if etapa.descricao_fase %}
           <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
           {% endif %}

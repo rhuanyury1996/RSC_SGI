@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Negociações · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
 {% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Funis</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> Negociações{% endblock %}
 {% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Negociações{% endblock %}
@@ -86,7 +87,10 @@
       <header class="kanban-column-head">
         <div>
           <strong>{{ etapa.nome }}</strong>
-          <div class="muted"><span class="kanban-count">{{ etapa.oportunidades.all|length }}</span> card(s)</div>
+          <div class="kanban-col-stats">
+            <span class="kanban-stat"><span class="kanban-count">{{ etapa.cards_count|default:0 }}</span> cards</span>
+            <span class="kanban-stat kanban-valor">R$ <span class="kanban-valor-total">{{ etapa.valor_acumulado|default:0|floatformat:2 }}</span></span>
+          </div>
           {% if etapa.descricao_fase %}
           <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
           {% endif %}
@@ -95,7 +99,7 @@
       </header>
       <div class="kanban-drop" data-etapa-id="{{ etapa.pk }}">
         {% for opp in etapa.oportunidades.all %}
-        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}{% if opp.alerta_follow_up %} has-followup-alert{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
+        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}{% if opp.alerta_follow_up %} has-followup-alert{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-valor="{% if opp.valor_negocio %}{% localize off %}{{ opp.valor_negocio }}{% endlocalize %}{% else %}0{% endif %}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
           <div class="kanban-card-tags">
             {% if opp.alerta_follow_up %}
             <span class="badge-followup badge-followup-{{ opp.alerta_follow_up }}">{{ opp.alerta_follow_up_label }}</span>

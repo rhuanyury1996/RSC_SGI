@@ -129,14 +129,15 @@
               <th>Classificação</th>
               <th>Cidade/UF</th>
               <th>Clientes RSC</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {% for item in itens %}
-            <tr>
+            <tr class="com-row-link" data-href="{% url 'crm_empresa_editar' item.pk %}" tabindex="0" role="link" aria-label="Abrir {{ item.nome }}">
               <td>
-                <strong>{{ item.nome }}</strong>
-                {% if item.site %}<div class="muted"><a href="{{ item.site }}" target="_blank" rel="noopener">{{ item.site }}</a></div>{% endif %}
+                <a href="{% url 'crm_empresa_editar' item.pk %}"><strong>{{ item.nome }}</strong></a>
+                {% if item.site %}<div class="muted"><a href="{{ item.site }}" target="_blank" rel="noopener" data-row-ignore>{{ item.site }}</a></div>{% endif %}
               </td>
               <td>{% if item.nicho %}{{ item.nicho.nome }}{% else %}—{% endif %}</td>
               <td>{% if item.classificacao_unidade %}{{ item.get_classificacao_unidade_display }}{% else %}—{% endif %}</td>
@@ -152,9 +153,12 @@
                   <span class="muted">—</span>
                 {% endfor %}
               </td>
+              <td class="com-row-actions">
+                <a class="link-action" href="{% url 'crm_empresa_editar' item.pk %}" data-row-ignore>Editar</a>
+              </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="muted">Nenhuma empresa cadastrada.</td></tr>
+            <tr><td colspan="6" class="muted">Nenhuma empresa cadastrada.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -182,6 +186,19 @@
   document.querySelectorAll('.js-phone-mask').forEach((input) => {
     input.addEventListener('input', () => {
       input.value = maskPhone(input.value);
+    });
+  });
+
+  document.querySelectorAll('.com-row-link[data-href]').forEach((row) => {
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('a, button, [data-row-ignore]')) return;
+      window.location.href = row.dataset.href;
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = row.dataset.href;
+      }
     });
   });
 </script>

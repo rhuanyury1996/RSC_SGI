@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Editar empresa · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Empresas <span>/</span> Editar{% endblock %}
+{% block page_title %}Editar empresa{% endblock %}
+{% block page_actions %}
+  <a class="btn ghost" href="{% url 'crm_empresas' %}">Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>{{ empresa.nome }}</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form empresa-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Identificação</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+              {{ form.nome }}{{ form.nome.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.site.id_for_label }}">{{ form.site.label }}</label>
+              {{ form.site }}{{ form.site.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.nicho.id_for_label }}">{{ form.nicho.label }}</label>
+              {{ form.nicho }}{{ form.nicho.errors }}
+              <p class="field-hint muted">Gerencie em <a href="{% url 'crm_listas' %}?tipo=nicho_mercadologico">Listas → Nicho</a></p>
+            </div>
+            <div class="field">
+              <label for="{{ form.classificacao_unidade.id_for_label }}">{{ form.classificacao_unidade.label }}</label>
+              {{ form.classificacao_unidade }}{{ form.classificacao_unidade.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Contato</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.telefone_portaria.id_for_label }}">{{ form.telefone_portaria.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_portaria }}
+              </div>
+              {{ form.telefone_portaria.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.telefone_portaria_2.id_for_label }}">{{ form.telefone_portaria_2.label }}</label>
+              <div class="phone-field">
+                <span class="phone-flag" title="Brasil">🇧🇷</span>
+                {{ form.telefone_portaria_2 }}
+              </div>
+              {{ form.telefone_portaria_2.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.email_geral.id_for_label }}">{{ form.email_geral.label }}</label>
+              {{ form.email_geral }}{{ form.email_geral.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Localização</h3>
+          <div class="empresa-grid">
+            <div class="field span-2-1">
+              <label for="{{ form.cidade.id_for_label }}">{{ form.cidade.label }}</label>
+              {{ form.cidade }}{{ form.cidade.errors }}
+            </div>
+            <div class="field span-2-2">
+              <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+              {{ form.estado }}{{ form.estado.errors }}
+            </div>
+          </div>
+        </div>
+
+        <details class="form-section form-section-collapse"{% if form.clientes_rsc.errors %} open{% endif %}>
+          <summary class="form-section-summary">
+            <span class="form-section-title">Visibilidade — clientes RSC</span>
+            <span class="apont-lista-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="form-section-body">
+            <p class="muted" style="margin:0 0 0.75rem;">
+              Funcionários RSC sempre veem todas as empresas. Marque abaixo apenas os
+              <strong>clientes externos</strong> que poderão ver este registro.
+              Cadastre-os em <a href="{% url 'crm_listas' %}?tipo=clientes_rsc">Listas → Clientes RSC</a>.
+            </p>
+            {% if form.clientes_rsc.field.queryset.exists %}
+            <div class="check-grid">
+              {{ form.clientes_rsc }}
+            </div>
+            {{ form.clientes_rsc.errors }}
+            {% else %}
+            <p class="muted" style="margin:0;">Nenhum cliente RSC cadastrado ainda.</p>
+            {% endif %}
+          </div>
+        </details>
+
+        <div class="empresa-form-actions">
+          <a class="btn ghost" href="{% url 'crm_empresas' %}">Cancelar</a>
+          <button class="btn" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </details>
+</div>
+
+<script>
+  function maskPhone(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 10) {
+      return digits
+        .replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*/, (_, a, b, c) => {
+          let out = '';
+          if (a) out += `(${a}`;
+          if (a.length === 2) out += ') ';
+          if (b) out += b;
+          if (c) out += `-${c}`;
+          return out;
+        });
+    }
+    return digits.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+  }
+  document.querySelectorAll('.js-phone-mask').forEach((input) => {
+    input.addEventListener('input', () => {
+      input.value = maskPhone(input.value);
+    });
+  });
+</script>
+{% endblock %}

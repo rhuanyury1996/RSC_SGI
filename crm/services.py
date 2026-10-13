@@ -1,6 +1,15 @@
 from decimal import Decimal
 
-from django.db.models import Count, Prefetch, Sum
+from django.db.models import (
+    Count,
+    DecimalField,
+    OuterRef,
+    Prefetch,
+    Subquery,
+    Sum,
+    Value,
+)
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from .models import (
@@ -14,6 +23,20 @@ from .models import (
     TipoLista,
     TipoSubfunil,
 )
+
+# Alinhado a Oportunidade.valor_negocio (final fechado, senão valor da proposta).
+_DECIMAL_VALOR = DecimalField(max_digits=12, decimal_places=2)
+_DECIMAL_PIPELINE = DecimalField(max_digits=14, decimal_places=2)
+
+
+def _expr_valor_negocio():
+    return Coalesce("valor_final_fechado", "valor", output_field=_DECIMAL_VALOR)
+
+
+def soma_pipeline_qs(qs) -> Decimal:
+    """Soma o valor de negócio das oportunidades do queryset."""
+    total = qs.aggregate(total=Sum(_expr_valor_negocio()))["total"]
+    return total if total is not None else Decimal("0")
 
 ETAPAS_POR_TIPO = {
     # Fluxo real de Prospecção (Pipefy → kanban SGI)
@@ -522,10 +545,10 @@ def sincronizar_funis_clientes() -> int:
 def metricas_comerciais() -> dict:
     ops = Oportunidade.objects.select_related("empresa", "etapa", "funil", "responsavel")
     total_ops = ops.count()
-    pipeline = ops.aggregate(total=Sum("valor"))["total"] or Decimal("0")
+    pipeline = soma_pipeline_qs(ops)
     por_etapa = (
         ops.values("etapa__nome")
-        .annotate(qtd=Count("id"), soma=Sum("valor"))
+        .annotate(qtd=Count("id"), soma=Sum(_expr_valor_negocio()))
         .order_by("etapa__ordem", "etapa__nome")
     )
     recentes = list(ops.order_by("-criado_em")[:8])
@@ -538,13 +561,26 @@ def metricas_comerciais() -> dict:
 
 
 def funis_com_contagens():
+    # Subquery evita o produto cartesiano etapas × oportunidades que inflava
+    # Sum("oportunidades__valor") quando Count("etapas") entra no mesmo annotate.
+    pipeline_sq = (
+        Oportunidade.objects.filter(funil_id=OuterRef("pk"))
+        .order_by()
+        .values("funil_id")
+        .annotate(total=Sum(_expr_valor_negocio()))
+        .values("total")[:1]
+    )
     return (
         Funil.objects.filter(ativo=True)
         .select_related("cliente_rsc")
         .annotate(
             total_etapas=Count("etapas", distinct=True),
             total_ops=Count("oportunidades", distinct=True),
-            pipeline=Sum("oportunidades__valor"),
+            pipeline=Coalesce(
+                Subquery(pipeline_sq, output_field=_DECIMAL_PIPELINE),
+                Value(Decimal("0.00")),
+                output_field=_DECIMAL_PIPELINE,
+            ),
         )
         .prefetch_related(
             Prefetch("etapas", queryset=EtapaFunil.objects.order_by("ordem", "nome"))

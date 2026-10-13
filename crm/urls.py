@@ -5,7 +5,9 @@ from . import views
 urlpatterns = [
     path("", views.hub, name="crm"),
     path("empresas/", views.empresas, name="crm_empresas"),
+    path("empresas/<int:pk>/", views.empresa_editar, name="crm_empresa_editar"),
     path("contatos/", views.contatos, name="crm_contatos"),
+    path("contatos/<int:pk>/", views.contato_editar, name="crm_contato_editar"),
     path("funis/", views.funis, name="crm_funis"),
     path("funis/<int:pk>/", views.funil_detalhe, name="crm_funil_detalhe"),
     path("funis/<int:pk>/mover/", views.funil_mover_card, name="crm_funil_mover"),

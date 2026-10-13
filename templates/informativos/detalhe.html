@@ -19,8 +19,8 @@
 <article class="info-post info-post-detail apont-panel">
   <div class="info-post-main" style="display:flex;gap:0.85rem;">
     <div class="info-post-side">
-      {% if item.autor and item.autor.funcionario and item.autor.funcionario.foto_perfil %}
-        <img class="info-avatar" src="{{ item.autor.funcionario.foto_perfil.url }}" alt="">
+      {% if item.autor and item.autor.funcionario and item.autor.funcionario.tem_foto %}
+        <img class="info-avatar" src="{{ item.autor.funcionario.foto_url }}" alt="">
       {% else %}
         <div class="info-avatar placeholder">
           {% if item.autor and item.autor.funcionario %}

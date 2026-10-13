@@ -68,8 +68,8 @@
 
         <details class="topbar-user">
           <summary>
-            {% if colaborador and colaborador.foto_perfil %}
-              <img class="topbar-avatar" src="{{ colaborador.foto_perfil.url }}" alt="">
+            {% if colaborador and colaborador.tem_foto %}
+              <img class="topbar-avatar" src="{{ colaborador.foto_url }}" alt="">
             {% else %}
               <span class="topbar-avatar placeholder">
                 {% if colaborador %}{{ colaborador.nome|slice:":1" }}{{ colaborador.sobrenome|slice:":1" }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}
@@ -94,8 +94,8 @@
     <div class="layout-body">
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-user">
-          {% if colaborador and colaborador.foto_perfil %}
-            <img class="avatar-sm" src="{{ colaborador.foto_perfil.url }}" alt="">
+          {% if colaborador and colaborador.tem_foto %}
+            <img class="avatar-sm" src="{{ colaborador.foto_url }}" alt="">
           {% else %}
             <div class="avatar-sm">
               {% if colaborador %}{{ colaborador.nome|slice:":1" }}{{ colaborador.sobrenome|slice:":1" }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}
@@ -191,30 +191,40 @@
                 <svg viewBox="0 0 24 24"><path d="M8 7h12M8 12h12M8 17h12"/><circle cx="4.5" cy="7" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="17" r="1"/></svg>
                 <span class="nav-text">Listas</span>
               </a>
+              {% if nav_funis_clientes %}
+              <details class="nav-funis-root" open>
+                <summary class="nav-funis-root-summary">
+                  <a class="nav-link nav-funis-root-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Funis" onclick="event.stopPropagation()">
+                    {% include "partials/icon_trofeu.html" %}
+                    <span class="nav-text">Funis</span>
+                  </a>
+                  <span class="nav-funil-caret" aria-hidden="true"></span>
+                </summary>
+                <div class="nav-funis">
+                  {% for grupo in nav_funis_clientes %}
+                  <details class="nav-funil-cliente"{% if grupo.aberto or nav_funis_clientes|length == 1 %} open{% endif %}>
+                    <summary class="nav-funil-cliente-summary" title="{{ grupo.cliente.nome }}">
+                      {% include "partials/icon_trofeu.html" %}
+                      <span class="nav-text nav-funil-cliente-name">{{ grupo.cliente.nome }}</span>
+                      <span class="nav-funil-caret" aria-hidden="true"></span>
+                    </summary>
+                    <div class="nav-funil-subs">
+                      {% for f in grupo.funis %}
+                      <a class="nav-link nav-sub {% if request.resolver_match.url_name == 'crm_funil_detalhe' and request.resolver_match.kwargs.pk|stringformat:'s' == f.pk|stringformat:'s' %}active{% endif %}" href="{% url 'crm_funil_detalhe' f.pk %}" title="{{ f.rotulo_sidebar }}">
+                        {% include "partials/icon_trofeu.html" %}
+                        <span class="nav-text">{{ f.rotulo_sidebar }}</span>
+                      </a>
+                      {% endfor %}
+                    </div>
+                  </details>
+                  {% endfor %}
+                </div>
+              </details>
+              {% else %}
               <a class="nav-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Funis">
                 {% include "partials/icon_trofeu.html" %}
                 <span class="nav-text">Funis</span>
               </a>
-              {% if nav_funis_clientes %}
-              <div class="nav-funis">
-                {% for grupo in nav_funis_clientes %}
-                <details class="nav-funil-cliente"{% if grupo.aberto or nav_funis_clientes|length == 1 %} open{% endif %}>
-                  <summary class="nav-funil-cliente-summary" title="{{ grupo.cliente.nome }}">
-                    {% include "partials/icon_trofeu.html" %}
-                    <span class="nav-text nav-funil-cliente-name">{{ grupo.cliente.nome }}</span>
-                    <span class="nav-funil-caret" aria-hidden="true"></span>
-                  </summary>
-                  <div class="nav-funil-subs">
-                    {% for f in grupo.funis %}
-                    <a class="nav-link nav-sub {% if request.resolver_match.url_name == 'crm_funil_detalhe' and request.resolver_match.kwargs.pk|stringformat:'s' == f.pk|stringformat:'s' %}active{% endif %}" href="{% url 'crm_funil_detalhe' f.pk %}" title="{{ f.rotulo_sidebar }}">
-                      {% include "partials/icon_trofeu.html" %}
-                      <span class="nav-text">{{ f.rotulo_sidebar }}</span>
-                    </a>
-                    {% endfor %}
-                  </div>
-                </details>
-                {% endfor %}
-              </div>
               {% endif %}
             </div>
           </details>

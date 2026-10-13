@@ -37,7 +37,7 @@
               </div>
               <div class="funil-card-meta">
                 <span>{{ item.total_etapas }} etapas</span>
-                <span class="com-value">R$ {{ item.pipeline|default:0|floatformat:2 }}</span>
+                <span class="com-value">R$ {{ item.pipeline|default_if_none:0|floatformat:2 }}</span>
               </div>
               <div class="funil-etapas-preview">
                 {% for e in item.etapas.all %}

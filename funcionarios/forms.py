@@ -99,6 +99,38 @@ class PerfilForm(forms.ModelForm):
             self.add_error("hora_saida", "A saída deve ser posterior à entrada.")
         return cleaned
 
+    def clean_foto_perfil(self):
+        from django.core.exceptions import ValidationError
+
+        from .avatar import encode_avatar
+
+        foto = self.cleaned_data.get("foto_perfil")
+        self._foto_perfil_data = None
+        self._limpar_foto = False
+        if foto is False:
+            self._limpar_foto = True
+            return foto
+        if foto:
+            try:
+                self._foto_perfil_data = encode_avatar(foto)
+            except Exception as exc:
+                raise ValidationError(
+                    "Não foi possível processar a imagem. Use JPG ou PNG."
+                ) from exc
+        return foto
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if getattr(self, "_limpar_foto", False):
+            instance.foto_perfil = None
+            instance.foto_perfil_data = ""
+        elif getattr(self, "_foto_perfil_data", None):
+            instance.foto_perfil_data = self._foto_perfil_data
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
 
 class AlterarSenhaForm(PasswordChangeForm):
     def __init__(self, *args, **kwargs):

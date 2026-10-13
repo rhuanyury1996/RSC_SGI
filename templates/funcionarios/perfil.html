@@ -10,8 +10,8 @@
 <div class="pf-page">
   <section class="pf-hero">
     <div class="pf-hero-copy">
-      {% if funcionario.foto_perfil %}
-        <img class="pf-hero-avatar" src="{{ funcionario.foto_perfil.url }}" alt="Foto de {{ funcionario.nome_completo }}">
+      {% if funcionario.tem_foto %}
+        <img class="pf-hero-avatar" src="{{ funcionario.foto_url }}" alt="Foto de {{ funcionario.nome_completo }}">
       {% else %}
         <div class="pf-hero-avatar placeholder">{{ funcionario.nome|slice:":1" }}{{ funcionario.sobrenome|slice:":1" }}</div>
       {% endif %}

@@ -1,8 +1,8 @@
 <li class="org-item org-setor-{{ no.funcionario.setor }}">
   <div class="org-node">
     <div class="org-avatar" aria-hidden="true">
-      {% if no.funcionario.foto_perfil %}
-        <img src="{{ no.funcionario.foto_perfil.url }}" alt="">
+      {% if no.funcionario.tem_foto %}
+        <img src="{{ no.funcionario.foto_url }}" alt="">
       {% else %}
         <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.2"/><path d="M5.5 19.2c1.1-3.2 3.4-4.8 6.5-4.8s5.4 1.6 6.5 4.8"/></svg>
       {% endif %}

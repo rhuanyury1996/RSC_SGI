@@ -11,8 +11,8 @@
 
   <section class="info-composer apont-panel">
     <div class="info-composer-head">
-      {% if funcionario and funcionario.foto_perfil %}
-        <img class="info-avatar" src="{{ funcionario.foto_perfil.url }}" alt="">
+      {% if funcionario and funcionario.tem_foto %}
+        <img class="info-avatar" src="{{ funcionario.foto_url }}" alt="">
       {% else %}
         <div class="info-avatar placeholder">
           {% if funcionario %}{{ funcionario.nome|slice:":1" }}{{ funcionario.sobrenome|slice:":1" }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}
@@ -61,8 +61,8 @@
     <article class="info-post">
       <div class="info-post-main">
         <div class="info-post-side">
-          {% if item.autor and item.autor.funcionario and item.autor.funcionario.foto_perfil %}
-            <img class="info-avatar" src="{{ item.autor.funcionario.foto_perfil.url }}" alt="">
+          {% if item.autor and item.autor.funcionario and item.autor.funcionario.tem_foto %}
+            <img class="info-avatar" src="{{ item.autor.funcionario.foto_url }}" alt="">
           {% else %}
             <div class="info-avatar placeholder">
               {% if item.autor and item.autor.funcionario %}

@@ -52,6 +52,7 @@ from .services import (
     metricas_comerciais,
     mover_oportunidade,
     registrar_historico,
+    soma_pipeline_qs,
     tempo_na_etapa,
 )
 
@@ -180,6 +181,7 @@ def contatos(request):
                 if not contato.responsavel_id and funcionario:
                     contato.responsavel = funcionario
                 contato.save()
+                form.save_m2m()
                 messages.success(request, "Contato cadastrado.")
                 return redirect("crm_contatos")
 
@@ -203,6 +205,50 @@ def contatos(request):
             "empresa_form": empresa_form,
             "abrir_popup_empresa": abrir_popup,
         },
+    )
+
+
+@login_required
+def empresa_editar(request, pk: int):
+    empresa = get_object_or_404(Empresa, pk=pk, ativa=True)
+
+    if request.method == "POST":
+        form = EmpresaForm(request.POST, instance=empresa)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Empresa atualizada.")
+            return redirect("crm_empresas")
+    else:
+        form = EmpresaForm(instance=empresa)
+
+    return render(
+        request,
+        "crm/empresa_editar.html",
+        {"form": form, "empresa": empresa},
+    )
+
+
+@login_required
+def contato_editar(request, pk: int):
+    contato = get_object_or_404(
+        Contato.objects.select_related("empresa", "responsavel"),
+        pk=pk,
+        ativo=True,
+    )
+
+    if request.method == "POST":
+        form = ContatoForm(request.POST, instance=contato)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Contato atualizado.")
+            return redirect("crm_contatos")
+    else:
+        form = ContatoForm(instance=contato)
+
+    return render(
+        request,
+        "crm/contato_editar.html",
+        {"form": form, "contato": contato},
     )
 
 
@@ -245,6 +291,21 @@ def _etapas_com_ops(funil: Funil) -> list[EtapaFunil]:
         )
         .order_by("ordem", "pk")
     )
+
+
+def _metricas_coluna(etapa: EtapaFunil, *, com_valor: bool = False) -> None:
+    """Contador de cards (e valor acumulado do negócio, se pedido) por coluna."""
+    ops = list(etapa.oportunidades.all())
+    etapa.cards_count = len(ops)
+    if com_valor:
+        total = Decimal("0")
+        for opp in ops:
+            valor = opp.valor_negocio
+            if valor is not None:
+                total += valor
+        etapa.valor_acumulado = total
+    else:
+        etapa.valor_acumulado = None
 
 
 @login_required
@@ -469,6 +530,7 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
             etapa.descricao_fase = DESCRICOES_ETAPAS_POS_VENDAS.get(etapa.nome, "")
             etapa.fase_key = fase_campos_pos_vendas(etapa.nome)
     for etapa in etapas:
+        _metricas_coluna(etapa, com_valor=False)
         for opp in etapa.oportunidades.all():
             opp.tempo_etapa = tempo_na_etapa(opp)
 
@@ -492,9 +554,7 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
                 posicao_na_etapa = (ids.index(card_ativo.pk) + 1, len(ids))
 
     total_cards = Oportunidade.objects.filter(funil=funil).count()
-    pipeline = (
-        Oportunidade.objects.filter(funil=funil).aggregate(total=Sum("valor"))["total"] or 0
-    )
+    pipeline = soma_pipeline_qs(Oportunidade.objects.filter(funil=funil))
 
     return render(
         request,
@@ -792,6 +852,7 @@ def _funil_negociacoes(request, funil: Funil):
         etapa.coluna_css = css_coluna_negociacoes(etapa.nome)
         etapa.descricao_fase = DESCRICOES_ETAPAS_NEGOCIACOES.get(etapa.nome, "")
         etapa.fase_key = _fase_campos_negociacoes(etapa.nome) or "geral"
+        _metricas_coluna(etapa, com_valor=True)
         for opp in etapa.oportunidades.all():
             opp.tempo_etapa = tempo_na_etapa(opp)
             if opp.alerta_follow_up:
@@ -820,9 +881,10 @@ def _funil_negociacoes(request, funil: Funil):
             posicao_na_etapa = (ids.index(card_ativo.pk) + 1, len(ids))
 
     total_cards = Oportunidade.objects.filter(funil=funil).count()
-    pipeline = (
-        Oportunidade.objects.filter(funil=funil).aggregate(total=Sum("valor"))["total"] or 0
-    )
+    pipeline = Decimal("0")
+    for etapa in etapas:
+        if etapa.valor_acumulado:
+            pipeline += etapa.valor_acumulado
 
     return render(
         request,
@@ -846,6 +908,7 @@ def _funil_negociacoes(request, funil: Funil):
             ),
             "total_cards": total_cards,
             "pipeline": pipeline,
+            "mostrar_valor_coluna": True,
         },
     )
 
@@ -1016,6 +1079,7 @@ def _funil_pre_vendas(request, funil: Funil):
         etapa.coluna_css = css_coluna_pre_vendas(etapa.nome)
         etapa.descricao_fase = DESCRICOES_ETAPAS_PRE_VENDAS.get(etapa.nome, "")
         etapa.fase_key = _fase_campos_pre_vendas(etapa.nome)
+        _metricas_coluna(etapa, com_valor=False)
         for opp in etapa.oportunidades.all():
             opp.tempo_etapa = tempo_na_etapa(opp)
 
