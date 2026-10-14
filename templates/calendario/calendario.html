@@ -216,11 +216,10 @@
     <input type="hidden" name="acao" id="campoAcao" value="salvar">
 
     <div class="dialog-head">
-      <div>
-        <h3 id="dialogTitulo">{% if evento_edit %}Editar evento{% else %}Novo evento{% endif %}</h3>
-        <p class="muted dialog-sub" id="dialogSub">{% if evento_edit %}{{ evento_edit.get_tipo_display }}{% endif %}</p>
-      </div>
-      <button type="button" class="btn ghost" id="btnFecharDialog">Fechar</button>
+      <span class="com-dialog-badge">Calendário</span>
+      <h3 id="dialogTitulo">{% if evento_edit %}Editar evento{% else %}Novo evento{% endif %}</h3>
+      <p class="dialog-sub" id="dialogSub">{% if evento_edit %}{{ evento_edit.get_tipo_display }}{% else %}Agende feriados, day off ou compromissos da equipe.{% endif %}</p>
+      <button type="button" class="sgi-dialog-close" id="btnFecharDialog" aria-label="Fechar"></button>
     </div>
 
     <label for="id_tipo">Tipo</label>

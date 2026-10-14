@@ -336,8 +336,10 @@
     {% csrf_token %}
     <input type="hidden" name="acao" value="criar_empresa">
     <div class="com-dialog-head">
+      <span class="com-dialog-badge">CRM</span>
       <h3>Cadastrar empresa</h3>
-      <button type="button" class="btn ghost" id="btnFecharEmpresa">Fechar</button>
+      <p class="com-dialog-sub">Preencha os dados essenciais para usar a empresa nas negociações.</p>
+      <button type="button" class="sgi-dialog-close" id="btnFecharEmpresa" aria-label="Fechar"></button>
     </div>
     {{ empresa_form.non_field_errors }}
     <div class="form-section" style="margin-top:0;">

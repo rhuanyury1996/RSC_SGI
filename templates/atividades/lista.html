@@ -340,10 +340,11 @@
       <input type="hidden" name="escopo" value="{{ escopo }}">
       <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
       <div class="com-dialog-head">
+        <span class="com-dialog-badge">Atividades</span>
         <h3>Nova tarefa</h3>
-        <button type="button" class="btn ghost" id="btnFecharTarefa">Fechar</button>
+        <p class="com-dialog-sub">Defina empresa, equipe e horário para acompanhar o tempo com clareza.</p>
+        <button type="button" class="sgi-dialog-close" id="btnFecharTarefa" aria-label="Fechar"></button>
       </div>
-      <p class="muted" style="margin-top:0;">Preencha os detalhes com calma — o foco fica no formulário.</p>
       {{ form.non_field_errors }}
       <div class="empresa-grid">
         <div class="field span-2">

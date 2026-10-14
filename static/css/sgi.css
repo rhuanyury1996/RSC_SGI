@@ -3783,30 +3783,84 @@ button.cal-agenda .item,
 
 .cal-dialog {
   border: 0;
-  border-radius: 18px;
+  border-radius: 24px;
   padding: 0;
   width: min(520px, calc(100vw - 2rem));
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
 }
-.cal-dialog::backdrop { background: rgba(15, 23, 42, 0.35); }
-.cal-dialog-form { padding: 1.2rem 1.25rem 1.3rem; }
+.cal-dialog::backdrop { background: rgba(15, 23, 42, 0.48); }
+.cal-dialog-form { padding: 1.35rem 1.45rem 1.5rem; }
 .dialog-head {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  position: relative;
+  padding: 0.15rem 2.5rem 0.35rem;
+  margin-bottom: 1rem;
 }
-.dialog-head h3 { margin: 0; }
+.dialog-head h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
 .dialog-sub {
-  margin: 0.2rem 0 0;
-  font-size: 0.82rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+.cal-dialog-form label {
+  display: block;
+  margin: 0.85rem 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #94a3b8;
+}
+.cal-dialog-form input[type="text"],
+.cal-dialog-form input[type="date"],
+.cal-dialog-form input[type="time"],
+.cal-dialog-form input[type="number"],
+.cal-dialog-form input[type="datetime-local"],
+.cal-dialog-form select,
+.cal-dialog-form textarea {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: #eef2f7;
+  padding: 0.8rem 0.95rem;
+  font: inherit;
+  color: #0f172a;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.cal-dialog-form input:focus,
+.cal-dialog-form select:focus,
+.cal-dialog-form textarea:focus {
+  outline: none;
+  background: #e8eef6;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 .cal-dialog-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.55rem;
   align-items: center;
+  margin-top: 0.35rem;
+}
+.cal-dialog-actions .btn {
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+}
+.cal-dialog-actions .btn:not(.ghost):not(.secondary):not(.danger) {
+  border: 0;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.22);
 }
 .cal-dialog-actions .btn.danger,
 .btn.ghost.danger {
@@ -5342,8 +5396,8 @@ button.lp-tab.active:focus-visible {
 .empresa-form label {
   margin: 0;
   font-size: 0.8rem;
-  font-weight: 700;
-  color: #374151;
+  font-weight: 650;
+  color: #94a3b8;
 }
 .empresa-form input[type="text"],
 .empresa-form input[type="url"],
@@ -5351,43 +5405,64 @@ button.lp-tab.active:focus-visible {
 .empresa-form input[type="tel"],
 .empresa-form input[type="number"],
 .empresa-form input[type="date"],
+.empresa-form input[type="time"],
 .empresa-form input[type="file"],
 .empresa-form select,
 .empresa-form textarea {
   width: 100%;
   margin: 0;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  padding: 0.75rem 0.85rem;
+  border: 0;
+  background: #eef2f7;
+  padding: 0.8rem 0.95rem;
   font: inherit;
-  color: var(--text);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  color: #0f172a;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 .empresa-form input:hover,
 .empresa-form select:hover,
 .empresa-form textarea:hover {
-  border-color: #cbd5e1;
-  background: #fff;
+  background: #e8eef6;
 }
 .empresa-form input:focus,
 .empresa-form select:focus,
 .empresa-form textarea:focus {
   outline: none;
-  background: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  background: #e8eef6;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 .empresa-form-actions {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   display: flex;
-  justify-content: flex-end;
+  justify-content: stretch;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
 .empresa-form-actions .btn {
-  min-width: 180px;
+  flex: 1;
+  min-width: 140px;
+  border-radius: 12px;
+  padding: 0.8rem 1.1rem;
+  font-weight: 750;
+  border: 0;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.22);
+}
+.empresa-form-actions .btn:hover {
+  background: #1d4ed8;
+}
+.empresa-form-actions .btn.secondary,
+.empresa-form-actions .btn.ghost {
+  background: #fff;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+}
+.empresa-form-actions .btn.secondary:hover,
+.empresa-form-actions .btn.ghost:hover {
+  background: #f8fafc;
 }
 .com-row-link {
   cursor: pointer;
@@ -5511,32 +5586,110 @@ button.lp-tab.active:focus-visible {
   margin: 0;
 }
 
-.com-dialog {
+/* Soft dialog — padrão do sistema */
+.com-dialog,
+.cal-dialog {
   border: 0;
-  border-radius: 16px;
+  border-radius: 24px;
   padding: 0;
-  width: min(720px, calc(100vw - 2rem));
+  background: #fff;
+  color: #0f172a;
   max-height: calc(100vh - 2rem);
-  box-shadow: 0 20px 50px rgba(16, 24, 40, 0.18);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
 }
-.com-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.45);
+.com-dialog {
+  width: min(640px, calc(100vw - 2rem));
+}
+.com-dialog::backdrop,
+.cal-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(2px);
 }
 .com-dialog-form {
-  padding: 1.1rem 1.2rem 1.25rem;
+  padding: 1.35rem 1.5rem 1.5rem;
   overflow: auto;
   max-height: calc(100vh - 2rem);
 }
 .com-dialog-head {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.35rem;
+  text-align: center;
+  gap: 0.35rem;
+  position: relative;
+  padding: 0.2rem 2.5rem 0.4rem;
+  margin-bottom: 0.85rem;
 }
 .com-dialog-head h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+.com-dialog-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  max-width: 36rem;
+}
+.com-dialog-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.15rem;
+}
+.sgi-dialog-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sgi-dialog-close::before {
+  content: "×";
+  font-weight: 500;
+  margin-top: -1px;
+}
+.sgi-dialog-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.dialog-head .sgi-dialog-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.com-dialog .cu-select-resp,
+.com-dialog .cu-select-equipe {
+  border: 0;
+  background: #eef2f7;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.com-dialog .cu-select-equipe:focus,
+.com-dialog .cu-select-resp:focus {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  background: #e8eef6;
 }
 
 /* ——— Atividades (lista estilo ClickUp) ——— */
