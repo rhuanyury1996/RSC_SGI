@@ -9,6 +9,7 @@ MAX_HORAS_RECUPERACAO_POR_DIA = 2
 class TipoEvento(models.TextChoices):
     FERIAS = "ferias", "Férias"
     DAY_OFF = "day_off", "Day off"
+    FERIADO = "feriado", "Feriado"
     REUNIAO = "reuniao", "Reunião"
     DEMANDA = "demanda", "Demanda"
     RECUPERACAO = "recuperacao", "Recuperação de horas"
@@ -86,6 +87,7 @@ class EventoCalendario(models.Model):
         return {
             TipoEvento.FERIAS: "#14b8a6",
             TipoEvento.DAY_OFF: "#ff6b4a",
+            TipoEvento.FERIADO: "#0ea5e9",
             TipoEvento.REUNIAO: "#7c6cf0",
             TipoEvento.DEMANDA: "#f43f8b",
             TipoEvento.RECUPERACAO: "#f59e0b",

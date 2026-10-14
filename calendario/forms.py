@@ -102,6 +102,19 @@ class EventoCalendarioForm(forms.ModelForm):
         if inicio and fim and fim < inicio:
             self.add_error("fim", "O fim deve ser igual ou posterior ao início.")
 
+        if tipo == TipoEvento.FERIADO:
+            cleaned["dia_inteiro"] = True
+            cleaned["horas_recuperar"] = None
+            cleaned["recuperacao_inicio"] = None
+            cleaned["recuperacao_fim"] = None
+            if not cleaned.get("titulo"):
+                cleaned["titulo"] = "Feriado"
+            if inicio:
+                # Dia inteiro no mesmo dia do início
+                cleaned["fim"] = inicio.replace(
+                    hour=23, minute=59, second=59, microsecond=0
+                )
+
         if tipo == TipoEvento.DAY_OFF:
             if not cleaned.get("motivo"):
                 self.add_error("motivo", "Informe o motivo do day-off.")

@@ -19,6 +19,7 @@ from .permissions import (
     funcionarios_atribuiveis,
 )
 from .services import (
+    agrupar_por_pessoa,
     agrupar_por_prioridade,
     agrupar_por_status,
     alterar_status,
@@ -141,10 +142,17 @@ def lista(request):
         dia=dia,
         organizacao=organizacao,
     )
-    if organizacao == "prioridade":
+    equipe = list(funcionarios_atribuiveis(funcionario))
+    # Equipe (Todos): quadro por pessoa. Com filtro de 1 responsável, mantém status/prioridade.
+    if escopo == "equipe" and not responsavel_id:
+        grupos = agrupar_por_pessoa(itens, equipe)
+        agrupamento = "pessoa"
+    elif organizacao == "prioridade":
         grupos = agrupar_por_prioridade(itens)
+        agrupamento = "prioridade"
     else:
         grupos = agrupar_por_status(itens)
+        agrupamento = "status"
 
     hoje = timezone.localdate()
     for g in grupos:
@@ -164,17 +172,21 @@ def lista(request):
             "form_rapida": AtividadeRapidaForm(ator=funcionario),
             "grupos": grupos,
             "resumo": resumo_visivel(
-                funcionario, escopo=escopo, responsavel_id=responsavel_id
+                funcionario,
+                escopo=escopo,
+                responsavel_id=responsavel_id,
+                dia=dia,
             ),
             "hoje": hoje,
             "dia": dia,
             "dia_anterior": dia - timedelta(days=1),
             "dia_seguinte": dia + timedelta(days=1),
             "organizacao": organizacao,
+            "agrupamento": agrupamento,
             "escopo": escopo,
             "pode_dirigir": pode_dirigir,
             "eu": funcionario,
-            "equipe": list(funcionarios_atribuiveis(funcionario)),
+            "equipe": equipe,
             "responsavel_id": responsavel_id,
             "historico": historico_planner(funcionario) if organizacao == "planner" else [],
             "status_choices": StatusAtividade.choices,

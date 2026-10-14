@@ -12,6 +12,9 @@ from .models import MarcacaoPonto, TipoMarcacao
 # Fallback: 09:15–17:00 com 45 min de almoço → 7h líquidas
 JORNADA_DIARIA_PADRAO_SEGUNDOS = 7 * 3600
 
+# Marco zero do controle de horas: semana de 12/10/2026 (segunda)
+MARCO_ZERO_HORAS = date(2026, 10, 12)
+
 PERIODOS = (
     ("manha", "Manhã", 6, 12, "#ff7a59"),
     ("tarde", "Tarde", 12, 18, "#3d2a26"),
@@ -99,6 +102,96 @@ def eh_dia_trabalho(funcionario: Funcionario | None, dia: date) -> bool:
     return funcionario.trabalha_no_dia(dia)
 
 
+def inicio_semana(dia: date | None = None) -> date:
+    """Segunda-feira da semana (marco operacional do período)."""
+    ref = dia or timezone.localdate()
+    return ref - timedelta(days=ref.weekday())
+
+
+def limitar_ao_marco_zero(inicio: date) -> date:
+    return max(inicio, MARCO_ZERO_HORAS)
+
+
+def _pascoa(ano: int) -> date:
+    """Algoritmo anônimo gregoriano — domingo de Páscoa."""
+    a = ano % 19
+    b = ano // 100
+    c = ano % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    el = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * el) // 451
+    mes = (h + el - 7 * m + 114) // 31
+    dia = ((h + el - 7 * m + 114) % 31) + 1
+    return date(ano, mes, dia)
+
+
+def feriados_nacionais_nomeados(ano: int) -> dict[date, str]:
+    """Feriados nacionais brasileiros (data → nome)."""
+    pascoa = _pascoa(ano)
+    return {
+        date(ano, 1, 1): "Confraternização Universal",
+        pascoa - timedelta(days=48): "Carnaval",
+        pascoa - timedelta(days=47): "Carnaval",
+        pascoa - timedelta(days=2): "Sexta-feira Santa",
+        date(ano, 4, 21): "Tiradentes",
+        date(ano, 5, 1): "Dia do Trabalhador",
+        pascoa + timedelta(days=60): "Corpus Christi",
+        date(ano, 9, 7): "Independência do Brasil",
+        date(ano, 10, 12): "Nossa Senhora Aparecida",
+        date(ano, 11, 2): "Finados",
+        date(ano, 11, 15): "Proclamação da República",
+        date(ano, 11, 20): "Dia da Consciência Negra",
+        date(ano, 12, 25): "Natal",
+    }
+
+
+def feriados_nacionais(ano: int) -> set[date]:
+    """Feriados nacionais brasileiros (fixos + móveis)."""
+    return set(feriados_nacionais_nomeados(ano))
+
+
+def feriados_no_periodo(inicio: date, fim: date) -> set[date]:
+    """Nacionais + feriados cadastrados no calendário (tipo Feriado)."""
+    if fim < inicio:
+        return set()
+    dias: set[date] = set()
+    for ano in range(inicio.year, fim.year + 1):
+        for d in feriados_nacionais(ano):
+            if inicio <= d <= fim:
+                dias.add(d)
+    try:
+        from calendario.models import EventoCalendario, StatusEvento, TipoEvento
+
+        eventos = (
+            EventoCalendario.objects.filter(
+                tipo=TipoEvento.FERIADO,
+                status__in=(StatusEvento.CONFIRMADO, StatusEvento.CONCLUIDO),
+                inicio__date__lte=fim,
+                fim__date__gte=inicio,
+            )
+            .only("inicio", "fim", "dia_inteiro")
+            .iterator()
+        )
+        for ev in eventos:
+            d0 = timezone.localtime(ev.inicio).date()
+            d1 = timezone.localtime(ev.fim).date()
+            cursor = max(d0, inicio)
+            limite = min(d1, fim)
+            while cursor <= limite:
+                dias.add(cursor)
+                cursor += timedelta(days=1)
+    except Exception:
+        # Calendário pode não estar migrado em algum ambiente
+        pass
+    return dias
+
+
 def dias_trabalho_periodo(
     funcionario: Funcionario | None,
     inicio: date,
@@ -144,35 +237,58 @@ def montar_dashboard(
     fim: date,
     funcionario: Funcionario | None = None,
 ) -> dict:
+    inicio = limitar_ao_marco_zero(inicio)
+    if fim < inicio:
+        fim = inicio
+
     por_dia: dict[date, list[MarcacaoPonto]] = defaultdict(list)
     for m in marcacoes:
-        por_dia[timezone.localtime(m.data_hora).date()].append(m)
+        dia_m = timezone.localtime(m.data_hora).date()
+        if dia_m < inicio or dia_m > fim:
+            continue
+        por_dia[dia_m].append(m)
 
     diaria = jornada_diaria_segundos(funcionario)
+    feriados = feriados_no_periodo(inicio, fim)
     horas_por_dia_labels: list[str] = []
     horas_por_dia_valores: list[float] = []
     total_trabalhado = 0
     total_extras = 0
+    total_feriado_dado = 0
 
     cursor = inicio
     while cursor <= fim:
         itens = por_dia.get(cursor, [])
         segundos = segundos_trabalhados(itens)
-        total_trabalhado += segundos
-        if eh_dia_trabalho(funcionario, cursor):
-            extras = max(0, segundos - diaria)
+        dia_util = eh_dia_trabalho(funcionario, cursor)
+        feriado = cursor in feriados
+
+        if feriado and dia_util:
+            # Feriado: jornada é dada; o que apontar conta como extra
+            total_trabalhado += diaria
+            total_feriado_dado += diaria
+            total_extras += segundos
+        elif dia_util:
+            total_trabalhado += segundos
+            total_extras += max(0, segundos - diaria)
         else:
             # Fora da jornada: tudo conta como extra
-            extras = segundos
-        total_extras += extras
+            total_trabalhado += segundos
+            total_extras += segundos
         cursor += timedelta(days=1)
 
     chart_inicio = max(inicio, fim - timedelta(days=13))
     cursor = chart_inicio
     while cursor <= fim:
-        segundos = segundos_trabalhados(por_dia.get(cursor, []))
+        itens = por_dia.get(cursor, [])
+        segundos = segundos_trabalhados(itens)
+        dia_util = eh_dia_trabalho(funcionario, cursor)
+        if cursor in feriados and dia_util:
+            segundos_grafico = diaria + segundos
+        else:
+            segundos_grafico = segundos
         horas_por_dia_labels.append(cursor.strftime("%d/%m"))
-        horas_por_dia_valores.append(round(segundos / 3600, 2))
+        horas_por_dia_valores.append(round(segundos_grafico / 3600, 2))
         cursor += timedelta(days=1)
 
     intervalos = extrair_intervalos(marcacoes)
@@ -215,6 +331,8 @@ def montar_dashboard(
         "horas_extras": formatar_duracao(total_extras),
         "horas_a_quitar_seg": a_quitar,
         "horas_a_quitar": formatar_duracao(a_quitar),
+        "horas_feriado_dado_seg": total_feriado_dado,
+        "horas_feriado_dado": formatar_duracao(total_feriado_dado),
         "horas_previstas": formatar_duracao(previsto),
         "dias_uteis": dias_uteis,
         "jornada_diaria": formatar_duracao(diaria),
@@ -223,6 +341,7 @@ def montar_dashboard(
         "resumo_jornada": (
             funcionario.resumo_jornada() if funcionario else f"Seg–Sex · {entrada}–{saida}"
         ),
+        "marco_zero": MARCO_ZERO_HORAS,
         "chart_dias": {
             "labels": horas_por_dia_labels,
             "values": horas_por_dia_valores,

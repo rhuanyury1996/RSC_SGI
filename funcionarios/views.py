@@ -74,8 +74,10 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
     from apontamentos.models import MarcacaoPonto
     from apontamentos.services import (
         formatar_duracao,
+        inicio_semana,
         jornada_diaria_segundos,
         jornada_em_andamento,
+        limitar_ao_marco_zero,
         montar_dashboard,
         segundos_trabalhados,
     )
@@ -151,18 +153,20 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
     )
     em_timer = next((a for a in atividades if a.cronometro_ativo), None)
 
-    inicio_mes = hoje.replace(day=1)
-    marcacoes_mes = list(
+    inicio_periodo = limitar_ao_marco_zero(inicio_semana(hoje))
+    marcacoes_periodo = list(
         MarcacaoPonto.objects.filter(
             funcionario=funcionario,
-            data_hora__date__gte=inicio_mes,
+            data_hora__date__gte=inicio_periodo,
             data_hora__date__lte=hoje,
         ).order_by("data_hora")
     )
-    horas_periodo = montar_dashboard(marcacoes_mes, inicio_mes, hoje, funcionario)
+    horas_periodo = montar_dashboard(
+        marcacoes_periodo, inicio_periodo, hoje, funcionario
+    )
     marcacoes_hoje = [
         m
-        for m in marcacoes_mes
+        for m in marcacoes_periodo
         if timezone.localtime(m.data_hora).date() == hoje
     ]
     segundos_hoje = segundos_trabalhados(marcacoes_hoje)

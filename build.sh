@@ -9,3 +9,6 @@ python manage.py migrate --no-input
 if [ -n "${CEO_PASSWORD:-}" ]; then
   python manage.py bootstrap_ceo
 fi
+
+# Cadastra feriados nacionais (crédito automático de jornada)
+python manage.py cadastrar_feriados

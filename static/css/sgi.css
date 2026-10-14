@@ -5549,6 +5549,37 @@ button.lp-tab.active:focus-visible {
   font-weight: 700;
   color: var(--muted);
 }
+.cu-equipe-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.86rem;
+}
+.cu-group.pessoa-group > .cu-group-head {
+  background: #f8fafc;
+}
+.cu-group.pessoa-group .cu-group-label {
+  background: #1e3a5f;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.cu-group-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 0.7rem;
+}
+.cu-resp-fixed {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: center;
+}
+.cu-board-pessoas .cu-group.pessoa-group {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 0.65rem;
+  overflow: hidden;
+}
 
 .cu-list { list-style: none; margin: 0; padding: 0; }
 .cu-row {

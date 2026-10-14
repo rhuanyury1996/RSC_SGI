@@ -73,7 +73,11 @@
     </div>
   </section>
 
-  <div class="cu-board">
+  {% if agrupamento == "pessoa" %}
+  <p class="muted cu-equipe-hint">Quadro da equipe por pessoa · {{ dia|date:"d/m/Y" }}. Filtre alguém no seletor para ver por status.</p>
+  {% endif %}
+
+  <div class="cu-board {% if agrupamento == 'pessoa' %}cu-board-pessoas{% endif %}">
     <div class="cu-cols-head">
       <div class="cu-col-nome">Nome</div>
       <div class="cu-col-quando">Data / horário</div>
@@ -85,11 +89,19 @@
     </div>
 
     {% for grupo in grupos %}
-    <details class="cu-group status-{{ grupo.status }}"{% if grupo.count %} open{% endif %}>
+    <details class="cu-group {% if grupo.kind == 'pessoa' %}pessoa-group{% else %}status-{{ grupo.status }}{% endif %}"{% if grupo.count or grupo.kind == 'pessoa' %} open{% endif %}>
       <summary class="cu-group-head">
         <span class="cu-group-caret" aria-hidden="true"></span>
+        {% if grupo.kind == "pessoa" and grupo.pessoa %}
+        <span class="cu-avatar cu-group-avatar" title="{{ grupo.pessoa.nome_completo }}">
+          {{ grupo.pessoa.nome|slice:":1" }}{{ grupo.pessoa.sobrenome|slice:":1" }}
+        </span>
+        <span class="cu-group-label">{{ grupo.label }}</span>
+        <span class="cu-group-count">{{ grupo.realizados }}/{{ grupo.count }}</span>
+        {% else %}
         <span class="cu-group-label">{{ grupo.label }}</span>
         <span class="cu-group-count">{{ grupo.count }}</span>
+        {% endif %}
       </summary>
 
       <form method="post" class="cu-add-row">
@@ -98,21 +110,26 @@
         <input type="hidden" name="org" value="{{ organizacao }}">
         <input type="hidden" name="escopo" value="{{ escopo }}">
         <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
-        <input type="hidden" name="status" value="{% if grupo.kind == 'prioridade' %}nao_iniciado{% else %}{{ grupo.status }}{% endif %}">
+        <input type="hidden" name="status" value="{% if grupo.kind == 'prioridade' or grupo.kind == 'pessoa' %}nao_iniciado{% else %}{{ grupo.status }}{% endif %}">
         {% if grupo.kind == 'prioridade' %}
         <input type="hidden" name="prioridade" value="{{ grupo.status }}">
         {% endif %}
-        <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa" autocomplete="off" required>
+        <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa{% if grupo.kind == 'pessoa' %} para {{ grupo.label }}{% endif %}" autocomplete="off" required>
         <input type="date" name="planejado_para" value="{{ dia|date:'Y-m-d' }}" aria-label="Data" title="Data">
         <input type="time" name="hora_inicio" aria-label="Início" title="Horário início">
         <input type="time" name="hora_fim" aria-label="Fim" title="Horário fim">
         {% if pode_dirigir %}
-        <select name="responsavel" class="cu-select-resp" aria-label="Responsável" required>
-          <option value="">Responsável…</option>
-          {% for f in equipe %}
-          <option value="{{ f.pk }}" {% if responsavel_id == f.pk or not responsavel_id and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
-          {% endfor %}
-        </select>
+          {% if grupo.kind == "pessoa" and grupo.pessoa %}
+          <input type="hidden" name="responsavel" value="{{ grupo.pessoa.pk }}">
+          <span class="cu-resp-fixed muted">{{ grupo.pessoa.nome_completo }}</span>
+          {% else %}
+          <select name="responsavel" class="cu-select-resp" aria-label="Responsável" required>
+            <option value="">Responsável…</option>
+            {% for f in equipe %}
+            <option value="{{ f.pk }}" {% if responsavel_id == f.pk or not responsavel_id and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
         {% endif %}
         <button class="btn ghost" type="submit">Adicionar</button>
       </form>

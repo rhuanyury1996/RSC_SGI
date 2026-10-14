@@ -26,7 +26,9 @@ from .models import (
 from .permissions import pode_aprovar_edicoes_marcacao
 from .services import (
     formatar_duracao,
+    inicio_semana,
     jornada_em_andamento,
+    limitar_ao_marco_zero,
     montar_dashboard,
     segundos_trabalhados,
 )
@@ -42,18 +44,23 @@ def _exige_funcionario(request):
 
 def _parse_periodo(request):
     hoje = timezone.localdate()
+    padrao_inicio = inicio_semana(hoje)
     try:
         inicio = date.fromisoformat(
-            request.GET.get("inicio", "") or hoje.replace(day=1).isoformat()
+            request.GET.get("inicio", "") or padrao_inicio.isoformat()
         )
     except ValueError:
-        inicio = hoje.replace(day=1)
+        inicio = padrao_inicio
     try:
         fim = date.fromisoformat(request.GET.get("fim", "") or hoje.isoformat())
     except ValueError:
         fim = hoje
     if fim < inicio:
         inicio, fim = fim, inicio
+    # Não conta horas anteriores ao marco zero (semana de go-live)
+    inicio = limitar_ao_marco_zero(inicio)
+    if fim < inicio:
+        fim = inicio
     return inicio, fim
 
 

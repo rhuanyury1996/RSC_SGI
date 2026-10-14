@@ -109,6 +109,45 @@ def agrupar_por_prioridade(itens: QuerySet[AtividadeDiaria]) -> list[dict]:
     ]
 
 
+def agrupar_por_pessoa(
+    itens: QuerySet[AtividadeDiaria] | list[AtividadeDiaria],
+    membros: list[Funcionario],
+) -> list[dict]:
+    """Quadro da equipe: uma seção por responsável (inclui quem está sem tarefas no dia)."""
+    buckets: dict[int, list] = defaultdict(list)
+    responsaveis: dict[int, Funcionario] = {m.pk: m for m in membros}
+    for item in itens:
+        if not item.responsavel_id:
+            continue
+        buckets[item.responsavel_id].append(item)
+        responsaveis[item.responsavel_id] = item.responsavel
+
+    ordem_ids = [m.pk for m in membros]
+    for pk in buckets:
+        if pk not in ordem_ids:
+            ordem_ids.append(pk)
+
+    grupos = []
+    for pk in ordem_ids:
+        pessoa = responsaveis.get(pk)
+        if pessoa is None:
+            continue
+        lista = buckets.get(pk, [])
+        feitos = sum(1 for i in lista if i.status == StatusAtividade.REALIZADO)
+        grupos.append(
+            {
+                "status": f"pessoa_{pk}",
+                "label": pessoa.nome_completo,
+                "pessoa": pessoa,
+                "itens": lista,
+                "count": len(lista),
+                "realizados": feitos,
+                "kind": "pessoa",
+            }
+        )
+    return grupos
+
+
 def criar_atividade(
     ator: Funcionario,
     *,
@@ -258,8 +297,12 @@ def resumo_visivel(
     *,
     escopo: str = "minhas",
     responsavel_id: int | None = None,
+    dia: date | None = None,
 ) -> dict:
     qs = queryset_visivel(ator, escopo=escopo, responsavel_id=responsavel_id)
+    # Mesmo recorte da lista (senão o Total fica maior que os grupos do dia)
+    if dia is not None:
+        qs = qs.filter(Q(planejado_para=dia) | Q(data_vencimento=dia))
     agg = qs.aggregate(
         total=Count("id"),
         realizados=Count("id", filter=Q(status=StatusAtividade.REALIZADO)),

@@ -22,6 +22,8 @@
     </form>
     <p class="hint">
       Hoje {{ horas_hoje }} · jornada {{ dashboard.jornada_diaria }}/dia ({{ dashboard.horario_padrao }})
+      · marco zero {{ dashboard.marco_zero|date:"d/m/Y" }}
+      {% if dashboard.horas_feriado_dado_seg %}· feriado creditado {{ dashboard.horas_feriado_dado }}{% endif %}
       · <a href="{% url 'editar_perfil' %}">ajustar no perfil</a>
     </p>
   </div>
