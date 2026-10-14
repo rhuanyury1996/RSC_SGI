@@ -5943,15 +5943,48 @@ button.lp-tab.active:focus-visible {
 .cu-dot.status-em_revisao { background: #eab308; border-color: #eab308; }
 .cu-dot.status-executando { background: #3b82f6; border-color: #3b82f6; }
 .cu-dot.status-nao_iniciado { border-color: #f97316; }
-.cu-task { min-width: 0; flex: 1; }
-.cu-task > summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
+.cu-task-open {
+  min-width: 0;
+  flex: 1 1 auto;
+  align-self: center;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0.1rem 0.2rem !important;
+  margin: 0 !important;
+  font: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  box-shadow: none;
+  transform: none;
 }
-.cu-task > summary::-webkit-details-marker { display: none; }
+.cu-task-open:hover,
+.cu-task-open:active,
+.cu-task-open:focus {
+  background: transparent !important;
+  color: inherit !important;
+  transform: none;
+  box-shadow: none;
+}
+.cu-task-open:hover .cu-title,
+.cu-task-open:focus-visible .cu-title {
+  color: var(--accent);
+}
+.cu-task-open:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
 .cu-title {
   font-weight: 650;
   font-size: 0.9rem;
@@ -5960,16 +5993,18 @@ button.lp-tab.active:focus-visible {
   text-overflow: ellipsis;
 }
 .cu-has-desc { color: var(--muted); font-size: 0.8rem; }
-.cu-task-body {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  display: grid;
-  gap: 0.55rem;
+#dialogEditarTarefa .empresa-form-actions {
+  justify-content: space-between;
 }
-.cu-task-actions { margin-top: 0.35rem; }
+#dialogEditarTarefa .empresa-form-actions .btn.ghost {
+  flex: 0 0 auto;
+  min-width: 0;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+#dialogEditarTarefa .empresa-form-actions .btn:not(.ghost) {
+  flex: 1;
+}
 
 .cu-avatars {
   display: inline-flex;
@@ -6003,21 +6038,117 @@ button.lp-tab.active:focus-visible {
   color: #475569;
   font-size: 0.62rem;
 }
-.cu-select-equipe {
-  width: 100%;
-  min-height: 5.5rem;
-  font: inherit;
-  font-size: 0.84rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.35rem 0.45rem;
-  background: #fff;
-  color: var(--text);
+.cu-equipe-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  background: #eef2f7;
 }
-.cu-select-equipe:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+.cu-equipe-box ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+}
+.cu-equipe-box li { margin: 0; }
+.cu-equipe-box label,
+.cu-equipe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #334155;
+  cursor: pointer;
+}
+.cu-equipe-box input {
+  width: auto;
+  margin: 0;
+  accent-color: #2563eb;
+}
+.cu-equipe-box label:has(input:checked),
+.cu-equipe-chip:has(input:checked) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+.cu-sub-indent {
+  width: 1.1rem;
+  flex-shrink: 0;
+  border-left: 2px solid #cbd5e1;
+  align-self: stretch;
+  margin: 0.2rem 0.15rem 0.2rem 0.35rem;
+}
+.cu-row.is-sub {
+  background: #f8fafc;
+}
+.cu-row.is-sub .cu-col-nome { padding-left: 0.15rem; }
+.cu-sub-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.08rem 0.3rem;
+  margin-right: 0.15rem;
+}
+.cu-sub-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0 0.3rem;
+}
+.cu-sub-list {
+  list-style: none;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.cu-sub-list li {
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.86rem;
+}
+.cu-sub-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.cu-sub-add input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+.cu-sub-add select {
+  flex: 0 1 160px;
+}
+.cu-sub-add .btn {
+  flex: 0 0 auto;
+  min-width: 0 !important;
+  padding: 0.65rem 0.9rem !important;
 }
 .cu-col-venc {
   font-size: 0.86rem;
@@ -6093,6 +6224,7 @@ button.lp-tab.active:focus-visible {
 .cu-timer-icon { font-size: 0.66rem; }
 
 .cu-add-row {
+  --cu-control-h: 36px;
   display: flex;
   flex-wrap: nowrap;
   gap: 0.4rem;
@@ -6107,14 +6239,17 @@ button.lp-tab.active:focus-visible {
   flex: 1 1 auto;
   min-width: 140px;
   width: auto;
+  height: var(--cu-control-h);
+  box-sizing: border-box;
   font: inherit;
   font-size: 0.88rem;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
-  padding: 0.38rem 0.55rem;
+  padding: 0 0.65rem;
   color: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: none;
+  line-height: calc(var(--cu-control-h) - 2px);
 }
 .cu-quick-input:focus {
   outline: none;
@@ -6147,33 +6282,48 @@ button.lp-tab.active:focus-visible {
 }
 .cu-add-row input[type="date"],
 .cu-add-row input[type="time"],
-.cu-select-empresa,
-.cu-select-resp {
+.cu-add-row .cu-select-empresa,
+.cu-add-row .cu-select-resp {
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 0.34rem 0.42rem;
+  height: var(--cu-control-h);
+  min-height: var(--cu-control-h);
+  box-sizing: border-box;
+  padding: 0 0.5rem;
   background: #fff;
   color: var(--text);
   flex: 0 0 auto;
+  line-height: calc(var(--cu-control-h) - 2px);
 }
-.cu-add-row input[type="date"] { width: 118px; }
-.cu-add-row input[type="time"] { width: 68px; }
-.cu-select-empresa {
+.cu-add-row input[type="date"] { width: 132px; }
+.cu-add-row input[type="time"] { width: 72px; }
+.cu-add-row .cu-select-empresa {
   width: 88px;
   font-weight: 700;
   color: #3730a3;
   background: #eef2ff;
   border-color: #c7d2fe;
 }
-.cu-select-empresa:focus,
-.cu-select-resp:focus,
+.cu-add-row .cu-select-empresa:focus,
+.cu-add-row .cu-select-resp:focus,
 .cu-add-row input[type="date"]:focus,
 .cu-add-row input[type="time"]:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cu-add-row .cu-select-resp {
+  width: 140px;
+  max-width: 160px;
+  cursor: pointer;
+}
+.cu-select-empresa {
+  font-weight: 700;
+  color: #3730a3;
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 .cu-select-resp {
   width: 140px;
@@ -6183,8 +6333,20 @@ button.lp-tab.active:focus-visible {
 .cu-add-row .btn {
   flex: 0 0 auto;
   white-space: nowrap;
-  padding: 0.38rem 0.75rem;
+  height: var(--cu-control-h);
+  min-height: var(--cu-control-h);
+  box-sizing: border-box;
+  padding: 0 0.85rem !important;
+  margin: 0 !important;
   font-size: 0.8rem;
+  line-height: 1;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.cu-add-row .btn:hover {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 .cu-add-row .cu-resp-fixed {
   flex: 0 1 120px;

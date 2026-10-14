@@ -141,189 +141,10 @@
 
       <ul class="cu-list">
         {% for item in grupo.itens %}
-        <li class="cu-row {% if item.status == 'realizado' %}is-done{% endif %}" data-id="{{ item.pk }}">
-          <div class="cu-col-nome">
-            <span class="cu-dot status-{{ item.status }}" aria-hidden="true"></span>
-            <span class="eisen-badge q-{{ item.quadrante }}" title="{{ item.get_quadrante_display }}">
-              {% if item.quadrante == "fazer" %}Q1 · Fazer{% elif item.quadrante == "agendar" %}Q2 · Agendar{% elif item.quadrante == "delegar" %}Q3 · Delegar{% else %}Q4 · Eliminar{% endif %}
-            </span>
-            <span class="cu-empresa-badge {% if item.eh_trabalho_interno %}is-rsc{% else %}is-cliente{% endif %}" title="Empresa">{{ item.empresa_label }}</span>
-            <details class="cu-task">
-              <summary>
-                <span class="cu-title">{{ item.titulo }}</span>
-                {% if item.descricao %}<span class="cu-has-desc" title="Tem descrição">≡</span>{% endif %}
-              </summary>
-              <div class="cu-task-body">
-                <form method="post" action="{% url 'atividade_editar' item.pk %}" class="com-form empresa-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="org" value="{{ organizacao }}">
-                  <input type="hidden" name="escopo" value="{{ escopo }}">
-                  <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
-                  {% if responsavel_id %}<input type="hidden" name="resp" value="{{ responsavel_id }}">{% endif %}
-                  <div class="empresa-grid">
-                    <div class="field span-2">
-                      <label>Título</label>
-                      <input type="text" name="titulo" value="{{ item.titulo }}" required>
-                    </div>
-                    <div class="field">
-                      <label>Status</label>
-                      <select name="status">
-                        {% for val, lab in status_choices %}
-                        <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ lab }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label>Prioridade</label>
-                      <select name="prioridade">
-                        {% for val, lab in prioridade_choices %}
-                        <option value="{{ val }}" {% if item.prioridade == val %}selected{% endif %}>{{ lab }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label>Responsável principal</label>
-                      {% if pode_dirigir %}
-                      <select name="responsavel" class="cu-select-resp" required>
-                        {% for f in equipe_opcoes %}
-                        <option value="{{ f.pk }}" {% if item.responsavel_id == f.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
-                        {% endfor %}
-                      </select>
-                      {% else %}
-                      <input type="hidden" name="responsavel" value="{{ item.responsavel_id }}">
-                      <span>{{ item.responsavel.nome_completo }}</span>
-                      {% endif %}
-                    </div>
-                    <div class="field span-2">
-                      <label>Equipe (grupo)</label>
-                      <select name="participantes" class="cu-select-equipe" multiple size="4" aria-label="Participantes">
-                        {% for f in equipe_opcoes %}
-                          {% if f.pk != item.responsavel_id %}
-                          <option value="{{ f.pk }}" {% if f in item.participantes.all %}selected{% endif %}>{{ f.nome_completo }}</option>
-                          {% endif %}
-                        {% endfor %}
-                      </select>
-                      <small class="muted">Ctrl/Cmd + clique para marcar várias pessoas.</small>
-                    </div>
-                    <div class="field">
-                      <label>Empresa</label>
-                      <select name="cliente_rsc" aria-label="Empresa">
-                        <option value="" {% if not item.cliente_rsc_id %}selected{% endif %}>RSC</option>
-                        {% for cli in clientes_rsc %}
-                        <option value="{{ cli.pk }}" {% if item.cliente_rsc_id == cli.pk %}selected{% endif %}>{{ cli.nome }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label>Data</label>
-                      <input type="date" name="planejado_para" value="{% if item.planejado_para %}{{ item.planejado_para|date:'Y-m-d' }}{% endif %}" required>
-                    </div>
-                    <div class="field">
-                      <label>Início</label>
-                      <input type="time" name="hora_inicio" value="{% if item.hora_inicio %}{{ item.hora_inicio|time:'H:i' }}{% endif %}">
-                    </div>
-                    <div class="field">
-                      <label>Fim</label>
-                      <input type="time" name="hora_fim" value="{% if item.hora_fim %}{{ item.hora_fim|time:'H:i' }}{% endif %}">
-                    </div>
-                    <div class="field">
-                      <label>Vencimento</label>
-                      <input type="date" name="data_vencimento" value="{% if item.data_vencimento %}{{ item.data_vencimento|date:'Y-m-d' }}{% endif %}">
-                    </div>
-                    <div class="field">
-                      <label>Eisenhower</label>
-                      <select name="quadrante">
-                        <option value="fazer" {% if item.quadrante == "fazer" %}selected{% endif %}>Fazer primeiro</option>
-                        <option value="agendar" {% if item.quadrante == "agendar" %}selected{% endif %}>Agendar</option>
-                        <option value="delegar" {% if item.quadrante == "delegar" %}selected{% endif %}>Delegar</option>
-                        <option value="eliminar" {% if item.quadrante == "eliminar" %}selected{% endif %}>Eliminar</option>
-                      </select>
-                    </div>
-                    <div class="field span-2">
-                      <label>Descrição</label>
-                      <textarea name="descricao" rows="2">{{ item.descricao }}</textarea>
-                    </div>
-                  </div>
-                  <div class="cu-task-actions">
-                    <button class="btn secondary" type="submit">Salvar</button>
-                  </div>
-                </form>
-                <form method="post" action="{% url 'atividade_excluir' item.pk %}" onsubmit="return confirm('Remover esta tarefa?');">
-                  {% csrf_token %}
-                  <input type="hidden" name="org" value="{{ organizacao }}">
-                  <input type="hidden" name="escopo" value="{{ escopo }}">
-                  <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
-                  <button class="btn ghost" type="submit">Excluir</button>
-                </form>
-              </div>
-            </details>
-          </div>
-
-          <div class="cu-col-quando">
-            <div class="cu-quando">
-              <strong>{% if item.planejado_para %}{{ item.planejado_para|date:"d/m" }}{% else %}—{% endif %}</strong>
-              {% if item.hora_inicio %}
-              <span class="cu-hora">
-                {{ item.hora_inicio|time:"H:i" }}{% if item.hora_fim %}–{{ item.hora_fim|time:"H:i" }}{% endif %}
-              </span>
-              {% else %}
-              <span class="muted">sem horário</span>
-              {% endif %}
-              {% if item.data_vencimento %}
-              <small class="{% if item.atrasada %}is-late{% endif %}">venc. {{ item.data_vencimento|date:"d/m" }}</small>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="cu-col-resp">
-            <div class="cu-avatars" title="{% for m in item.membros_equipe %}{{ m.nome_completo }}{% if not forloop.last %}, {% endif %}{% endfor %}">
-              {% for m in item.membros_equipe %}
-              <span class="cu-avatar {% if m.pk == item.responsavel_id %}is-lead{% endif %}" {% if forloop.counter > 3 %}style="display:none"{% endif %}>
-                {{ m.nome|slice:":1" }}{{ m.sobrenome|slice:":1" }}
-              </span>
-              {% endfor %}
-              {% if item.membros_equipe|length > 3 %}
-              <span class="cu-avatar cu-avatar-more">+{{ item.membros_equipe|length|add:"-3" }}</span>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="cu-col-prio">
-            <span class="cu-flag prio-{{ item.prioridade }}">{{ item.get_prioridade_display }}</span>
-          </div>
-
-          <div class="cu-col-status">
-            <form method="post" action="{% url 'atividade_status' item.pk %}" class="cu-status-form">
-              {% csrf_token %}
-              <input type="hidden" name="org" value="{{ organizacao }}">
-              <input type="hidden" name="escopo" value="{{ escopo }}">
-              <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
-              <select name="status" class="cu-status-select status-{{ item.status }}" onchange="this.form.submit()" aria-label="Status">
-                {% for val, lab in status_choices %}
-                <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ lab }}</option>
-                {% endfor %}
-              </select>
-            </form>
-          </div>
-
-          <div class="cu-col-timer">
-            <form method="post" action="{% url 'atividade_cronometro' item.pk %}" class="cu-timer-form">
-              {% csrf_token %}
-              <input type="hidden" name="org" value="{{ organizacao }}">
-              <input type="hidden" name="escopo" value="{{ escopo }}">
-              <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
-              <button type="submit"
-                      class="cu-timer-btn {% if item.cronometro_ativo %}is-running{% endif %}"
-                      title="{% if item.cronometro_ativo %}Pausar{% else %}Iniciar{% endif %}"
-                      data-segundos="{{ item.tempo_atual_segundos }}"
-                      data-inicio="{% if item.cronometro_inicio %}{{ item.cronometro_inicio|date:'c' }}{% endif %}">
-                <span class="cu-timer-icon">{% if item.cronometro_ativo %}❚❚{% else %}▶{% endif %}</span>
-                <span class="cu-timer-text">{{ item.tempo_fmt }}</span>
-              </button>
-            </form>
-          </div>
-
-        </li>
+          {% include "atividades/_linha_atividade.html" with item=item is_sub=False %}
+          {% for filho in item.filhos %}
+            {% include "atividades/_linha_atividade.html" with item=filho is_sub=True %}
+          {% endfor %}
         {% empty %}
         <li class="cu-empty muted">Nenhuma tarefa neste grupo.</li>
         {% endfor %}
@@ -367,9 +188,12 @@
           {% endif %}
         </div>
         <div class="field span-2">
-          <label for="{{ form.participantes.id_for_label }}">Equipe (grupo)</label>
-          {{ form.participantes }}{{ form.participantes.errors }}
-          <small class="muted">Ctrl/Cmd + clique para incluir colegas na mesma tarefa.</small>
+          <label>Aparece também para</label>
+          <div class="cu-equipe-box">
+            {{ form.participantes }}
+          </div>
+          {{ form.participantes.errors }}
+          <small class="muted">Marque quem mais deve ver esta demanda (ex.: Isadora e Denise). O responsável principal já vê automaticamente.</small>
         </div>
         <div class="field">
           <label for="{{ form.cliente_rsc.id_for_label }}">Empresa</label>
@@ -414,6 +238,125 @@
     </form>
   </dialog>
 
+  <dialog class="com-dialog" id="dialogEditarTarefa">
+    <form method="post" class="com-dialog-form empresa-form" id="formEditarTarefa" action="">
+      {% csrf_token %}
+      <input type="hidden" name="org" value="{{ organizacao }}">
+      <input type="hidden" name="escopo" value="{{ escopo }}">
+      <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+      {% if responsavel_id %}<input type="hidden" name="resp" value="{{ responsavel_id }}">{% endif %}
+      <div class="com-dialog-head">
+        <span class="com-dialog-badge">Atividades</span>
+        <h3>Editar tarefa</h3>
+        <p class="com-dialog-sub">Ajuste equipe, empresa e horários sem sair da lista.</p>
+        <button type="button" class="sgi-dialog-close" id="btnFecharEditarTarefa" aria-label="Fechar"></button>
+      </div>
+      <div class="empresa-grid">
+        <div class="field span-2">
+          <label for="editTitulo">Título</label>
+          <input type="text" name="titulo" id="editTitulo" required>
+        </div>
+        <div class="field">
+          <label for="editStatus">Status</label>
+          <select name="status" id="editStatus">
+            {% for val, lab in status_choices %}
+            <option value="{{ val }}">{{ lab }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="editPrioridade">Prioridade</label>
+          <select name="prioridade" id="editPrioridade">
+            {% for val, lab in prioridade_choices %}
+            <option value="{{ val }}">{{ lab }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="editResponsavel">Responsável principal</label>
+          {% if pode_dirigir %}
+          <select name="responsavel" id="editResponsavel" class="cu-select-resp" required>
+            {% for f in equipe_opcoes %}
+            <option value="{{ f.pk }}">{{ f.nome_completo }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="hidden" name="responsavel" id="editResponsavel" value="{{ eu.pk }}">
+          <span id="editResponsavelLabel">{{ eu.nome_completo }}</span>
+          {% endif %}
+        </div>
+        <div class="field span-2">
+          <label>Aparece também para</label>
+          <div class="cu-equipe-box" id="editParticipantesBox">
+            {% for f in equipe_opcoes %}
+            <label class="cu-equipe-chip">
+              <input type="checkbox" name="participantes" value="{{ f.pk }}" class="edit-part-check" data-pk="{{ f.pk }}">
+              <span>{{ f.nome_completo }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <small class="muted">Quem marcar verá a mesma demanda na lista Minhas (além do responsável principal).</small>
+        </div>
+        <div class="field span-2" id="blocoSubtarefas">
+          <label>Subtarefas</label>
+          <ul class="cu-sub-list" id="listaSubtarefas"></ul>
+          <div class="cu-sub-add">
+            <input type="text" id="novaSubtitulo" placeholder="+ Nova subtarefa" maxlength="200" autocomplete="off">
+            <select id="novaSubResp" aria-label="Responsável da subtarefa">
+              {% for f in equipe_opcoes %}
+              <option value="{{ f.pk }}" {% if f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn secondary" id="btnAddSubtarefa">Adicionar</button>
+          </div>
+          <small class="muted">Distribua partes da demanda (cada pessoa pode ter a sua subtarefa).</small>
+        </div>
+        <div class="field">
+          <label for="editCliente">Empresa</label>
+          <select name="cliente_rsc" id="editCliente">
+            <option value="">RSC</option>
+            {% for cli in clientes_rsc %}
+            <option value="{{ cli.pk }}">{{ cli.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="editPlanejado">Data</label>
+          <input type="date" name="planejado_para" id="editPlanejado" required>
+        </div>
+        <div class="field">
+          <label for="editHoraInicio">Início</label>
+          <input type="time" name="hora_inicio" id="editHoraInicio">
+        </div>
+        <div class="field">
+          <label for="editHoraFim">Fim</label>
+          <input type="time" name="hora_fim" id="editHoraFim">
+        </div>
+        <div class="field">
+          <label for="editVencimento">Vencimento</label>
+          <input type="date" name="data_vencimento" id="editVencimento">
+        </div>
+        <div class="field">
+          <label for="editQuadrante">Eisenhower</label>
+          <select name="quadrante" id="editQuadrante">
+            <option value="fazer">Fazer primeiro</option>
+            <option value="agendar">Agendar</option>
+            <option value="delegar">Delegar</option>
+            <option value="eliminar">Eliminar</option>
+          </select>
+        </div>
+        <div class="field span-2">
+          <label for="editDescricao">Descrição</label>
+          <textarea name="descricao" id="editDescricao" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="empresa-form-actions">
+        <button class="btn ghost" type="submit" formaction="" formmethod="post" id="btnExcluirTarefaDialog" onclick="return confirm('Remover esta tarefa?');">Excluir</button>
+        <button class="btn" type="submit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
   {% if historico %}
   <section class="cu-hist-wrap">
     <h2>Últimos dias no planner</h2>
@@ -444,6 +387,126 @@
   }
   if (dialog && dialog.getAttribute("data-auto-open") === "1") {
     try { dialog.showModal(); } catch (e) {}
+  }
+
+  var dialogEdit = document.getElementById("dialogEditarTarefa");
+  var formEdit = document.getElementById("formEditarTarefa");
+  var btnCloseEdit = document.getElementById("btnFecharEditarTarefa");
+  var btnDeleteEdit = document.getElementById("btnExcluirTarefaDialog");
+  function setVal(id, value) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.value = value || "";
+  }
+  var subUrl = "";
+  function openEditFromBtn(btn) {
+    if (!dialogEdit || !formEdit) return;
+    formEdit.action = btn.getAttribute("data-edit-url") || "";
+    subUrl = btn.getAttribute("data-sub-url") || "";
+    if (btnDeleteEdit) {
+      btnDeleteEdit.setAttribute("formaction", btn.getAttribute("data-delete-url") || "");
+    }
+    setVal("editTitulo", btn.getAttribute("data-titulo"));
+    setVal("editStatus", btn.getAttribute("data-status"));
+    setVal("editPrioridade", btn.getAttribute("data-prioridade"));
+    setVal("editResponsavel", btn.getAttribute("data-responsavel"));
+    setVal("editCliente", btn.getAttribute("data-cliente"));
+    setVal("editPlanejado", btn.getAttribute("data-planejado"));
+    setVal("editHoraInicio", btn.getAttribute("data-hora-inicio"));
+    setVal("editHoraFim", btn.getAttribute("data-hora-fim"));
+    setVal("editVencimento", btn.getAttribute("data-vencimento"));
+    setVal("editQuadrante", btn.getAttribute("data-quadrante"));
+    setVal("editDescricao", btn.getAttribute("data-descricao"));
+    var part = (btn.getAttribute("data-participantes") || "").split(",").filter(Boolean);
+    var respId = btn.getAttribute("data-responsavel") || "";
+    function syncPartChips(resp) {
+      document.querySelectorAll(".edit-part-check").forEach(function (chk) {
+        var chip = chk.closest(".cu-equipe-chip");
+        if (chip) chip.style.display = chk.value === resp ? "none" : "";
+        if (chk.value === resp) chk.checked = false;
+      });
+    }
+    document.querySelectorAll(".edit-part-check").forEach(function (chk) {
+      chk.checked = part.indexOf(chk.value) !== -1;
+    });
+    syncPartChips(respId);
+    var editResp = document.getElementById("editResponsavel");
+    if (editResp && !editResp._partBound) {
+      editResp.addEventListener("change", function () {
+        syncPartChips(editResp.value || "");
+      });
+      editResp._partBound = true;
+    }
+    var blocoSub = document.getElementById("blocoSubtarefas");
+    var listaSub = document.getElementById("listaSubtarefas");
+    var ehSub = btn.getAttribute("data-eh-sub") === "1";
+    if (blocoSub) blocoSub.style.display = ehSub ? "none" : "";
+    if (listaSub) {
+      listaSub.innerHTML = "";
+      var raw = btn.getAttribute("data-subtarefas") || "";
+      if (raw) {
+        raw.split(";;").forEach(function (row) {
+          if (!row) return;
+          var bits = row.split("|");
+          var li = document.createElement("li");
+          li.innerHTML = "<strong></strong> <span class='muted'></span>";
+          li.querySelector("strong").textContent = bits[0] || "";
+          li.querySelector("span").textContent = bits[1] ? "· " + bits[1] : "";
+          listaSub.appendChild(li);
+        });
+      }
+      if (!listaSub.children.length) {
+        listaSub.innerHTML = "<li class='muted'>Nenhuma subtarefa ainda.</li>";
+      }
+    }
+    setVal("novaSubtitulo", "");
+    try { dialogEdit.showModal(); } catch (e) {}
+  }
+  document.querySelectorAll(".cu-task-open").forEach(function (btn) {
+    btn.addEventListener("click", function () { openEditFromBtn(btn); });
+  });
+  if (dialogEdit && btnCloseEdit) {
+    btnCloseEdit.addEventListener("click", function () { dialogEdit.close(); });
+  }
+  var btnAddSub = document.getElementById("btnAddSubtarefa");
+  if (btnAddSub) {
+    btnAddSub.addEventListener("click", function () {
+      var titulo = (document.getElementById("novaSubtitulo") || {}).value || "";
+      titulo = titulo.trim();
+      if (!titulo || !subUrl || !formEdit) return;
+      var f = document.createElement("form");
+      f.method = "post";
+      f.action = subUrl;
+      var csrf = formEdit.querySelector("input[name=csrfmiddlewaretoken]");
+      ["org", "escopo", "data", "resp"].forEach(function (name) {
+        var src = formEdit.querySelector("input[name='" + name + "']");
+        if (!src) return;
+        var h = document.createElement("input");
+        h.type = "hidden";
+        h.name = name;
+        h.value = src.value;
+        f.appendChild(h);
+      });
+      if (csrf) {
+        var c = document.createElement("input");
+        c.type = "hidden";
+        c.name = "csrfmiddlewaretoken";
+        c.value = csrf.value;
+        f.appendChild(c);
+      }
+      var t = document.createElement("input");
+      t.type = "hidden";
+      t.name = "titulo";
+      t.value = titulo;
+      f.appendChild(t);
+      var r = document.createElement("input");
+      r.type = "hidden";
+      r.name = "responsavel";
+      r.value = (document.getElementById("novaSubResp") || {}).value || "";
+      f.appendChild(r);
+      document.body.appendChild(f);
+      f.submit();
+    });
   }
 
   function fmt(sec) {

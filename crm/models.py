@@ -188,8 +188,8 @@ class Funil(models.Model):
     ativo = models.BooleanField("Ativo", default=True)
 
     class Meta:
-        verbose_name = "Funil"
-        verbose_name_plural = "Funis"
+        verbose_name = "Carteira"
+        verbose_name_plural = "Carteira"
         ordering = ["cliente_rsc__nome", "ordem", "nome"]
         constraints = [
             models.UniqueConstraint(

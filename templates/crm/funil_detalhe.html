@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ funil.get_tipo_display }} · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
-{% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Funis</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Carteira</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
 {% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %}{% endblock %}
 {% block page_actions %}
   <span class="status-pill">Pipeline R$ {{ pipeline|floatformat:2 }}</span>

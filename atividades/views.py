@@ -31,6 +31,7 @@ from .services import (
     excluir_atividade,
     formatar_tempo,
     historico_planner,
+    montar_arvore_atividades,
     resumo_visivel,
 )
 
@@ -159,14 +160,21 @@ def lista(request):
         agrupamento = "status"
 
     hoje = timezone.localdate()
+
+    def _anotar(item):
+        item.tempo_fmt = formatar_tempo(item.tempo_atual_segundos())
+        item.atrasada = bool(
+            item.data_vencimento
+            and item.data_vencimento < hoje
+            and item.status != StatusAtividade.REALIZADO
+        )
+        for filho in getattr(item, "filhos", []) or []:
+            _anotar(filho)
+
     for g in grupos:
+        g["itens"] = montar_arvore_atividades(g["itens"])
         for item in g["itens"]:
-            item.tempo_fmt = formatar_tempo(item.tempo_atual_segundos())
-            item.atrasada = bool(
-                item.data_vencimento
-                and item.data_vencimento < hoje
-                and item.status != StatusAtividade.REALIZADO
-            )
+            _anotar(item)
 
     return render(
         request,
@@ -260,6 +268,48 @@ def excluir(request, pk: int):
         return redirect("atividades")
     excluir_atividade(item)
     messages.success(request, "Tarefa removida.")
+    return _redirect_lista(request)
+
+
+@login_required
+@require_POST
+def criar_subtarefa(request, pk: int):
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return redirect("home")
+    pai = get_object_or_404(
+        AtividadeDiaria.objects.prefetch_related("participantes"), pk=pk
+    )
+    if pai.eh_subtarefa:
+        messages.error(request, "Não é possível criar subtarefa de outra subtarefa.")
+        return _redirect_lista(request)
+    if not pode_gerenciar_atividade(funcionario, pai):
+        messages.error(request, "Sem permissão para criar subtarefa.")
+        return _redirect_lista(request)
+
+    titulo = (request.POST.get("titulo") or "").strip()
+    if not titulo:
+        messages.error(request, "Informe o título da subtarefa.")
+        return _redirect_lista(request)
+
+    resp_id = request.POST.get("responsavel")
+    responsavel = None
+    if resp_id:
+        responsavel = next(
+            (f for f in funcionarios_para_equipe(funcionario) if str(f.pk) == str(resp_id)),
+            None,
+        )
+    criar_atividade(
+        funcionario,
+        titulo=titulo,
+        responsavel=responsavel or funcionario,
+        atividade_pai=pai,
+        status=StatusAtividade.NAO_INICIADO,
+        prioridade=pai.prioridade,
+        cliente_rsc=pai.cliente_rsc,
+        planejado_para=pai.planejado_para,
+    )
+    messages.success(request, "Subtarefa criada.")
     return _redirect_lista(request)
 
 

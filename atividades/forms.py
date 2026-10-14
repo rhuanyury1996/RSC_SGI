@@ -61,12 +61,12 @@ class AtividadeForm(forms.ModelForm):
         self.fields["cliente_rsc"].empty_label = "RSC"
         self.fields["cliente_rsc"].label = "Empresa"
         self.fields["participantes"].required = False
-        self.fields["participantes"].label = "Equipe (grupo)"
+        self.fields["participantes"].label = "Aparece também para"
         self.fields["participantes"].help_text = (
-            "Selecione outras pessoas que trabalham nesta tarefa."
+            "Marque quem mais deve ver e trabalhar nesta demanda (ex.: Isadora e Denise)."
         )
-        self.fields["participantes"].widget.attrs.update(
-            {"class": "cu-select-equipe", "size": "4"}
+        self.fields["participantes"].widget = forms.CheckboxSelectMultiple(
+            attrs={"class": "cu-equipe-checks"}
         )
         self.fields["planejado_para"].required = True
         self.fields["data_vencimento"].required = False

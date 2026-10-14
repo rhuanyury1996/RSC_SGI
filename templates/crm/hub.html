@@ -4,7 +4,7 @@
 {% block page_title %}Área Comercial{% endblock %}
 {% block page_actions %}
   <a class="btn secondary" href="{% url 'crm_empresas' %}">+ Empresa</a>
-  <a class="btn" href="{% url 'crm_funis' %}">Funis</a>
+  <a class="btn" href="{% url 'crm_funis' %}">Carteira</a>
 {% endblock %}
 
 {% block content %}
@@ -46,7 +46,7 @@
       <span class="muted">Pessoas-chave nas empresas</span>
     </a>
     <a class="com-tile" href="{% url 'crm_funis' %}">
-      <strong>Funis & oportunidades</strong>
+      <strong>Carteira & oportunidades</strong>
       <span class="muted">Área de controle por Cliente RSC</span>
     </a>
   </section>
@@ -55,7 +55,7 @@
     <details class="apont-panel apont-lista" open>
       <summary class="apont-lista-summary">
         <div class="panel-head">
-          <h2>Funis</h2>
+          <h2>Carteira</h2>
           <span class="muted">{{ total_funis }} ativo(s)</span>
         </div>
         <span class="apont-lista-toggle" aria-hidden="true"></span>

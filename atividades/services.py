@@ -35,6 +35,15 @@ def _prio_rank():
     )
 
 
+def _q_membro(funcionario_id: int) -> Q:
+    return (
+        Q(responsavel_id=funcionario_id)
+        | Q(participantes=funcionario_id)
+        | Q(subtarefas__responsavel_id=funcionario_id)
+        | Q(subtarefas__participantes=funcionario_id)
+    )
+
+
 def queryset_visivel(
     ator: Funcionario,
     *,
@@ -43,17 +52,15 @@ def queryset_visivel(
 ) -> QuerySet[AtividadeDiaria]:
     qs = (
         AtividadeDiaria.objects.select_related(
-            "responsavel", "criado_por", "cliente_rsc"
+            "responsavel", "criado_por", "cliente_rsc", "atividade_pai"
         )
-        .prefetch_related("participantes")
+        .prefetch_related("participantes", "subtarefas__responsavel", "subtarefas__participantes")
     )
     if escopo == "equipe" and pode_dirigir_atividades(ator):
         if responsavel_id:
-            qs = qs.filter(
-                Q(responsavel_id=responsavel_id) | Q(participantes=responsavel_id)
-            ).distinct()
+            qs = qs.filter(_q_membro(responsavel_id)).distinct()
         return qs
-    return qs.filter(Q(responsavel=ator) | Q(participantes=ator)).distinct()
+    return qs.filter(_q_membro(ator.pk)).distinct()
 
 
 def atividades_filtradas(
@@ -68,6 +75,8 @@ def atividades_filtradas(
     # Lista e Planner compartilham o mesmo recorte do dia
     if dia is not None:
         qs = qs.filter(Q(planejado_para=dia) | Q(data_vencimento=dia))
+    # Subtarefas ficam aninhadas no pai (prefetch); evita linha duplicada na lista
+    qs = qs.filter(atividade_pai__isnull=True)
     return qs.annotate(prio_rank=_prio_rank()).order_by(
         F("hora_inicio").asc(nulls_last=True),
         "ordem",
@@ -120,13 +129,22 @@ def agrupar_por_pessoa(
     itens: QuerySet[AtividadeDiaria] | list[AtividadeDiaria],
     membros: list[Funcionario],
 ) -> list[dict]:
-    """Quadro da equipe: seção por pessoa (inclui participação em grupo)."""
+    """Quadro da equipe: seção por pessoa (inclui participação e subtarefas)."""
     buckets: dict[int, list] = defaultdict(list)
     responsaveis: dict[int, Funcionario] = {m.pk: m for m in membros}
     for item in itens:
+        vistos: set[int] = set()
         for membro in item.membros_equipe():
             buckets[membro.pk].append(item)
             responsaveis[membro.pk] = membro
+            vistos.add(membro.pk)
+        for sub in item.subtarefas.all():
+            for membro in sub.membros_equipe():
+                if membro.pk in vistos:
+                    continue
+                buckets[membro.pk].append(item)
+                responsaveis[membro.pk] = membro
+                vistos.add(membro.pk)
 
     ordem_ids = [m.pk for m in membros]
     for pk in buckets:
@@ -166,12 +184,46 @@ def definir_participantes(
     atividade.participantes.set(ids)
 
 
+def montar_arvore_atividades(itens) -> list:
+    """Raízes com .filhos anexados; subtarefas órfãs visíveis sobem como raiz."""
+    lista = list(itens)
+    by_id = {a.pk: a for a in lista}
+    for a in lista:
+        a.filhos = []
+    raizes = []
+    for a in lista:
+        if a.atividade_pai_id and a.atividade_pai_id in by_id:
+            by_id[a.atividade_pai_id].filhos.append(a)
+        else:
+            raizes.append(a)
+    from datetime import time as time_cls
+
+    # Anexa todas as subtarefas do prefetch (lista já exclui filhos no topo)
+    for a in raizes:
+        if hasattr(a, "_prefetched_objects_cache") and "subtarefas" in a._prefetched_objects_cache:
+            vistos = {f.pk for f in a.filhos}
+            for sub in a.subtarefas.all():
+                if sub.pk not in vistos:
+                    a.filhos.append(sub)
+                    vistos.add(sub.pk)
+        a.filhos.sort(
+            key=lambda s: (
+                s.hora_inicio is None,
+                s.hora_inicio or time_cls.min,
+                s.ordem,
+                s.pk,
+            )
+        )
+    return raizes
+
+
 def criar_atividade(
     ator: Funcionario,
     *,
     titulo: str,
     responsavel: Funcionario | None = None,
     participantes=None,
+    atividade_pai: AtividadeDiaria | None = None,
     status: str = StatusAtividade.NAO_INICIADO,
     prioridade: str = PrioridadeAtividade.MEDIA,
     descricao: str = "",
@@ -195,9 +247,14 @@ def criar_atividade(
         hora_inicio = time_cls.fromisoformat(hora_inicio)
     if isinstance(hora_fim, str) and hora_fim:
         hora_fim = time_cls.fromisoformat(hora_fim)
+    if atividade_pai is not None and cliente_rsc is None:
+        cliente_rsc = atividade_pai.cliente_rsc
+    if atividade_pai is not None and planejado_para is None:
+        dia = atividade_pai.planejado_para or dia
     item = AtividadeDiaria(
         responsavel=dest,
         criado_por=ator,
+        atividade_pai=atividade_pai,
         titulo=titulo.strip(),
         descricao=(descricao or "").strip(),
         cliente_rsc=cliente_rsc,

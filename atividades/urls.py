@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.lista, name="atividades"),
     path("<int:pk>/editar/", views.editar, name="atividade_editar"),
     path("<int:pk>/excluir/", views.excluir, name="atividade_excluir"),
+    path("<int:pk>/subtarefa/", views.criar_subtarefa, name="atividade_subtarefa"),
     path("<int:pk>/status/", views.mudar_status, name="atividade_status"),
     path("<int:pk>/cronometro/", views.cronometro, name="atividade_cronometro"),
     path("planner/agua/", planner_views.agua, name="planner_agua"),

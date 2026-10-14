@@ -73,6 +73,15 @@ class AtividadeDiaria(models.Model):
         related_name="atividades_criadas",
         verbose_name="Criado por",
     )
+    atividade_pai = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="subtarefas",
+        verbose_name="Atividade principal",
+        help_text="Se preenchido, esta é uma subtarefa.",
+    )
     titulo = models.CharField("Título", max_length=200)
     descricao = models.TextField("Descrição", blank=True)
     cliente_rsc = models.ForeignKey(
@@ -160,6 +169,10 @@ class AtividadeDiaria(models.Model):
         if not self.pk:
             return False
         return self.participantes.filter(pk=funcionario.id).exists()
+
+    @property
+    def eh_subtarefa(self) -> bool:
+        return self.atividade_pai_id is not None
 
     @property
     def empresa_label(self) -> str:

@@ -219,9 +219,9 @@
               {% if nav_funis_clientes %}
               <details class="nav-funis-root" open>
                 <summary class="nav-funis-root-summary">
-                  <a class="nav-link nav-funis-root-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Funis" onclick="event.stopPropagation()">
+                  <a class="nav-link nav-funis-root-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Carteira" onclick="event.stopPropagation()">
                     {% include "partials/icon_trofeu.html" %}
-                    <span class="nav-text">Funis</span>
+                    <span class="nav-text">Carteira</span>
                   </a>
                   <span class="nav-funil-caret" aria-hidden="true"></span>
                 </summary>
@@ -246,9 +246,9 @@
                 </div>
               </details>
               {% else %}
-              <a class="nav-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Funis">
+              <a class="nav-link {% if request.resolver_match.url_name == 'crm_funis' %}active{% endif %}" href="{% url 'crm_funis' %}" title="Carteira">
                 {% include "partials/icon_trofeu.html" %}
-                <span class="nav-text">Funis</span>
+                <span class="nav-text">Carteira</span>
               </a>
               {% endif %}
             </div>
