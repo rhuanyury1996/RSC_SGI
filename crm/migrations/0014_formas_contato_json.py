@@ -3,6 +3,8 @@ from django.db import migrations, models
 
 def preparar_json(apps, schema_editor):
     """Normaliza valores vazios/inválidos para JSON array antes do cast."""
+    if schema_editor.connection.vendor != "postgresql":
+        return
     with schema_editor.connection.cursor() as cursor:
         cursor.execute(
             """

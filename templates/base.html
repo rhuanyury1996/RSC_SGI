@@ -38,8 +38,8 @@
              data-acumulado="{{ topbar_timer.acumulado }}"
              data-inicio="{{ topbar_timer.inicio }}"
              data-url="{% url 'atividade_cronometro' topbar_timer.pk %}">
-          <a class="topbar-timer-link" href="{{ topbar_timer.href }}" title="{{ topbar_timer.titulo }}">
-            <span class="topbar-timer-label">{% if topbar_timer.ativo %}Em execução{% else %}Próxima{% endif %}</span>
+          <a class="topbar-timer-link" href="{{ topbar_timer.href }}" title="{% if topbar_timer.ativo %}Em execução{% else %}Próxima{% endif %}: {{ topbar_timer.titulo }}">
+            <span class="topbar-timer-label">{% if topbar_timer.ativo %}Executando{% else %}Próxima{% endif %}</span>
             <strong class="topbar-timer-title">{{ topbar_timer.titulo }}</strong>
             <span class="topbar-timer-clock" id="topbarTimerClock">{{ topbar_timer.texto }}</span>
           </a>
