@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from crm.models import Empresa
 from funcionarios.utils import obter_funcionario
 
 from . import planner_views
@@ -97,6 +98,7 @@ def lista(request):
                     or StatusAtividade.NAO_INICIADO,
                     prioridade=form_rapida.cleaned_data.get("prioridade")
                     or PrioridadeAtividade.MEDIA,
+                    empresa=form_rapida.cleaned_data.get("empresa"),
                     planejado_para=form_rapida.cleaned_data.get("planejado_para")
                     or dia,
                     data_vencimento=form_rapida.cleaned_data.get("data_vencimento"),
@@ -121,6 +123,7 @@ def lista(request):
                     prioridade=form.cleaned_data.get("prioridade")
                     or PrioridadeAtividade.MEDIA,
                     descricao=form.cleaned_data.get("descricao") or "",
+                    empresa=form.cleaned_data.get("empresa"),
                     planejado_para=form.cleaned_data.get("planejado_para") or dia,
                     data_vencimento=form.cleaned_data.get("data_vencimento"),
                     hora_inicio=form.cleaned_data.get("hora_inicio"),
@@ -191,6 +194,7 @@ def lista(request):
             "historico": historico_planner(funcionario) if organizacao == "planner" else [],
             "status_choices": StatusAtividade.choices,
             "prioridade_choices": PrioridadeAtividade.choices,
+            "empresas": Empresa.objects.filter(ativa=True).order_by("nome"),
             "eh_hoje": dia == hoje,
             "abrir_popup_tarefa": abrir_popup_tarefa,
         },
@@ -225,6 +229,7 @@ def editar(request, pk: int):
             item,
             titulo=form.cleaned_data["titulo"],
             descricao=form.cleaned_data.get("descricao") or "",
+            empresa=form.cleaned_data.get("empresa"),
             prioridade=prio,
             status=form.cleaned_data.get("status"),
             quadrante=quad,

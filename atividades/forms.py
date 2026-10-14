@@ -1,10 +1,15 @@
 from django import forms
 from django.utils import timezone
 
+from crm.models import Empresa
 from funcionarios.models import Funcionario
 
 from .models import AtividadeDiaria, PrioridadeAtividade, StatusAtividade
 from .permissions import funcionarios_atribuiveis, pode_dirigir_atividades
+
+
+def _queryset_empresas_ativas():
+    return Empresa.objects.filter(ativa=True).order_by("nome")
 
 
 class AtividadeForm(forms.ModelForm):
@@ -13,6 +18,7 @@ class AtividadeForm(forms.ModelForm):
         fields = (
             "titulo",
             "descricao",
+            "empresa",
             "responsavel",
             "status",
             "prioridade",
@@ -43,6 +49,10 @@ class AtividadeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.ator = ator
         self.fields["descricao"].required = False
+        self.fields["empresa"].required = False
+        self.fields["empresa"].queryset = _queryset_empresas_ativas()
+        self.fields["empresa"].empty_label = "RSC (interno)"
+        self.fields["empresa"].label = "Empresa"
         self.fields["planejado_para"].required = True
         self.fields["data_vencimento"].required = False
         self.fields["hora_inicio"].required = False
@@ -128,10 +138,17 @@ class AtividadeRapidaForm(forms.Form):
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
         input_formats=["%Y-%m-%d"],
     )
+    empresa = forms.ModelChoiceField(
+        queryset=Empresa.objects.none(),
+        required=False,
+        empty_label="RSC (interno)",
+        label="Empresa",
+    )
 
     def __init__(self, *args, ator=None, status_padrao=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.ator = ator
+        self.fields["empresa"].queryset = _queryset_empresas_ativas()
         if status_padrao:
             self.fields["status"].initial = status_padrao
         if ator is not None:

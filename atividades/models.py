@@ -67,6 +67,16 @@ class AtividadeDiaria(models.Model):
     )
     titulo = models.CharField("Título", max_length=200)
     descricao = models.TextField("Descrição", blank=True)
+    empresa = models.ForeignKey(
+        "crm.Empresa",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades",
+        verbose_name="Empresa",
+        help_text="Em branco = trabalho interno RSC. Preencha para apontar horas ao cliente.",
+        limit_choices_to={"ativa": True},
+    )
     status = models.CharField(
         "Status",
         max_length=20,
@@ -119,6 +129,16 @@ class AtividadeDiaria(models.Model):
 
     def __str__(self) -> str:
         return self.titulo
+
+    @property
+    def empresa_label(self) -> str:
+        if self.empresa_id and self.empresa:
+            return self.empresa.nome
+        return "RSC"
+
+    @property
+    def eh_trabalho_interno(self) -> bool:
+        return self.empresa_id is None
 
     @property
     def cronometro_ativo(self) -> bool:

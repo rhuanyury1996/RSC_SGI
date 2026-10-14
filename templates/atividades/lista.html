@@ -115,6 +115,12 @@
         <input type="hidden" name="prioridade" value="{{ grupo.status }}">
         {% endif %}
         <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa{% if grupo.kind == 'pessoa' %} para {{ grupo.label }}{% endif %}" autocomplete="off" required>
+        <select name="empresa" class="cu-select-empresa" aria-label="Empresa" title="Empresa">
+          <option value="">RSC</option>
+          {% for emp in empresas %}
+          <option value="{{ emp.pk }}">{{ emp.nome }}</option>
+          {% endfor %}
+        </select>
         <input type="date" name="planejado_para" value="{{ dia|date:'Y-m-d' }}" aria-label="Data" title="Data">
         <input type="time" name="hora_inicio" aria-label="Início" title="Horário início">
         <input type="time" name="hora_fim" aria-label="Fim" title="Horário fim">
@@ -142,6 +148,7 @@
             <span class="eisen-badge q-{{ item.quadrante }}" title="{{ item.get_quadrante_display }}">
               {% if item.quadrante == "fazer" %}Q1 · Fazer{% elif item.quadrante == "agendar" %}Q2 · Agendar{% elif item.quadrante == "delegar" %}Q3 · Delegar{% else %}Q4 · Eliminar{% endif %}
             </span>
+            <span class="cu-empresa-badge {% if item.eh_trabalho_interno %}is-rsc{% else %}is-cliente{% endif %}" title="Empresa">{{ item.empresa_label }}</span>
             <details class="cu-task">
               <summary>
                 <span class="cu-title">{{ item.titulo }}</span>
@@ -187,6 +194,15 @@
                       <input type="hidden" name="responsavel" value="{{ item.responsavel_id }}">
                       <span>{{ item.responsavel.nome_completo }}</span>
                       {% endif %}
+                    </div>
+                    <div class="field">
+                      <label>Empresa</label>
+                      <select name="empresa" aria-label="Empresa">
+                        <option value="" {% if not item.empresa_id %}selected{% endif %}>RSC (interno)</option>
+                        {% for emp in empresas %}
+                        <option value="{{ emp.pk }}" {% if item.empresa_id == emp.pk %}selected{% endif %}>{{ emp.nome }}</option>
+                        {% endfor %}
+                      </select>
                     </div>
                     <div class="field">
                       <label>Data</label>
@@ -332,6 +348,10 @@
           <span class="cu-avatar" title="{{ eu.nome_completo }}">{{ eu.nome|slice:":1" }}{{ eu.sobrenome|slice:":1" }}</span>
           <span>{{ eu.nome_completo }}</span>
           {% endif %}
+        </div>
+        <div class="field">
+          <label for="{{ form.empresa.id_for_label }}">Empresa</label>
+          {{ form.empresa }}{{ form.empresa.errors }}
         </div>
         <div class="field">
           <label for="{{ form.status.id_for_label }}">Status</label>

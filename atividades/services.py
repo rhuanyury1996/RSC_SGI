@@ -41,7 +41,7 @@ def queryset_visivel(
     escopo: str = "minhas",
     responsavel_id: int | None = None,
 ) -> QuerySet[AtividadeDiaria]:
-    qs = AtividadeDiaria.objects.select_related("responsavel", "criado_por")
+    qs = AtividadeDiaria.objects.select_related("responsavel", "criado_por", "empresa")
     if escopo == "equipe" and pode_dirigir_atividades(ator):
         if responsavel_id:
             qs = qs.filter(responsavel_id=responsavel_id)
@@ -156,6 +156,7 @@ def criar_atividade(
     status: str = StatusAtividade.NAO_INICIADO,
     prioridade: str = PrioridadeAtividade.MEDIA,
     descricao: str = "",
+    empresa=None,
     planejado_para: date | None = None,
     data_vencimento: date | None = None,
     hora_inicio=None,
@@ -180,6 +181,7 @@ def criar_atividade(
         criado_por=ator,
         titulo=titulo.strip(),
         descricao=(descricao or "").strip(),
+        empresa=empresa,
         status=status,
         prioridade=prio,
         quadrante=quadrante_por_prioridade(prio),
@@ -198,6 +200,7 @@ def atualizar_atividade(atividade: AtividadeDiaria, **campos) -> AtividadeDiaria
     for key, value in campos.items():
         if value is not None or key in (
             "descricao",
+            "empresa",
             "data_vencimento",
             "planejado_para",
             "hora_inicio",

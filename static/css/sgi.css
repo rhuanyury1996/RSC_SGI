@@ -552,17 +552,20 @@ img.info-avatar,
   gap: 0.45rem;
   min-width: min(420px, 48vw);
   max-width: min(560px, 56vw);
-  background: #16a34a;
-  border: 1px solid #15803d;
+  /* Pausado: mesmo visual da barra de produtividade */
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   padding: 0.28rem 0.35rem 0.28rem 0.9rem;
-  color: #ecfdf5;
-  box-shadow: 0 1px 0 rgba(20, 83, 45, 0.25);
+  color: #fff;
+  box-shadow: none;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 .topbar-timer.is-running {
-  background: #15803d;
-  border-color: #14532d;
-  box-shadow: 0 0 0 1px rgba(187, 247, 208, 0.35), 0 1px 0 rgba(20, 83, 45, 0.3);
+  background: #16a34a;
+  border-color: #15803d;
+  color: #ecfdf5;
+  box-shadow: 0 1px 0 rgba(20, 83, 45, 0.25);
 }
 .topbar-timer-link {
   display: grid;
@@ -578,8 +581,12 @@ img.info-avatar,
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.9;
+  opacity: 0.85;
   line-height: 1.1;
+  color: inherit;
+}
+.topbar-timer.is-running .topbar-timer-label {
+  opacity: 0.9;
   color: #bbf7d0;
 }
 .topbar-timer-title {
@@ -595,6 +602,9 @@ img.info-avatar,
   font-size: 0.78rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.92);
+}
+.topbar-timer.is-running .topbar-timer-clock {
   color: #dcfce7;
 }
 .topbar-timer-form { margin: 0; }
@@ -602,26 +612,28 @@ img.info-avatar,
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  background: #fff;
-  color: #14532d;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
   font-size: 0.72rem;
   flex-shrink: 0;
-  transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .topbar-timer-btn:hover {
-  background: #bbf7d0;
-  border-color: #fff;
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 .topbar-timer.is-running .topbar-timer-btn {
+  border: 2px solid rgba(255, 255, 255, 0.85);
   background: #fff;
   color: #14532d;
 }
 .topbar-timer.is-running .topbar-timer-btn:hover {
   background: #dcfce7;
+  border-color: #fff;
 }
 .topbar-prod-chip {
   display: inline-flex;
@@ -5908,6 +5920,44 @@ button.lp-tab.active:focus-visible {
   color: var(--text);
 }
 .cu-add-row select,
+.cu-empresa-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 9.5rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  margin-right: 0.15rem;
+}
+.cu-empresa-badge.is-rsc {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.cu-empresa-badge.is-cliente {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.cu-select-empresa {
+  max-width: 9.5rem;
+  min-width: 5.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.28rem 0.4rem;
+  font-size: 0.78rem;
+  background: #fff;
+  color: var(--ink);
+}
+.cu-select-empresa:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .cu-select-resp {
   font: inherit;
   border: 1px solid var(--line);
