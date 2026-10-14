@@ -79,13 +79,12 @@
 
   <div class="cu-board {% if agrupamento == 'pessoa' %}cu-board-pessoas{% endif %}">
     <div class="cu-cols-head">
-      <div class="cu-col-nome">Nome</div>
-      <div class="cu-col-quando">Data / horário</div>
-      <div class="cu-col-resp">Responsável</div>
+      <div class="cu-col-nome">Tarefa</div>
+      <div class="cu-col-quando">Quando</div>
+      <div class="cu-col-resp">Resp.</div>
       <div class="cu-col-prio">Prioridade</div>
       <div class="cu-col-status">Status</div>
-      <div class="cu-col-timer">Cronômetro</div>
-      <div class="cu-col-more"></div>
+      <div class="cu-col-timer">Timer</div>
     </div>
 
     {% for grupo in grupos %}
@@ -115,10 +114,10 @@
         <input type="hidden" name="prioridade" value="{{ grupo.status }}">
         {% endif %}
         <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa{% if grupo.kind == 'pessoa' %} para {{ grupo.label }}{% endif %}" autocomplete="off" required>
-        <select name="empresa" class="cu-select-empresa" aria-label="Empresa" title="Empresa">
+        <select name="cliente_rsc" class="cu-select-empresa" aria-label="Empresa" title="Empresa">
           <option value="">RSC</option>
-          {% for emp in empresas %}
-          <option value="{{ emp.pk }}">{{ emp.nome }}</option>
+          {% for cli in clientes_rsc %}
+          <option value="{{ cli.pk }}">{{ cli.nome }}</option>
           {% endfor %}
         </select>
         <input type="date" name="planejado_para" value="{{ dia|date:'Y-m-d' }}" aria-label="Data" title="Data">
@@ -183,10 +182,10 @@
                       </select>
                     </div>
                     <div class="field">
-                      <label>Responsável</label>
+                      <label>Responsável principal</label>
                       {% if pode_dirigir %}
                       <select name="responsavel" class="cu-select-resp" required>
-                        {% for f in equipe %}
+                        {% for f in equipe_opcoes %}
                         <option value="{{ f.pk }}" {% if item.responsavel_id == f.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
                         {% endfor %}
                       </select>
@@ -195,12 +194,23 @@
                       <span>{{ item.responsavel.nome_completo }}</span>
                       {% endif %}
                     </div>
+                    <div class="field span-2">
+                      <label>Equipe (grupo)</label>
+                      <select name="participantes" class="cu-select-equipe" multiple size="4" aria-label="Participantes">
+                        {% for f in equipe_opcoes %}
+                          {% if f.pk != item.responsavel_id %}
+                          <option value="{{ f.pk }}" {% if f in item.participantes.all %}selected{% endif %}>{{ f.nome_completo }}</option>
+                          {% endif %}
+                        {% endfor %}
+                      </select>
+                      <small class="muted">Ctrl/Cmd + clique para marcar várias pessoas.</small>
+                    </div>
                     <div class="field">
                       <label>Empresa</label>
-                      <select name="empresa" aria-label="Empresa">
-                        <option value="" {% if not item.empresa_id %}selected{% endif %}>RSC (interno)</option>
-                        {% for emp in empresas %}
-                        <option value="{{ emp.pk }}" {% if item.empresa_id == emp.pk %}selected{% endif %}>{{ emp.nome }}</option>
+                      <select name="cliente_rsc" aria-label="Empresa">
+                        <option value="" {% if not item.cliente_rsc_id %}selected{% endif %}>RSC</option>
+                        {% for cli in clientes_rsc %}
+                        <option value="{{ cli.pk }}" {% if item.cliente_rsc_id == cli.pk %}selected{% endif %}>{{ cli.nome }}</option>
                         {% endfor %}
                       </select>
                     </div>
@@ -266,9 +276,16 @@
           </div>
 
           <div class="cu-col-resp">
-            <span class="cu-avatar" title="{{ item.responsavel.nome_completo }}">
-              {{ item.responsavel.nome|slice:":1" }}{{ item.responsavel.sobrenome|slice:":1" }}
-            </span>
+            <div class="cu-avatars" title="{% for m in item.membros_equipe %}{{ m.nome_completo }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+              {% for m in item.membros_equipe %}
+              <span class="cu-avatar {% if m.pk == item.responsavel_id %}is-lead{% endif %}" {% if forloop.counter > 3 %}style="display:none"{% endif %}>
+                {{ m.nome|slice:":1" }}{{ m.sobrenome|slice:":1" }}
+              </span>
+              {% endfor %}
+              {% if item.membros_equipe|length > 3 %}
+              <span class="cu-avatar cu-avatar-more">+{{ item.membros_equipe|length|add:"-3" }}</span>
+              {% endif %}
+            </div>
           </div>
 
           <div class="cu-col-prio">
@@ -306,7 +323,6 @@
             </form>
           </div>
 
-          <div class="cu-col-more"></div>
         </li>
         {% empty %}
         <li class="cu-empty muted">Nenhuma tarefa neste grupo.</li>
@@ -335,11 +351,11 @@
           {{ form.titulo }}{{ form.titulo.errors }}
         </div>
         <div class="field">
-          <label for="id_responsavel_manual">Responsável</label>
+          <label for="id_responsavel_manual">Responsável principal</label>
           {% if pode_dirigir %}
           <select name="responsavel" id="id_responsavel_manual" class="cu-select-resp" required>
             <option value="">Selecione o responsável…</option>
-            {% for f in equipe %}
+            {% for f in equipe_opcoes %}
             <option value="{{ f.pk }}" {% if form.responsavel.value|stringformat:"s" == f.pk|stringformat:"s" or not form.responsavel.value and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
             {% endfor %}
           </select>
@@ -349,9 +365,14 @@
           <span>{{ eu.nome_completo }}</span>
           {% endif %}
         </div>
+        <div class="field span-2">
+          <label for="{{ form.participantes.id_for_label }}">Equipe (grupo)</label>
+          {{ form.participantes }}{{ form.participantes.errors }}
+          <small class="muted">Ctrl/Cmd + clique para incluir colegas na mesma tarefa.</small>
+        </div>
         <div class="field">
-          <label for="{{ form.empresa.id_for_label }}">Empresa</label>
-          {{ form.empresa }}{{ form.empresa.errors }}
+          <label for="{{ form.cliente_rsc.id_for_label }}">Empresa</label>
+          {{ form.cliente_rsc }}{{ form.cliente_rsc.errors }}
         </div>
         <div class="field">
           <label for="{{ form.status.id_for_label }}">Status</label>

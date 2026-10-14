@@ -1,15 +1,21 @@
 from django import forms
 from django.utils import timezone
 
-from crm.models import Empresa
+from crm.models import ItemLista, TipoLista
 from funcionarios.models import Funcionario
 
 from .models import AtividadeDiaria, PrioridadeAtividade, StatusAtividade
-from .permissions import funcionarios_atribuiveis, pode_dirigir_atividades
+from .permissions import (
+    funcionarios_atribuiveis,
+    funcionarios_para_equipe,
+    pode_dirigir_atividades,
+)
 
 
-def _queryset_empresas_ativas():
-    return Empresa.objects.filter(ativa=True).order_by("nome")
+def queryset_clientes_rsc():
+    return ItemLista.objects.filter(
+        tipo=TipoLista.CLIENTES_RSC, ativo=True
+    ).order_by("ordem", "nome")
 
 
 class AtividadeForm(forms.ModelForm):
@@ -18,8 +24,9 @@ class AtividadeForm(forms.ModelForm):
         fields = (
             "titulo",
             "descricao",
-            "empresa",
+            "cliente_rsc",
             "responsavel",
+            "participantes",
             "status",
             "prioridade",
             "quadrante",
@@ -49,10 +56,18 @@ class AtividadeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.ator = ator
         self.fields["descricao"].required = False
-        self.fields["empresa"].required = False
-        self.fields["empresa"].queryset = _queryset_empresas_ativas()
-        self.fields["empresa"].empty_label = "RSC (interno)"
-        self.fields["empresa"].label = "Empresa"
+        self.fields["cliente_rsc"].required = False
+        self.fields["cliente_rsc"].queryset = queryset_clientes_rsc()
+        self.fields["cliente_rsc"].empty_label = "RSC"
+        self.fields["cliente_rsc"].label = "Empresa"
+        self.fields["participantes"].required = False
+        self.fields["participantes"].label = "Equipe (grupo)"
+        self.fields["participantes"].help_text = (
+            "Selecione outras pessoas que trabalham nesta tarefa."
+        )
+        self.fields["participantes"].widget.attrs.update(
+            {"class": "cu-select-equipe", "size": "4"}
+        )
         self.fields["planejado_para"].required = True
         self.fields["data_vencimento"].required = False
         self.fields["hora_inicio"].required = False
@@ -68,6 +83,13 @@ class AtividadeForm(forms.ModelForm):
         if ator is not None:
             self.fields["responsavel"].queryset = funcionarios_atribuiveis(ator)
             self.fields["responsavel"].empty_label = "Selecione o responsável"
+            self.fields["participantes"].queryset = funcionarios_para_equipe(
+                ator
+            ).exclude(pk=ator.pk)
+            if self.instance and self.instance.pk and self.instance.responsavel_id:
+                self.fields["participantes"].queryset = funcionarios_para_equipe(
+                    ator
+                ).exclude(pk=self.instance.responsavel_id)
             if not pode_dirigir_atividades(ator):
                 self.fields["responsavel"].initial = ator.pk
                 self.fields["responsavel"].widget = forms.HiddenInput()
@@ -138,17 +160,17 @@ class AtividadeRapidaForm(forms.Form):
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
         input_formats=["%Y-%m-%d"],
     )
-    empresa = forms.ModelChoiceField(
-        queryset=Empresa.objects.none(),
+    cliente_rsc = forms.ModelChoiceField(
+        queryset=ItemLista.objects.none(),
         required=False,
-        empty_label="RSC (interno)",
+        empty_label="RSC",
         label="Empresa",
     )
 
     def __init__(self, *args, ator=None, status_padrao=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.ator = ator
-        self.fields["empresa"].queryset = _queryset_empresas_ativas()
+        self.fields["cliente_rsc"].queryset = queryset_clientes_rsc()
         if status_padrao:
             self.fields["status"].initial = status_padrao
         if ator is not None:

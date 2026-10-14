@@ -41,12 +41,19 @@ def queryset_visivel(
     escopo: str = "minhas",
     responsavel_id: int | None = None,
 ) -> QuerySet[AtividadeDiaria]:
-    qs = AtividadeDiaria.objects.select_related("responsavel", "criado_por", "empresa")
+    qs = (
+        AtividadeDiaria.objects.select_related(
+            "responsavel", "criado_por", "cliente_rsc"
+        )
+        .prefetch_related("participantes")
+    )
     if escopo == "equipe" and pode_dirigir_atividades(ator):
         if responsavel_id:
-            qs = qs.filter(responsavel_id=responsavel_id)
+            qs = qs.filter(
+                Q(responsavel_id=responsavel_id) | Q(participantes=responsavel_id)
+            ).distinct()
         return qs
-    return qs.filter(responsavel=ator)
+    return qs.filter(Q(responsavel=ator) | Q(participantes=ator)).distinct()
 
 
 def atividades_filtradas(
@@ -113,14 +120,13 @@ def agrupar_por_pessoa(
     itens: QuerySet[AtividadeDiaria] | list[AtividadeDiaria],
     membros: list[Funcionario],
 ) -> list[dict]:
-    """Quadro da equipe: uma seção por responsável (inclui quem está sem tarefas no dia)."""
+    """Quadro da equipe: seção por pessoa (inclui participação em grupo)."""
     buckets: dict[int, list] = defaultdict(list)
     responsaveis: dict[int, Funcionario] = {m.pk: m for m in membros}
     for item in itens:
-        if not item.responsavel_id:
-            continue
-        buckets[item.responsavel_id].append(item)
-        responsaveis[item.responsavel_id] = item.responsavel
+        for membro in item.membros_equipe():
+            buckets[membro.pk].append(item)
+            responsaveis[membro.pk] = membro
 
     ordem_ids = [m.pk for m in membros]
     for pk in buckets:
@@ -148,15 +154,28 @@ def agrupar_por_pessoa(
     return grupos
 
 
+def definir_participantes(
+    atividade: AtividadeDiaria,
+    participantes,
+) -> None:
+    ids = []
+    for p in participantes or []:
+        pk = getattr(p, "pk", p)
+        if pk and pk != atividade.responsavel_id:
+            ids.append(pk)
+    atividade.participantes.set(ids)
+
+
 def criar_atividade(
     ator: Funcionario,
     *,
     titulo: str,
     responsavel: Funcionario | None = None,
+    participantes=None,
     status: str = StatusAtividade.NAO_INICIADO,
     prioridade: str = PrioridadeAtividade.MEDIA,
     descricao: str = "",
-    empresa=None,
+    cliente_rsc=None,
     planejado_para: date | None = None,
     data_vencimento: date | None = None,
     hora_inicio=None,
@@ -181,7 +200,7 @@ def criar_atividade(
         criado_por=ator,
         titulo=titulo.strip(),
         descricao=(descricao or "").strip(),
-        empresa=empresa,
+        cliente_rsc=cliente_rsc,
         status=status,
         prioridade=prio,
         quadrante=quadrante_por_prioridade(prio),
@@ -193,14 +212,17 @@ def criar_atividade(
     )
     item.sincronizar_conclusao()
     item.save()
+    if participantes is not None:
+        definir_participantes(item, participantes)
     return item
 
 
 def atualizar_atividade(atividade: AtividadeDiaria, **campos) -> AtividadeDiaria:
+    participantes = campos.pop("participantes", None)
     for key, value in campos.items():
         if value is not None or key in (
             "descricao",
-            "empresa",
+            "cliente_rsc",
             "data_vencimento",
             "planejado_para",
             "hora_inicio",
@@ -214,6 +236,8 @@ def atualizar_atividade(atividade: AtividadeDiaria, **campos) -> AtividadeDiaria
         atividade.descricao = (campos.get("descricao") or "").strip()
     atividade.sincronizar_conclusao()
     atividade.save()
+    if participantes is not None:
+        definir_participantes(atividade, participantes)
     return atividade
 
 
@@ -236,11 +260,13 @@ def excluir_atividade(atividade: AtividadeDiaria) -> None:
 
 
 def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
-    # Um cronômetro ativo por responsável
-    ativos = AtividadeDiaria.objects.filter(
-        responsavel=ator,
-        cronometro_inicio__isnull=False,
-    ).exclude(pk=atividade.pk)
+    # Um cronômetro ativo por pessoa (em qualquer tarefa da equipe)
+    ativos = (
+        AtividadeDiaria.objects.filter(cronometro_inicio__isnull=False)
+        .filter(Q(responsavel=ator) | Q(participantes=ator))
+        .exclude(pk=atividade.pk)
+        .distinct()
+    )
     for outro in ativos:
         parar_cronometro(outro)
 

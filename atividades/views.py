@@ -8,16 +8,16 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from crm.models import Empresa
 from funcionarios.utils import obter_funcionario
 
 from . import planner_views
-from .forms import AtividadeForm, AtividadeRapidaForm
+from .forms import AtividadeForm, AtividadeRapidaForm, queryset_clientes_rsc
 from .models import AtividadeDiaria, PrioridadeAtividade, StatusAtividade
 from .permissions import (
     pode_dirigir_atividades,
     pode_gerenciar_atividade,
     funcionarios_atribuiveis,
+    funcionarios_para_equipe,
 )
 from .services import (
     agrupar_por_pessoa,
@@ -98,7 +98,7 @@ def lista(request):
                     or StatusAtividade.NAO_INICIADO,
                     prioridade=form_rapida.cleaned_data.get("prioridade")
                     or PrioridadeAtividade.MEDIA,
-                    empresa=form_rapida.cleaned_data.get("empresa"),
+                    cliente_rsc=form_rapida.cleaned_data.get("cliente_rsc"),
                     planejado_para=form_rapida.cleaned_data.get("planejado_para")
                     or dia,
                     data_vencimento=form_rapida.cleaned_data.get("data_vencimento"),
@@ -118,12 +118,13 @@ def lista(request):
                     funcionario,
                     titulo=form.cleaned_data["titulo"],
                     responsavel=form.cleaned_data.get("responsavel"),
+                    participantes=form.cleaned_data.get("participantes"),
                     status=form.cleaned_data.get("status")
                     or StatusAtividade.NAO_INICIADO,
                     prioridade=form.cleaned_data.get("prioridade")
                     or PrioridadeAtividade.MEDIA,
                     descricao=form.cleaned_data.get("descricao") or "",
-                    empresa=form.cleaned_data.get("empresa"),
+                    cliente_rsc=form.cleaned_data.get("cliente_rsc"),
                     planejado_para=form.cleaned_data.get("planejado_para") or dia,
                     data_vencimento=form.cleaned_data.get("data_vencimento"),
                     hora_inicio=form.cleaned_data.get("hora_inicio"),
@@ -194,7 +195,8 @@ def lista(request):
             "historico": historico_planner(funcionario) if organizacao == "planner" else [],
             "status_choices": StatusAtividade.choices,
             "prioridade_choices": PrioridadeAtividade.choices,
-            "empresas": Empresa.objects.filter(ativa=True).order_by("nome"),
+            "clientes_rsc": queryset_clientes_rsc(),
+            "equipe_opcoes": list(funcionarios_para_equipe(funcionario)),
             "eh_hoje": dia == hoje,
             "abrir_popup_tarefa": abrir_popup_tarefa,
         },
@@ -229,7 +231,7 @@ def editar(request, pk: int):
             item,
             titulo=form.cleaned_data["titulo"],
             descricao=form.cleaned_data.get("descricao") or "",
-            empresa=form.cleaned_data.get("empresa"),
+            cliente_rsc=form.cleaned_data.get("cliente_rsc"),
             prioridade=prio,
             status=form.cleaned_data.get("status"),
             quadrante=quad,
@@ -238,6 +240,7 @@ def editar(request, pk: int):
             hora_inicio=form.cleaned_data.get("hora_inicio"),
             hora_fim=form.cleaned_data.get("hora_fim"),
             responsavel=dest,
+            participantes=form.cleaned_data.get("participantes"),
         )
         messages.success(request, "Tarefa atualizada.")
     else:
@@ -283,20 +286,16 @@ def cronometro(request, pk: int):
     funcionario = obter_funcionario(request)
     if funcionario is None:
         return redirect("home")
-    item = get_object_or_404(AtividadeDiaria, pk=pk)
-    if item.responsavel_id != funcionario.id and not pode_dirigir_atividades(
-        funcionario
-    ):
-        messages.error(request, "Só o responsável pode usar o cronômetro.")
-        return redirect("atividades")
-    # Cronômetro só para o responsável (mesmo se gerente iniciar, conta no responsável)
-    ator_timer = item.responsavel
-    if item.responsavel_id != funcionario.id:
-        # gerente só visualiza; não inicia timer de outro
-        messages.error(request, "O cronômetro é pessoal do responsável.")
+    item = get_object_or_404(
+        AtividadeDiaria.objects.prefetch_related("participantes"), pk=pk
+    )
+    if not item.faz_parte_da_equipe(funcionario):
+        messages.error(
+            request, "Só quem faz parte da equipe da tarefa pode usar o cronômetro."
+        )
         return redirect("atividades")
 
-    alternar_cronometro(item, ator_timer)
+    alternar_cronometro(item, funcionario)
     item.refresh_from_db()
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse(

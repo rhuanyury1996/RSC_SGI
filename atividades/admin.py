@@ -17,7 +17,7 @@ class HabitoDiaInline(admin.TabularInline):
 class AtividadeDiariaAdmin(admin.ModelAdmin):
     list_display = (
         "titulo",
-        "empresa",
+        "cliente_rsc",
         "responsavel",
         "status",
         "prioridade",
@@ -33,15 +33,16 @@ class AtividadeDiariaAdmin(admin.ModelAdmin):
         "quadrante",
         "concluida",
         "planejado_para",
-        "empresa",
+        "cliente_rsc",
     )
     search_fields = (
         "titulo",
         "responsavel__nome",
         "responsavel__sobrenome",
-        "empresa__nome",
+        "cliente_rsc__nome",
     )
-    autocomplete_fields = ("responsavel", "criado_por", "empresa")
+    autocomplete_fields = ("responsavel", "criado_por", "cliente_rsc")
+    filter_horizontal = ("participantes",)
     date_hierarchy = "planejado_para"
 
 

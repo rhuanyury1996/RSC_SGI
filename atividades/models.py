@@ -55,7 +55,15 @@ class AtividadeDiaria(models.Model):
         Funcionario,
         on_delete=models.CASCADE,
         related_name="atividades",
-        verbose_name="Responsável",
+        verbose_name="Responsável principal",
+        help_text="Dono da tarefa na equipe.",
+    )
+    participantes = models.ManyToManyField(
+        Funcionario,
+        blank=True,
+        related_name="atividades_participando",
+        verbose_name="Participantes",
+        help_text="Outras pessoas que trabalham nesta atividade em grupo.",
     )
     criado_por = models.ForeignKey(
         Funcionario,
@@ -67,15 +75,15 @@ class AtividadeDiaria(models.Model):
     )
     titulo = models.CharField("Título", max_length=200)
     descricao = models.TextField("Descrição", blank=True)
-    empresa = models.ForeignKey(
-        "crm.Empresa",
+    cliente_rsc = models.ForeignKey(
+        "crm.ItemLista",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="atividades",
         verbose_name="Empresa",
-        help_text="Em branco = trabalho interno RSC. Preencha para apontar horas ao cliente.",
-        limit_choices_to={"ativa": True},
+        help_text="Em branco = RSC. Opções = Clientes RSC (ex.: DPR, OTILINE, CRITEQ).",
+        limit_choices_to={"tipo": "clientes_rsc", "ativo": True},
     )
     status = models.CharField(
         "Status",
@@ -130,15 +138,38 @@ class AtividadeDiaria(models.Model):
     def __str__(self) -> str:
         return self.titulo
 
+    def membros_equipe(self) -> list:
+        """Responsável principal + participantes, sem duplicar."""
+        membros = []
+        if self.responsavel_id:
+            membros.append(self.responsavel)
+        try:
+            extras = self.participantes.all()
+        except ValueError:
+            extras = []
+        for p in extras:
+            if p.pk != self.responsavel_id:
+                membros.append(p)
+        return membros
+
+    def faz_parte_da_equipe(self, funcionario) -> bool:
+        if funcionario is None:
+            return False
+        if self.responsavel_id == funcionario.id:
+            return True
+        if not self.pk:
+            return False
+        return self.participantes.filter(pk=funcionario.id).exists()
+
     @property
     def empresa_label(self) -> str:
-        if self.empresa_id and self.empresa:
-            return self.empresa.nome
+        if self.cliente_rsc_id and self.cliente_rsc:
+            return self.cliente_rsc.nome
         return "RSC"
 
     @property
     def eh_trabalho_interno(self) -> bool:
-        return self.empresa_id is None
+        return self.cliente_rsc_id is None
 
     @property
     def cronometro_ativo(self) -> bool:

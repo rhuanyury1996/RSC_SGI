@@ -29,12 +29,14 @@ def topbar(request):
         from atividades.models import AtividadeDiaria, StatusAtividade
         from atividades.services import formatar_tempo, metricas_planner
 
+        from django.db.models import Q
+
         hoje = timezone.localdate()
+        minhas = Q(responsavel=funcionario) | Q(participantes=funcionario)
         itens = list(
-            AtividadeDiaria.objects.filter(
-                responsavel=funcionario,
-                planejado_para=hoje,
-            ).order_by("ordem", "hora_inicio", "pk")
+            AtividadeDiaria.objects.filter(minhas, planejado_para=hoje)
+            .distinct()
+            .order_by("ordem", "hora_inicio", "pk")
         )
         metricas = metricas_planner(funcionario, hoje, itens)
         produtividade = {
@@ -49,9 +51,10 @@ def topbar(request):
         if ativo is None:
             ativo = (
                 AtividadeDiaria.objects.filter(
-                    responsavel=funcionario,
+                    minhas,
                     cronometro_inicio__isnull=False,
                 )
+                .distinct()
                 .order_by("-cronometro_inicio")
                 .first()
             )
