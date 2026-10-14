@@ -101,6 +101,7 @@ class PerfilForm(forms.ModelForm):
 
     def clean_foto_perfil(self):
         from django.core.exceptions import ValidationError
+        from django.core.files.uploadedfile import UploadedFile
 
         from .avatar import encode_avatar
 
@@ -109,23 +110,31 @@ class PerfilForm(forms.ModelForm):
         self._limpar_foto = False
         if foto is False:
             self._limpar_foto = True
-            return foto
-        if foto:
+            return None
+        # Só processa upload novo — FieldFile existente não deve ser reaberto do disco
+        if isinstance(foto, UploadedFile):
             try:
                 self._foto_perfil_data = encode_avatar(foto)
             except Exception as exc:
                 raise ValidationError(
                     "Não foi possível processar a imagem. Use JPG ou PNG."
                 ) from exc
+            # Persiste só no banco (data URI); evita /media quebrado no Render
+            return None
         return foto
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         if getattr(self, "_limpar_foto", False):
+            if instance.foto_perfil:
+                instance.foto_perfil.delete(save=False)
             instance.foto_perfil = None
             instance.foto_perfil_data = ""
         elif getattr(self, "_foto_perfil_data", None):
             instance.foto_perfil_data = self._foto_perfil_data
+            if instance.foto_perfil:
+                instance.foto_perfil.delete(save=False)
+            instance.foto_perfil = None
         if commit:
             instance.save()
             self.save_m2m()

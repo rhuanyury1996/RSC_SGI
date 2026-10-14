@@ -18,5 +18,9 @@ def encode_avatar(uploaded_file: BinaryIO, max_size: int = 320) -> str:
         img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85, optimize=True)
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    uploaded_file.seek(0)
+    raw = buf.getvalue()
+    if not raw:
+        raise ValueError("Imagem vazia após processamento.")
+    b64 = base64.b64encode(raw).decode("ascii")
     return f"data:image/jpeg;base64,{b64}"

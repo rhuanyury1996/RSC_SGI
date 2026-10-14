@@ -1160,6 +1160,20 @@ button:active, .btn:active { transform: translateY(1px); }
   margin: 0.9rem 0 0;
   font-size: 0.84rem;
 }
+.pf-foto-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem;
+}
+.pf-foto-preview img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+}
 .pf-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

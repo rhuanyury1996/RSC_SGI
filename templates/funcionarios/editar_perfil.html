@@ -29,8 +29,15 @@
         </div>
         <div>
           <label for="{{ form.foto_perfil.id_for_label }}">{{ form.foto_perfil.label }}</label>
+          {% if funcionario.tem_foto %}
+          <div class="pf-foto-preview">
+            <img src="{{ funcionario.foto_url }}" alt="Foto atual">
+            <span class="muted">Foto atual — envie outra para substituir.</span>
+          </div>
+          {% endif %}
           {{ form.foto_perfil }}
           {{ form.foto_perfil.errors }}
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">JPG ou PNG. A foto fica salva no banco para aparecer no Render.</p>
         </div>
       </div>
 

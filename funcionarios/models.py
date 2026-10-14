@@ -158,17 +158,25 @@ class Funcionario(models.Model):
 
     @property
     def tem_foto(self) -> bool:
-        return bool(self.foto_perfil_data or self.foto_perfil)
+        if self.foto_perfil_data and self.foto_perfil_data.startswith("data:image"):
+            return True
+        if self.foto_perfil and self.foto_perfil.name:
+            try:
+                return self.foto_perfil.storage.exists(self.foto_perfil.name)
+            except Exception:
+                return False
+        return False
 
     @property
     def foto_url(self) -> str:
         """URL da foto: data URI no banco (produção) ou arquivo em MEDIA."""
-        if self.foto_perfil_data:
+        if self.foto_perfil_data and self.foto_perfil_data.startswith("data:image"):
             return self.foto_perfil_data
-        if self.foto_perfil:
+        if self.foto_perfil and self.foto_perfil.name:
             try:
-                return self.foto_perfil.url
-            except ValueError:
+                if self.foto_perfil.storage.exists(self.foto_perfil.name):
+                    return self.foto_perfil.url
+            except Exception:
                 return ""
         return ""
 

@@ -108,17 +108,21 @@ class FuncionarioAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("usuario", "responde_a")
 
     def save_model(self, request, obj, form, change):
+        from django.core.files.uploadedfile import UploadedFile
+
         from .avatar import encode_avatar
 
         foto = form.cleaned_data.get("foto_perfil") if form is not None else None
         if foto is False:
+            if obj.foto_perfil:
+                obj.foto_perfil.delete(save=False)
             obj.foto_perfil = None
             obj.foto_perfil_data = ""
-        elif foto:
-            try:
-                obj.foto_perfil_data = encode_avatar(foto)
-            except Exception:
-                pass
+        elif isinstance(foto, UploadedFile):
+            obj.foto_perfil_data = encode_avatar(foto)
+            if obj.foto_perfil:
+                obj.foto_perfil.delete(save=False)
+            obj.foto_perfil = None
 
         super().save_model(request, obj, form, change)
 
