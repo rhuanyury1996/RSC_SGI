@@ -546,6 +546,77 @@ img.info-avatar,
   border-radius: 999px;
   background: #fff;
 }
+.topbar-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: min(340px, 36vw);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 0.2rem 0.28rem 0.2rem 0.7rem;
+  color: #fff;
+}
+.topbar-timer.is-running {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: rgba(134, 239, 172, 0.55);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+.topbar-timer-link {
+  display: grid;
+  gap: 0.02rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  padding-right: 0.15rem;
+}
+.topbar-timer-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  line-height: 1.1;
+}
+.topbar-timer-title {
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+}
+.topbar-timer-clock {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.92;
+}
+.topbar-timer-form { margin: 0; }
+.topbar-timer-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.topbar-timer-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.topbar-timer.is-running .topbar-timer-btn {
+  background: #22c55e;
+  color: #052e16;
+}
+.topbar-timer.is-running .topbar-timer-btn:hover {
+  background: #4ade80;
+}
 .topbar-prod-chip {
   display: inline-flex;
   align-items: center;
@@ -3591,6 +3662,18 @@ button.link-btn.danger:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+button.ev-bar {
+  display: block;
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+button.ev-bar:hover {
+  filter: brightness(0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
 .ev-dot {
   display: flex;
   align-items: center;
@@ -3601,9 +3684,23 @@ button.link-btn.danger:focus-visible,
   min-width: 0;
   text-decoration: none;
 }
+button.ev-dot {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  padding: 0.1rem 0.15rem;
+  border-radius: 6px;
+}
+button.ev-dot:hover,
 a.ev-dot:hover span {
   text-decoration: underline;
   color: #0f172a;
+}
+button.ev-dot:hover {
+  background: #f1f5f9;
 }
 .ev-dot i {
   width: 7px;
@@ -3629,6 +3726,32 @@ a.ev-dot:hover span {
   text-decoration: none;
 }
 .cal-agenda .item a:hover strong { text-decoration: underline; }
+button.cal-agenda .item,
+.cal-agenda button.item {
+  display: grid;
+  gap: 0.1rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  padding: 0.15rem 0.35rem 0.15rem 0.55rem;
+  border-radius: 8px;
+  border-left: 3px solid var(--ev, #94a3b8);
+}
+.cal-agenda button.item:hover {
+  background: #f1f5f9;
+}
+.cal-agenda button.item strong {
+  display: block;
+  font-size: 0.86rem;
+}
+.cal-agenda button.item span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .cal-cell .more {
   font-size: 0.7rem;
   color: var(--muted);
@@ -3648,10 +3771,29 @@ a.ev-dot:hover span {
 .dialog-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.75rem;
   margin-bottom: 0.5rem;
 }
 .dialog-head h3 { margin: 0; }
+.dialog-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+}
+.cal-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cal-dialog-actions .btn.danger,
+.btn.ghost.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.cal-dialog-actions .btn.ghost.danger:hover {
+  background: #fef2f2;
+}
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3760,6 +3902,12 @@ a.ev-dot:hover span {
   .topbar-nav { display: none; }
   .topbar-prod-label { display: none; }
   .topbar-prod-track { width: 40px; }
+  .topbar-timer { max-width: min(220px, 42vw); }
+  .topbar-timer-label { display: none; }
+}
+@media (max-width: 720px) {
+  .topbar-timer-title { display: none; }
+  .topbar-timer { max-width: none; padding-left: 0.35rem; }
 }
 @media (max-width: 900px) {
   .layout-body { flex-direction: column; }

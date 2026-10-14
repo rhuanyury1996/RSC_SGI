@@ -30,6 +30,31 @@
       </div>
 
       <div class="topbar-right">
+        {% if topbar_timer %}
+        <div class="topbar-timer {% if topbar_timer.ativo %}is-running{% endif %}" id="topbarTimer"
+             data-pk="{{ topbar_timer.pk }}"
+             data-ativo="{% if topbar_timer.ativo %}1{% else %}0{% endif %}"
+             data-segundos="{{ topbar_timer.segundos }}"
+             data-acumulado="{{ topbar_timer.acumulado }}"
+             data-inicio="{{ topbar_timer.inicio }}"
+             data-url="{% url 'atividade_cronometro' topbar_timer.pk %}">
+          <a class="topbar-timer-link" href="{{ topbar_timer.href }}" title="{{ topbar_timer.titulo }}">
+            <span class="topbar-timer-label">{% if topbar_timer.ativo %}Em execução{% else %}Próxima{% endif %}</span>
+            <strong class="topbar-timer-title">{{ topbar_timer.titulo }}</strong>
+            <span class="topbar-timer-clock" id="topbarTimerClock">{{ topbar_timer.texto }}</span>
+          </a>
+          <form method="post" action="{% url 'atividade_cronometro' topbar_timer.pk %}" class="topbar-timer-form" id="topbarTimerForm">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="topbar-timer-btn" id="topbarTimerBtn"
+                    title="{% if topbar_timer.ativo %}Pausar timer{% else %}Iniciar timer{% endif %}"
+                    aria-label="{% if topbar_timer.ativo %}Pausar timer{% else %}Iniciar timer{% endif %}">
+              <span id="topbarTimerIcon">{% if topbar_timer.ativo %}❚❚{% else %}▶{% endif %}</span>
+            </button>
+          </form>
+        </div>
+        {% endif %}
+
         <a class="topbar-prod-chip" href="{% url 'atividades' %}?org=planner" title="Produtividade do dia">
           <span class="topbar-prod-label">Produtividade</span>
           <strong>{{ topbar_produtividade.percentual|default:0 }}%</strong>
@@ -303,17 +328,93 @@
   (function () {
     var layout = document.getElementById("app-layout");
     var btn = document.getElementById("sidebar-toggle");
-    if (!layout || !btn) return;
-    var key = "sgi-sidebar-collapsed";
-    function apply(collapsed) {
-      layout.classList.toggle("sidebar-collapsed", !!collapsed);
-      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      try { localStorage.setItem(key, collapsed ? "1" : "0"); } catch (e) {}
+    if (layout && btn) {
+      var key = "sgi-sidebar-collapsed";
+      function apply(collapsed) {
+        layout.classList.toggle("sidebar-collapsed", !!collapsed);
+        btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        try { localStorage.setItem(key, collapsed ? "1" : "0"); } catch (e) {}
+      }
+      try { apply(localStorage.getItem(key) === "1"); } catch (e) { apply(false); }
+      btn.addEventListener("click", function () {
+        apply(!layout.classList.contains("sidebar-collapsed"));
+      });
     }
-    try { apply(localStorage.getItem(key) === "1"); } catch (e) { apply(false); }
-    btn.addEventListener("click", function () {
-      apply(!layout.classList.contains("sidebar-collapsed"));
-    });
+
+    var timer = document.getElementById("topbarTimer");
+    if (!timer) return;
+    var clock = document.getElementById("topbarTimerClock");
+    var icon = document.getElementById("topbarTimerIcon");
+    var form = document.getElementById("topbarTimerForm");
+    var label = timer.querySelector(".topbar-timer-label");
+
+    function fmt(sec) {
+      sec = Math.max(0, Math.floor(sec));
+      var h = Math.floor(sec / 3600);
+      var m = Math.floor((sec % 3600) / 60);
+      var s = sec % 60;
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      return h ? h + ":" + pad(m) + ":" + pad(s) : pad(m) + ":" + pad(s);
+    }
+
+    function isRunning() {
+      return timer.getAttribute("data-ativo") === "1";
+    }
+
+    function tick() {
+      if (!isRunning() || !clock) return;
+      var acum = parseInt(timer.getAttribute("data-acumulado") || "0", 10);
+      var inicio = timer.getAttribute("data-inicio");
+      if (!inicio) return;
+      var start = Date.parse(inicio);
+      if (isNaN(start)) return;
+      clock.textContent = fmt(acum + Math.floor((Date.now() - start) / 1000));
+    }
+
+    function paint(data) {
+      timer.setAttribute("data-ativo", data.ativo ? "1" : "0");
+      timer.setAttribute("data-segundos", String(data.segundos || 0));
+      timer.setAttribute("data-acumulado", String(data.acumulado || 0));
+      timer.setAttribute("data-inicio", data.inicio || "");
+      timer.classList.toggle("is-running", !!data.ativo);
+      if (clock) clock.textContent = data.texto || fmt(data.segundos || 0);
+      if (icon) icon.textContent = data.ativo ? "❚❚" : "▶";
+      if (label) label.textContent = data.ativo ? "Em execução" : "Próxima";
+      var btn = document.getElementById("topbarTimerBtn");
+      if (btn) {
+        btn.title = data.ativo ? "Pausar timer" : "Iniciar timer";
+        btn.setAttribute("aria-label", btn.title);
+      }
+    }
+
+    setInterval(tick, 1000);
+    tick();
+
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var url = timer.getAttribute("data-url");
+        var csrf = form.querySelector("[name=csrfmiddlewaretoken]");
+        var body = new FormData();
+        if (csrf) body.append("csrfmiddlewaretoken", csrf.value);
+        body.append("next", window.location.pathname + window.location.search);
+        fetch(url, {
+          method: "POST",
+          body: body,
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data || !data.ok) {
+              form.submit();
+              return;
+            }
+            paint(data);
+          })
+          .catch(function () { form.submit(); });
+      });
+    }
   })();
   </script>
 {% else %}

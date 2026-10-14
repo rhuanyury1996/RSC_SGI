@@ -59,14 +59,32 @@
             <div class="time">
               {% if ev.dia_inteiro %}Dia{% else %}{{ ev.inicio|date:"H:i" }}{% endif %}
             </div>
+            {% if ev.tipo == "atividade" %}
             <div class="item" style="--ev: {{ ev.cor }}">
-              {% if ev.href %}
-                <a href="{{ ev.href }}"><strong>{{ ev.titulo }}</strong></a>
-              {% else %}
-                <strong>{{ ev.titulo }}</strong>
-              {% endif %}
+              <a href="{{ ev.href }}"><strong>{{ ev.titulo }}</strong></a>
               <span>{{ ev.get_tipo_display }}</span>
             </div>
+            {% else %}
+            <button
+              type="button"
+              class="item js-open-evento"
+              style="--ev: {{ ev.cor }}"
+              data-id="{{ ev.pk }}"
+              data-tipo="{{ ev.tipo }}"
+              data-titulo="{{ ev.titulo|escape }}"
+              data-motivo="{{ ev.motivo|default:''|escape }}"
+              data-inicio="{{ ev.inicio|date:'Y-m-d' }}T{{ ev.inicio|time:'H:i' }}"
+              data-fim="{{ ev.fim|date:'Y-m-d' }}T{{ ev.fim|time:'H:i' }}"
+              data-dia-inteiro="{% if ev.dia_inteiro %}1{% else %}0{% endif %}"
+              data-horas="{% if ev.horas_recuperar %}{{ ev.horas_recuperar }}{% endif %}"
+              data-rec-ini="{% if ev.recuperacao_inicio %}{{ ev.recuperacao_inicio|date:'Y-m-d' }}{% endif %}"
+              data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
+              data-tipo-label="{{ ev.get_tipo_display }}"
+            >
+              <strong>{{ ev.titulo }}</strong>
+              <span>{{ ev.get_tipo_display }}</span>
+            </button>
+            {% endif %}
           </li>
           {% endfor %}
         </ul>
@@ -118,7 +136,7 @@
     <div class="cal-main-head">
       <div>
         <h2>{{ mes_nome }} {{ ano }}</h2>
-        <p class="muted">Férias, day-off, reuniões, recuperação e atividades do planner.</p>
+        <p class="muted">Clique em um evento para ver, editar, duplicar ou excluir.</p>
       </div>
       <div class="view-toggle">
         <span class="active">Mês</span>
@@ -134,22 +152,51 @@
           {% if cel %}
           <div class="cal-cell {% if cel.is_today %}is-today{% endif %}">
             <div class="daynum">{{ cel.day }}</div>
-            {% for ev in cel.visiveis %}
-              {% if ev.tipo == 'ferias' or ev.tipo == 'day_off' %}
-                <div class="ev-bar" style="background:{{ ev.cor }}" title="{{ ev.titulo }}">{{ ev.titulo }}</div>
-              {% elif ev.tipo == 'atividade' %}
+            {% for ev in cel.eventos %}
+              {% if ev.tipo == "atividade" %}
                 <a class="ev-dot ev-atividade {% if ev.status %}st-{{ ev.status }}{% endif %}" style="--ev:{{ ev.cor }}" href="{{ ev.href }}" title="{{ ev.titulo }} · {{ ev.get_tipo_display }}">
                   <i></i><span>{{ ev.titulo }}</span>
                 </a>
+              {% elif ev.tipo == "ferias" or ev.tipo == "day_off" %}
+                <button
+                  type="button"
+                  class="ev-bar js-open-evento"
+                  style="background:{{ ev.cor }}"
+                  title="{{ ev.titulo }} — clique para editar"
+                  data-id="{{ ev.pk }}"
+                  data-tipo="{{ ev.tipo }}"
+                  data-titulo="{{ ev.titulo|escape }}"
+                  data-motivo="{{ ev.motivo|default:''|escape }}"
+                  data-inicio="{{ ev.inicio|date:'Y-m-d' }}T{{ ev.inicio|time:'H:i' }}"
+                  data-fim="{{ ev.fim|date:'Y-m-d' }}T{{ ev.fim|time:'H:i' }}"
+                  data-dia-inteiro="{% if ev.dia_inteiro %}1{% else %}0{% endif %}"
+                  data-horas="{% if ev.horas_recuperar %}{{ ev.horas_recuperar }}{% endif %}"
+                  data-rec-ini="{% if ev.recuperacao_inicio %}{{ ev.recuperacao_inicio|date:'Y-m-d' }}{% endif %}"
+                  data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
+                  data-tipo-label="{{ ev.get_tipo_display }}"
+                >{{ ev.titulo }}</button>
               {% else %}
-                <div class="ev-dot" style="--ev:{{ ev.cor }}" title="{{ ev.titulo }}">
+                <button
+                  type="button"
+                  class="ev-dot js-open-evento"
+                  style="--ev:{{ ev.cor }}"
+                  title="{{ ev.titulo }} — clique para editar"
+                  data-id="{{ ev.pk }}"
+                  data-tipo="{{ ev.tipo }}"
+                  data-titulo="{{ ev.titulo|escape }}"
+                  data-motivo="{{ ev.motivo|default:''|escape }}"
+                  data-inicio="{{ ev.inicio|date:'Y-m-d' }}T{{ ev.inicio|time:'H:i' }}"
+                  data-fim="{{ ev.fim|date:'Y-m-d' }}T{{ ev.fim|time:'H:i' }}"
+                  data-dia-inteiro="{% if ev.dia_inteiro %}1{% else %}0{% endif %}"
+                  data-horas="{% if ev.horas_recuperar %}{{ ev.horas_recuperar }}{% endif %}"
+                  data-rec-ini="{% if ev.recuperacao_inicio %}{{ ev.recuperacao_inicio|date:'Y-m-d' }}{% endif %}"
+                  data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
+                  data-tipo-label="{{ ev.get_tipo_display }}"
+                >
                   <i></i><span>{{ ev.titulo }}</span>
-                </div>
+                </button>
               {% endif %}
             {% endfor %}
-            {% if cel.extra %}
-              <div class="more">+{{ cel.extra }} mais</div>
-            {% endif %}
           </div>
           {% else %}
           <div class="cal-cell muted-cell"></div>
@@ -161,10 +208,18 @@
 </div>
 
 <dialog class="cal-dialog" id="dialogEvento">
-  <form method="post" class="cal-dialog-form">
+  <form method="post" class="cal-dialog-form" id="formEvento">
     {% csrf_token %}
+    <input type="hidden" name="ano" value="{{ ano }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    <input type="hidden" name="evento_id" id="campoEventoId" value="{% if evento_edit %}{{ evento_edit.pk }}{% endif %}">
+    <input type="hidden" name="acao" id="campoAcao" value="salvar">
+
     <div class="dialog-head">
-      <h3>Novo evento</h3>
+      <div>
+        <h3 id="dialogTitulo">{% if evento_edit %}Editar evento{% else %}Novo evento{% endif %}</h3>
+        <p class="muted dialog-sub" id="dialogSub">{% if evento_edit %}{{ evento_edit.get_tipo_display }}{% endif %}</p>
+      </div>
       <button type="button" class="btn ghost" id="btnFecharDialog">Fechar</button>
     </div>
 
@@ -228,16 +283,25 @@
     {% endif %}
 
     {{ form.non_field_errors }}
-    <div class="actions" style="margin-top:1rem;">
-      <button class="btn" type="submit">Salvar no calendário</button>
+    <div class="actions cal-dialog-actions" style="margin-top:1rem;">
+      <button class="btn" type="submit" id="btnSalvarEvento">Salvar</button>
+      <button class="btn secondary" type="submit" id="btnDuplicarEvento" {% if not evento_edit %}hidden{% endif %}>Duplicar</button>
+      <button class="btn ghost danger" type="submit" id="btnExcluirEvento" {% if not evento_edit %}hidden{% endif %}>Excluir</button>
     </div>
   </form>
 </dialog>
 
 <script>
   const dialog = document.getElementById('dialogEvento');
+  const formEvento = document.getElementById('formEvento');
   const btnOpen = document.getElementById('btnNovoEvento');
   const btnClose = document.getElementById('btnFecharDialog');
+  const btnDuplicar = document.getElementById('btnDuplicarEvento');
+  const btnExcluir = document.getElementById('btnExcluirEvento');
+  const campoId = document.getElementById('campoEventoId');
+  const campoAcao = document.getElementById('campoAcao');
+  const dialogTitulo = document.getElementById('dialogTitulo');
+  const dialogSub = document.getElementById('dialogSub');
   const tipo = document.getElementById('id_tipo');
   const bloco = document.getElementById('blocoDayOff');
   const horas = document.getElementById('id_horas_recuperar');
@@ -245,6 +309,18 @@
   const recFim = document.getElementById('id_recuperacao_fim');
   const dica = document.getElementById('dicaCapacidade');
   const MAX_H = 2;
+
+  const campos = {
+    tipo,
+    titulo: document.getElementById('id_titulo'),
+    motivo: document.getElementById('id_motivo'),
+    inicio: document.getElementById('id_inicio'),
+    fim: document.getElementById('id_fim'),
+    diaInteiro: document.getElementById('id_dia_inteiro'),
+    horas,
+    recIni,
+    recFim,
+  };
 
   function syncDayOff() {
     bloco.style.display = tipo.value === 'day_off' ? 'block' : 'none';
@@ -272,15 +348,87 @@
       : `Período insuficiente: ${h}h exigem pelo menos ${minDias} dia(s) (máx. ${MAX_H}h/dia).`;
   }
 
+  function modoNovo() {
+    campoId.value = '';
+    campoAcao.value = 'salvar';
+    dialogTitulo.textContent = 'Novo evento';
+    dialogSub.textContent = '';
+    btnDuplicar.hidden = true;
+    btnExcluir.hidden = true;
+    formEvento.reset();
+    syncDayOff();
+  }
+
+  function modoEdicao(data) {
+    campoId.value = data.id || '';
+    campoAcao.value = 'salvar';
+    dialogTitulo.textContent = 'Editar evento';
+    dialogSub.textContent = data.tipoLabel || data.tipo || '';
+    btnDuplicar.hidden = !data.id;
+    btnExcluir.hidden = !data.id;
+    if (campos.tipo) campos.tipo.value = data.tipo || '';
+    if (campos.titulo) campos.titulo.value = data.titulo || '';
+    if (campos.motivo) campos.motivo.value = data.motivo || '';
+    if (campos.inicio) campos.inicio.value = data.inicio || '';
+    if (campos.fim) campos.fim.value = data.fim || '';
+    if (campos.diaInteiro) campos.diaInteiro.checked = data.diaInteiro === '1' || data.diaInteiro === true;
+    if (campos.horas) campos.horas.value = data.horas || '';
+    if (campos.recIni) campos.recIni.value = data.recIni || '';
+    if (campos.recFim) campos.recFim.value = data.recFim || '';
+    syncDayOff();
+  }
+
+  function abrirDeBotao(btn) {
+    modoEdicao({
+      id: btn.dataset.id,
+      tipo: btn.dataset.tipo,
+      tipoLabel: btn.dataset.tipoLabel,
+      titulo: btn.dataset.titulo || '',
+      motivo: btn.dataset.motivo || '',
+      inicio: btn.dataset.inicio || '',
+      fim: btn.dataset.fim || '',
+      diaInteiro: btn.dataset.diaInteiro,
+      horas: btn.dataset.horas || '',
+      recIni: btn.dataset.recIni || '',
+      recFim: btn.dataset.recFim || '',
+    });
+    dialog.showModal();
+  }
+
   tipo.addEventListener('change', syncDayOff);
   [horas, recIni, recFim].forEach((el) => el && el.addEventListener('input', atualizarCapacidade));
   syncDayOff();
 
-  btnOpen.addEventListener('click', () => dialog.showModal());
+  btnOpen.addEventListener('click', () => {
+    modoNovo();
+    dialog.showModal();
+  });
   btnClose.addEventListener('click', () => dialog.close());
 
-  {% if form.errors %}
+  btnDuplicar.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!campoId.value) return;
+    campoAcao.value = 'duplicar';
+    formEvento.requestSubmit();
+  });
+  btnExcluir.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!campoId.value) return;
+    if (!confirm('Remover este evento do calendário?')) return;
+    campoAcao.value = 'excluir';
+    formEvento.requestSubmit();
+  });
+
+  document.querySelectorAll('.js-open-evento').forEach((btn) => {
+    btn.addEventListener('click', () => abrirDeBotao(btn));
+  });
+
+  {% if abrir_dialog or form.errors %}
   dialog.showModal();
+  {% if evento_edit %}
+  btnDuplicar.hidden = false;
+  btnExcluir.hidden = false;
+  {% endif %}
   {% endif %}
 
   (function () {

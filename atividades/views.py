@@ -297,12 +297,18 @@ def cronometro(request, pk: int):
         return JsonResponse(
             {
                 "ok": True,
+                "pk": item.pk,
+                "titulo": item.titulo,
                 "ativo": item.cronometro_ativo,
                 "segundos": item.tempo_atual_segundos(),
+                "acumulado": int(item.tempo_acumulado_segundos or 0),
                 "texto": formatar_tempo(item.tempo_atual_segundos()),
                 "inicio": item.cronometro_inicio.isoformat()
                 if item.cronometro_inicio
                 else None,
             }
         )
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return redirect(next_url)
     return _redirect_lista(request)

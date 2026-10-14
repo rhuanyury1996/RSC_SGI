@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from funcionarios.utils import obter_funcionario
 
@@ -14,7 +14,7 @@ from .google_sync import (
     google_configurado,
     save_credentials,
 )
-from .models import EventoCalendario, GoogleCalendarConta, TipoEvento
+from .models import EventoCalendario, GoogleCalendarConta, StatusEvento, TipoEvento
 from .services import (
     atividade_para_item,
     eventos_do_dia,
@@ -41,6 +41,82 @@ def _google_status(user):
     }
 
 
+def _normalizar_dia_inteiro(evento: EventoCalendario) -> None:
+    if not evento.dia_inteiro:
+        return
+    ini = timezone.localtime(evento.inicio).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    fim = timezone.localtime(evento.fim).replace(
+        hour=23, minute=59, second=0, microsecond=0
+    )
+    evento.inicio = ini
+    evento.fim = fim
+
+
+def _espelhar_lista(request, eventos: list[EventoCalendario], google: dict) -> None:
+    if not google.get("google_conectado"):
+        return
+    google_ok = 0
+    google_fail = 0
+    for ev in eventos:
+        if not ev:
+            continue
+        if espelhar_evento_google(request.user, ev):
+            google_ok += 1
+        else:
+            google_fail += 1
+    if google_ok:
+        messages.info(
+            request,
+            f"Espelhado no Google Calendar ({google_ok} evento(s)).",
+        )
+    if google_fail:
+        messages.warning(
+            request,
+            "Falha ao espelhar no Google. Tente reconectar a conta.",
+        )
+
+
+def _persistir_evento(
+    request,
+    form: EventoCalendarioForm,
+    funcionario,
+    google: dict,
+    *,
+    novo: bool,
+) -> EventoCalendario:
+    evento = form.save(commit=False)
+    evento.funcionario = funcionario
+    if not evento.titulo:
+        evento.titulo = evento.get_tipo_display()
+    _normalizar_dia_inteiro(evento)
+    evento.save()
+
+    eventos_para_google = [evento]
+    if evento.tipo == TipoEvento.DAY_OFF:
+        demandas = garantir_demanda_recuperacao(evento)
+        messages.success(
+            request,
+            (
+                f"{'Day-off atualizado' if not novo else 'Day-off registrado'}. "
+                f"{len(demandas)} demanda(s) de recuperação "
+                f"{'atualizada(s)' if not novo else 'criada(s)'} (máx. 2h/dia)."
+            ),
+        )
+        eventos_para_google = [evento] + [
+            d.evento_agenda for d in demandas if d.evento_agenda_id
+        ]
+    else:
+        messages.success(
+            request,
+            "Evento atualizado." if not novo else "Evento adicionado ao calendário.",
+        )
+
+    _espelhar_lista(request, eventos_para_google, google)
+    return evento
+
+
 @login_required
 def calendario(request):
     funcionario = _exige_funcionario(request)
@@ -48,8 +124,14 @@ def calendario(request):
         return redirect("home")
 
     hoje = timezone.localdate()
-    ano = int(request.GET.get("ano", hoje.year))
-    mes = int(request.GET.get("mes", hoje.month))
+    try:
+        ano = int(request.POST.get("ano") or request.GET.get("ano") or hoje.year)
+    except (TypeError, ValueError):
+        ano = hoje.year
+    try:
+        mes = int(request.POST.get("mes") or request.GET.get("mes") or hoje.month)
+    except (TypeError, ValueError):
+        mes = hoje.month
     if mes < 1 or mes > 12:
         mes = hoje.month
 
@@ -66,64 +148,89 @@ def calendario(request):
         filtros_ativos.add("atividade")
 
     google = _google_status(request.user)
+    evento_edit = None
+    abrir_dialog = False
 
     if request.method == "POST":
-        form = EventoCalendarioForm(request.POST, funcionario=funcionario)
-        if form.is_valid():
-            evento = form.save(commit=False)
-            evento.funcionario = funcionario
-            if not evento.titulo:
-                evento.titulo = evento.get_tipo_display()
-            if evento.dia_inteiro:
-                ini = timezone.localtime(evento.inicio).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                )
-                fim = timezone.localtime(evento.fim).replace(
-                    hour=23, minute=59, second=0, microsecond=0
-                )
-                evento.inicio = ini
-                evento.fim = fim
-            evento.save()
+        acao = (request.POST.get("acao") or "salvar").strip()
+        evento_id = (request.POST.get("evento_id") or "").strip()
+        if evento_id:
+            evento_edit = get_object_or_404(
+                EventoCalendario,
+                pk=evento_id,
+                funcionario=funcionario,
+            )
 
-            if evento.tipo == TipoEvento.DAY_OFF:
-                demandas = garantir_demanda_recuperacao(evento)
-                messages.success(
-                    request,
-                    (
-                        f"Day-off registrado. {len(demandas)} demanda(s) de recuperação "
-                        f"criada(s) (máx. 2h/dia)."
-                    ),
-                )
-                eventos_para_google = [evento] + [
-                    d.evento_agenda for d in demandas if d.evento_agenda_id
-                ]
-            else:
-                messages.success(request, "Evento adicionado ao calendário.")
-                eventos_para_google = [evento]
-
-            # Se a conta Google estiver conectada, espelha automaticamente
-            if google["google_conectado"]:
-                google_ok = 0
-                google_fail = 0
-                for ev in eventos_para_google:
-                    if espelhar_evento_google(request.user, ev):
-                        google_ok += 1
-                    else:
-                        google_fail += 1
-                if google_ok:
-                    messages.info(
-                        request,
-                        f"Espelhado no Google Calendar ({google_ok} evento(s)).",
-                    )
-                if google_fail:
-                    messages.warning(
-                        request,
-                        "Falha ao espelhar no Google. Tente reconectar a conta.",
-                    )
-
+        if acao == "excluir" and evento_edit is not None:
+            evento_edit.status = StatusEvento.CANCELADO
+            evento_edit.save(update_fields=["status", "atualizado_em"])
+            messages.success(request, "Evento removido do calendário.")
             return redirect(f"{request.path}?ano={ano}&mes={mes}")
+
+        if acao == "duplicar" and evento_edit is not None:
+            copia = EventoCalendario.objects.get(pk=evento_edit.pk)
+            copia.pk = None
+            copia.id = None
+            copia.titulo = f"{evento_edit.titulo} (cópia)"
+            copia.status = StatusEvento.CONFIRMADO
+            copia.google_event_id = ""
+            copia.espelhado_google = False
+            # Empurra 7 dias para não sobrepor o original no mesmo dia
+            copia.inicio = evento_edit.inicio + timedelta(days=7)
+            copia.fim = evento_edit.fim + timedelta(days=7)
+            if evento_edit.recuperacao_inicio:
+                copia.recuperacao_inicio = evento_edit.recuperacao_inicio + timedelta(
+                    days=7
+                )
+            if evento_edit.recuperacao_fim:
+                copia.recuperacao_fim = evento_edit.recuperacao_fim + timedelta(days=7)
+            copia.save()
+            if copia.tipo == TipoEvento.DAY_OFF:
+                demandas = garantir_demanda_recuperacao(copia)
+                _espelhar_lista(
+                    request,
+                    [copia]
+                    + [d.evento_agenda for d in demandas if d.evento_agenda_id],
+                    google,
+                )
+            else:
+                _espelhar_lista(request, [copia], google)
+            messages.success(request, "Evento duplicado (+7 dias).")
+            return redirect(
+                f"{request.path}?ano={ano}&mes={mes}&evento={copia.pk}"
+            )
+
+        if evento_edit is not None:
+            form = EventoCalendarioForm(
+                request.POST, instance=evento_edit, funcionario=funcionario
+            )
+        else:
+            form = EventoCalendarioForm(request.POST, funcionario=funcionario)
+
+        if form.is_valid():
+            evento = _persistir_evento(
+                request,
+                form,
+                funcionario,
+                google,
+                novo=evento_edit is None,
+            )
+            return redirect(f"{request.path}?ano={ano}&mes={mes}&evento={evento.pk}")
+        abrir_dialog = True
     else:
-        form = EventoCalendarioForm(funcionario=funcionario)
+        evento_id = (request.GET.get("evento") or "").strip()
+        if evento_id:
+            evento_edit = get_object_or_404(
+                EventoCalendario,
+                pk=evento_id,
+                funcionario=funcionario,
+            )
+            form = EventoCalendarioForm(
+                instance=evento_edit, funcionario=funcionario
+            )
+            abrir_dialog = True
+        else:
+            form = EventoCalendarioForm(funcionario=funcionario)
 
     primeiro = date(ano, mes, 1)
     if mes == 12:
@@ -187,6 +294,8 @@ def calendario(request):
         "calendario/calendario.html",
         {
             "form": form,
+            "evento_edit": evento_edit,
+            "abrir_dialog": abrir_dialog,
             "semanas": semanas,
             "mini": mini,
             "ano": ano,
