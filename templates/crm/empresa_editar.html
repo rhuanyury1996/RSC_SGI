@@ -25,7 +25,13 @@
               <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
               {{ form.nome }}{{ form.nome.errors }}
             </div>
-            <div class="field span-2">
+            <div class="field">
+              <label for="{{ form.cnpj.id_for_label }}">{{ form.cnpj.label }}</label>
+              {{ form.cnpj }}{{ form.cnpj.errors }}
+              <p class="js-cnpj-status" hidden></p>
+              <p class="field-hint muted">{{ form.cnpj.help_text }}</p>
+            </div>
+            <div class="field">
               <label for="{{ form.site.id_for_label }}">{{ form.site.label }}</label>
               {{ form.site }}{{ form.site.errors }}
             </div>
@@ -134,4 +140,5 @@
     });
   });
 </script>
+{% include "crm/_empresa_cnpj_js.html" %}
 {% endblock %}

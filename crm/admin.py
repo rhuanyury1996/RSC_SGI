@@ -28,6 +28,7 @@ class ItemListaAdmin(admin.ModelAdmin):
 class EmpresaAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
+        "cnpj",
         "nicho",
         "classificacao_unidade",
         "cidade",
@@ -36,7 +37,7 @@ class EmpresaAdmin(admin.ModelAdmin):
         "email_geral",
         "ativa",
     )
-    search_fields = ("nome", "email_geral", "cidade", "site")
+    search_fields = ("nome", "cnpj", "email_geral", "cidade", "site")
     list_filter = ("ativa", "estado", "nicho", "classificacao_unidade")
     autocomplete_fields = ("nicho",)
 

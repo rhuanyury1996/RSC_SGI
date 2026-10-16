@@ -35,6 +35,7 @@ class EmpresaForm(forms.ModelForm):
         model = Empresa
         fields = (
             "nome",
+            "cnpj",
             "site",
             "nicho",
             "classificacao_unidade",
@@ -47,6 +48,15 @@ class EmpresaForm(forms.ModelForm):
         )
         widgets = {
             "nome": forms.TextInput(attrs={"placeholder": "Digite aqui..."}),
+            "cnpj": forms.TextInput(
+                attrs={
+                    "placeholder": "00.000.000/0000-00",
+                    "class": "js-cnpj-mask",
+                    "inputmode": "numeric",
+                    "autocomplete": "off",
+                    "maxlength": "18",
+                }
+            ),
             "site": forms.URLInput(
                 attrs={"placeholder": "https://...", "inputmode": "url"}
             ),
@@ -74,6 +84,10 @@ class EmpresaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["cnpj"].label = "CNPJ"
+        self.fields["cnpj"].help_text = (
+            "Ao preencher, buscamos telefone, cidade e estado na base pública (Receita)."
+        )
         self.fields["nicho"].queryset = ItemLista.objects.filter(
             tipo=TipoLista.NICHO_MERCADOLOGICO, ativo=True
         )
@@ -87,6 +101,7 @@ class EmpresaForm(forms.ModelForm):
         self.fields["clientes_rsc"].required = False
         self.fields["clientes_rsc"].label = "Visível para clientes RSC"
         for name in (
+            "cnpj",
             "site",
             "nicho",
             "classificacao_unidade",
@@ -103,6 +118,19 @@ class EmpresaForm(forms.ModelForm):
         if site and not site.startswith(("http://", "https://")):
             site = f"https://{site}"
         return site
+
+    def clean_cnpj(self):
+        from .cnpj import cnpj_valido, formatar_cnpj, somente_digitos
+
+        raw = (self.cleaned_data.get("cnpj") or "").strip()
+        if not raw:
+            return ""
+        digitos = somente_digitos(raw)
+        if len(digitos) != 14:
+            raise forms.ValidationError("CNPJ deve ter 14 dígitos.")
+        if not cnpj_valido(digitos):
+            raise forms.ValidationError("CNPJ inválido.")
+        return formatar_cnpj(digitos)
 
 
 class ItemListaForm(forms.ModelForm):

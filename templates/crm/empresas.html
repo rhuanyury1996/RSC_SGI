@@ -27,7 +27,13 @@
               <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
               {{ form.nome }}{{ form.nome.errors }}
             </div>
-            <div class="field span-2">
+            <div class="field">
+              <label for="{{ form.cnpj.id_for_label }}">{{ form.cnpj.label }}</label>
+              {{ form.cnpj }}{{ form.cnpj.errors }}
+              <p class="js-cnpj-status" hidden></p>
+              <p class="field-hint muted">{{ form.cnpj.help_text }}</p>
+            </div>
+            <div class="field">
               <label for="{{ form.site.id_for_label }}">{{ form.site.label }}</label>
               {{ form.site }}{{ form.site.errors }}
             </div>
@@ -126,6 +132,7 @@
           <thead>
             <tr>
               <th>Empresa</th>
+              <th>CNPJ</th>
               <th>Nicho</th>
               <th>Classificação</th>
               <th>Cidade/UF</th>
@@ -140,6 +147,7 @@
                 <a href="{% url 'crm_empresa_editar' item.pk %}"><strong>{{ item.nome }}</strong></a>
                 {% if item.site %}<div class="muted"><a href="{{ item.site }}" target="_blank" rel="noopener" data-row-ignore>{{ item.site }}</a></div>{% endif %}
               </td>
+              <td>{% if item.cnpj %}{{ item.cnpj }}{% else %}—{% endif %}</td>
               <td>{% if item.nicho %}{{ item.nicho.nome }}{% else %}—{% endif %}</td>
               <td>{% if item.classificacao_unidade %}{{ item.get_classificacao_unidade_display }}{% else %}—{% endif %}</td>
               <td>
@@ -159,7 +167,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="muted">Nenhuma empresa cadastrada.</td></tr>
+            <tr><td colspan="7" class="muted">Nenhuma empresa cadastrada.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -204,4 +212,5 @@
   });
 </script>
 {% include "crm/_dialog_importar_base.html" %}
+{% include "crm/_empresa_cnpj_js.html" %}
 {% endblock %}

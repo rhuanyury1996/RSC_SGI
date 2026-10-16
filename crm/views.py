@@ -21,6 +21,7 @@ from .forms import (
     ItemListaForm,
     OportunidadeForm,
 )
+from .cnpj import CnpjErro, consultar_cnpj
 from .importacao import ImportacaoErro, importar_empresas_contatos
 from .models import (
     Contato,
@@ -97,6 +98,23 @@ def empresas(request):
         )
     )
     return render(request, "crm/empresas.html", {"itens": itens, "form": form})
+
+
+@login_required
+@require_http_methods(["GET"])
+def consultar_cnpj_view(request):
+    """Proxy JSON para BrasilAPI — preenche formulário de empresa."""
+    cnpj = (request.GET.get("cnpj") or "").strip()
+    try:
+        dados = consultar_cnpj(cnpj)
+    except CnpjErro as exc:
+        return JsonResponse({"ok": False, "erro": str(exc)}, status=400)
+    except Exception:
+        return JsonResponse(
+            {"ok": False, "erro": "Falha inesperada ao consultar o CNPJ."},
+            status=502,
+        )
+    return JsonResponse({"ok": True, "dados": dados})
 
 
 @login_required

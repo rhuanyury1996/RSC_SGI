@@ -1,0 +1,114 @@
+<script>
+(function () {
+  var LOOKUP_URL = "{% url 'crm_consultar_cnpj' %}";
+
+  function onlyDigits(v) {
+    return String(v || "").replace(/\D/g, "").slice(0, 14);
+  }
+
+  function maskCnpj(value) {
+    var d = onlyDigits(value);
+    if (d.length <= 2) return d;
+    if (d.length <= 5) return d.slice(0, 2) + "." + d.slice(2);
+    if (d.length <= 8) return d.slice(0, 2) + "." + d.slice(2, 5) + "." + d.slice(5);
+    if (d.length <= 12) {
+      return d.slice(0, 2) + "." + d.slice(2, 5) + "." + d.slice(5, 8) + "/" + d.slice(8);
+    }
+    return (
+      d.slice(0, 2) + "." + d.slice(2, 5) + "." + d.slice(5, 8) + "/" +
+      d.slice(8, 12) + "-" + d.slice(12)
+    );
+  }
+
+  function setIfEmpty(el, value) {
+    if (!el || !value) return;
+    if (String(el.value || "").trim()) return;
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function setStatus(form, text, isError) {
+    var box = form.querySelector(".js-cnpj-status");
+    if (!box) return;
+    box.textContent = text || "";
+    box.classList.toggle("is-error", !!isError);
+    box.hidden = !text;
+  }
+
+  function fillFromDados(form, dados) {
+    var nome = form.querySelector('[name="nome"]');
+    var tel1 = form.querySelector('[name="telefone_portaria"]');
+    var tel2 = form.querySelector('[name="telefone_portaria_2"]');
+    var email = form.querySelector('[name="email_geral"]');
+    var cidade = form.querySelector('[name="cidade"]');
+    var estado = form.querySelector('[name="estado"]');
+    var cnpj = form.querySelector('[name="cnpj"]');
+
+    if (cnpj && dados.cnpj) cnpj.value = dados.cnpj;
+    setIfEmpty(nome, dados.nome);
+    setIfEmpty(tel1, dados.telefone_portaria);
+    setIfEmpty(tel2, dados.telefone_portaria_2);
+    setIfEmpty(email, dados.email_geral);
+    setIfEmpty(cidade, dados.cidade);
+    if (estado && dados.estado && !String(estado.value || "").trim()) {
+      estado.value = dados.estado;
+      estado.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  function lookup(form, cnpjInput) {
+    var digits = onlyDigits(cnpjInput.value);
+    if (digits.length !== 14) return;
+    if (cnpjInput.dataset.lastCnpj === digits) return;
+    cnpjInput.dataset.lastCnpj = digits;
+
+    setStatus(form, "Consultando CNPJ…", false);
+    fetch(LOOKUP_URL + "?cnpj=" + encodeURIComponent(digits), {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.body || !res.body.ok) {
+          setStatus(form, (res.body && res.body.erro) || "CNPJ não encontrado.", true);
+          return;
+        }
+        fillFromDados(form, res.body.dados || {});
+        var sit = (res.body.dados && res.body.dados.situacao) ? " · " + res.body.dados.situacao : "";
+        setStatus(form, "Dados preenchidos automaticamente" + sit + ".", false);
+      })
+      .catch(function () {
+        setStatus(form, "Falha na consulta do CNPJ.", true);
+      });
+  }
+
+  function bindForm(form) {
+    if (!form || form.dataset.cnpjBound === "1") return;
+    form.dataset.cnpjBound = "1";
+    var input = form.querySelector(".js-cnpj-mask, [name='cnpj']");
+    if (!input) return;
+
+    input.addEventListener("input", function () {
+      input.value = maskCnpj(input.value);
+      if (onlyDigits(input.value).length < 14) {
+        input.dataset.lastCnpj = "";
+        setStatus(form, "", false);
+      }
+    });
+    input.addEventListener("blur", function () { lookup(form, input); });
+    input.addEventListener("change", function () { lookup(form, input); });
+  }
+
+  document.querySelectorAll("form.empresa-form").forEach(bindForm);
+})();
+</script>
+<style>
+.js-cnpj-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: #15803d;
+}
+.js-cnpj-status.is-error { color: #b91c1c; }
+.js-cnpj-status[hidden] { display: none; }
+</style>
