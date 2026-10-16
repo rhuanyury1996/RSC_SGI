@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AtividadeDiaria, DiaPlanner, HabitoDia, MetaFoco
+from .models import AtividadeDiaria, DiaPlanner, HabitoDia, MetaFoco, SessaoTempoAtividade
 
 
 class MetaFocoInline(admin.TabularInline):
@@ -44,6 +44,19 @@ class AtividadeDiariaAdmin(admin.ModelAdmin):
     autocomplete_fields = ("responsavel", "criado_por", "cliente_rsc")
     filter_horizontal = ("participantes",)
     date_hierarchy = "planejado_para"
+
+
+@admin.register(SessaoTempoAtividade)
+class SessaoTempoAtividadeAdmin(admin.ModelAdmin):
+    list_display = ("atividade", "funcionario", "inicio", "fim", "segundos")
+    list_filter = ("inicio",)
+    search_fields = (
+        "atividade__titulo",
+        "funcionario__nome",
+        "funcionario__sobrenome",
+    )
+    autocomplete_fields = ("atividade", "funcionario")
+    date_hierarchy = "inicio"
 
 
 @admin.register(DiaPlanner)

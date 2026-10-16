@@ -206,6 +206,44 @@ class AtividadeDiaria(models.Model):
             self.concluida_em = None
 
 
+class SessaoTempoAtividade(models.Model):
+    """Trecho de cronômetro atribuído a quem iniciou (para relatório)."""
+
+    atividade = models.ForeignKey(
+        AtividadeDiaria,
+        on_delete=models.CASCADE,
+        related_name="sessoes_tempo",
+        verbose_name="Atividade",
+    )
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="sessoes_tempo_atividade",
+        verbose_name="Funcionário",
+    )
+    inicio = models.DateTimeField("Início")
+    fim = models.DateTimeField("Fim", null=True, blank=True)
+    segundos = models.PositiveIntegerField("Segundos", default=0)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Sessão de tempo"
+        verbose_name_plural = "Sessões de tempo"
+        ordering = ["-inicio"]
+        indexes = [
+            models.Index(fields=["funcionario", "inicio"]),
+            models.Index(fields=["atividade", "inicio"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.funcionario} · {self.atividade_id} · {self.segundos}s"
+
+    def segundos_atuais(self) -> int:
+        if self.fim:
+            return int(self.segundos or 0)
+        return max(0, int((timezone.now() - self.inicio).total_seconds()))
+
+
 def quadrante_por_prioridade(prioridade: str) -> str:
     mapa = {
         PrioridadeAtividade.URGENTE: QuadranteEisenhower.FAZER,

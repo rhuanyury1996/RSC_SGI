@@ -147,9 +147,17 @@ def calendario(request):
     if mostrar_atividades:
         filtros_ativos.add("atividade")
 
+    visao = (request.GET.get("visao") or request.POST.get("visao") or "minhas").strip()
+    if visao not in ("minhas", "equipe"):
+        visao = "minhas"
+    ver_equipe = visao == "equipe"
+
     google = _google_status(request.user)
     evento_edit = None
     abrir_dialog = False
+
+    def _qs_visao(extra: str = ""):
+        return f"{request.path}?ano={ano}&mes={mes}&visao={visao}{extra}"
 
     if request.method == "POST":
         acao = (request.POST.get("acao") or "salvar").strip()
@@ -165,7 +173,7 @@ def calendario(request):
             evento_edit.status = StatusEvento.CANCELADO
             evento_edit.save(update_fields=["status", "atualizado_em"])
             messages.success(request, "Evento removido do calendário.")
-            return redirect(f"{request.path}?ano={ano}&mes={mes}")
+            return redirect(_qs_visao())
 
         if acao == "duplicar" and evento_edit is not None:
             copia = EventoCalendario.objects.get(pk=evento_edit.pk)
@@ -196,9 +204,7 @@ def calendario(request):
             else:
                 _espelhar_lista(request, [copia], google)
             messages.success(request, "Evento duplicado (+7 dias).")
-            return redirect(
-                f"{request.path}?ano={ano}&mes={mes}&evento={copia.pk}"
-            )
+            return redirect(_qs_visao(f"&evento={copia.pk}"))
 
         if evento_edit is not None:
             form = EventoCalendarioForm(
@@ -215,7 +221,7 @@ def calendario(request):
                 google,
                 novo=evento_edit is None,
             )
-            return redirect(f"{request.path}?ano={ano}&mes={mes}&evento={evento.pk}")
+            return redirect(_qs_visao(f"&evento={evento.pk}"))
         abrir_dialog = True
     else:
         evento_id = (request.GET.get("evento") or "").strip()
@@ -244,7 +250,6 @@ def calendario(request):
     if tipos_filtro:
         qs = (
             EventoCalendario.objects.filter(
-                funcionario=funcionario,
                 inicio__date__lte=janela_fim,
                 fim__date__gte=janela_ini,
                 tipo__in=tipos_filtro,
@@ -252,18 +257,39 @@ def calendario(request):
             .exclude(status="cancelado")
             .select_related("funcionario")
         )
-        itens.extend(qs)
+        if not ver_equipe:
+            qs = qs.filter(funcionario=funcionario)
+        eventos = list(qs)
+        if ver_equipe:
+            for ev in eventos:
+                # Anexa rótulo de pessoa para a grade sem alterar o modelo
+                ev._pessoa_label = ev.funcionario.nome if ev.funcionario_id else ""
+                ev._editavel = ev.funcionario_id == funcionario.id
+                if ev._pessoa_label and ev.funcionario_id != funcionario.id:
+                    ev.titulo_exibicao = f"{ev.titulo} · {ev._pessoa_label}"
+                else:
+                    ev.titulo_exibicao = ev.titulo
+        else:
+            for ev in eventos:
+                ev._pessoa_label = ""
+                ev._editavel = True
+                ev.titulo_exibicao = ev.titulo
+        itens.extend(eventos)
 
     if mostrar_atividades:
         from atividades.models import AtividadeDiaria
 
-        atividades = AtividadeDiaria.objects.filter(
-            responsavel=funcionario,
+        atividades_qs = AtividadeDiaria.objects.filter(
             planejado_para__gte=janela_ini,
             planejado_para__lte=janela_fim,
-        ).order_by("planejado_para", "hora_inicio", "ordem", "pk")
+        ).select_related("responsavel")
+        if not ver_equipe:
+            atividades_qs = atividades_qs.filter(responsavel=funcionario)
+        atividades = atividades_qs.order_by(
+            "planejado_para", "hora_inicio", "ordem", "pk"
+        )
         for at in atividades:
-            item = atividade_para_item(at)
+            item = atividade_para_item(at, mostrar_pessoa=ver_equipe)
             if item:
                 itens.append(item)
 
@@ -308,6 +334,9 @@ def calendario(request):
             "tipos_filtro": filtros_ativos,
             "mostrar_atividades": mostrar_atividades,
             "hoje": hoje,
+            "visao": visao,
+            "ver_equipe": ver_equipe,
+            "eu": funcionario,
             **google,
         },
     )

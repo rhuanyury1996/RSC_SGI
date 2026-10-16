@@ -39,12 +39,16 @@ class ItemCalendario:
     tipo_label: str = ""
     href: str = ""
     status: str = ""
+    pessoa: str = ""
+    pessoa_id: int | None = None
+    editavel: bool = True
+    pk: int | None = None
 
     def get_tipo_display(self) -> str:
         return self.tipo_label or self.tipo
 
 
-def atividade_para_item(atividade) -> ItemCalendario | None:
+def atividade_para_item(atividade, *, mostrar_pessoa: bool = False) -> ItemCalendario | None:
     """Converte AtividadeDiaria em item de calendário (usa planejado_para)."""
     dia = atividade.planejado_para or atividade.data_vencimento
     if not dia:
@@ -72,16 +76,27 @@ def atividade_para_item(atividade) -> ItemCalendario | None:
         if hasattr(atividade, "get_status_display")
         else "Atividade"
     )
+    pessoa = ""
+    if mostrar_pessoa and getattr(atividade, "responsavel", None):
+        pessoa = atividade.responsavel.nome_completo
+    titulo = atividade.titulo
+    if pessoa:
+        titulo = f"{atividade.titulo} · {atividade.responsavel.nome}"
     return ItemCalendario(
-        titulo=atividade.titulo,
+        titulo=titulo,
         tipo="atividade",
         cor=cor,
         inicio=ini,
         fim=fim,
         dia_inteiro=dia_inteiro,
-        tipo_label=f"Atividade · {status_label}",
+        tipo_label=f"Atividade · {status_label}"
+        + (f" · {pessoa}" if pessoa else ""),
         href=f"{reverse('atividades')}?org=planner&data={dia.isoformat()}",
         status=status,
+        pessoa=pessoa,
+        pessoa_id=getattr(atividade, "responsavel_id", None),
+        editavel=False,
+        pk=atividade.pk,
     )
 
 

@@ -19,6 +19,7 @@ from .models import (
     MetaFoco,
     PrioridadeAtividade,
     QuadranteEisenhower,
+    SessaoTempoAtividade,
     StatusAtividade,
     quadrante_por_prioridade,
 )
@@ -316,6 +317,32 @@ def excluir_atividade(atividade: AtividadeDiaria) -> None:
     atividade.delete()
 
 
+def _fechar_sessoes_abertas(
+    atividade: AtividadeDiaria,
+    *,
+    ator: Funcionario | None = None,
+    fim=None,
+) -> int:
+    """Fecha sessões abertas e devolve segundos creditados nesta parada."""
+    agora = fim or timezone.now()
+    qs = SessaoTempoAtividade.objects.filter(atividade=atividade, fim__isnull=True)
+    if ator is not None:
+        preferida = qs.filter(funcionario=ator).order_by("-inicio").first()
+        abertas = [preferida] if preferida else list(qs.order_by("-inicio")[:1])
+    else:
+        abertas = list(qs.order_by("inicio"))
+    total = 0
+    for sessao in abertas:
+        if sessao is None:
+            continue
+        decorrido = max(0, int((agora - sessao.inicio).total_seconds()))
+        sessao.fim = agora
+        sessao.segundos = decorrido
+        sessao.save(update_fields=["fim", "segundos"])
+        total += decorrido
+    return total
+
+
 def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
     # Um cronômetro ativo por pessoa (em qualquer tarefa da equipe)
     ativos = (
@@ -325,7 +352,7 @@ def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> Ativida
         .distinct()
     )
     for outro in ativos:
-        parar_cronometro(outro)
+        parar_cronometro(outro, ator=ator)
 
     if atividade.cronometro_inicio:
         return atividade
@@ -334,7 +361,8 @@ def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> Ativida
         atividade.status = StatusAtividade.EXECUTANDO
         atividade.sincronizar_conclusao()
 
-    atividade.cronometro_inicio = timezone.now()
+    agora = timezone.now()
+    atividade.cronometro_inicio = agora
     atividade.save(
         update_fields=[
             "cronometro_inicio",
@@ -344,14 +372,25 @@ def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> Ativida
             "atualizado_em",
         ]
     )
+    SessaoTempoAtividade.objects.create(
+        atividade=atividade,
+        funcionario=ator,
+        inicio=agora,
+    )
     return atividade
 
 
-def parar_cronometro(atividade: AtividadeDiaria) -> AtividadeDiaria:
+def parar_cronometro(
+    atividade: AtividadeDiaria,
+    ator: Funcionario | None = None,
+) -> AtividadeDiaria:
     if not atividade.cronometro_inicio:
+        _fechar_sessoes_abertas(atividade, ator=ator)
         return atividade
-    decorrido = max(
-        0, int((timezone.now() - atividade.cronometro_inicio).total_seconds())
+    agora = timezone.now()
+    decorrido_sessao = _fechar_sessoes_abertas(atividade, ator=ator, fim=agora)
+    decorrido = decorrido_sessao or max(
+        0, int((agora - atividade.cronometro_inicio).total_seconds())
     )
     atividade.tempo_acumulado_segundos = (
         int(atividade.tempo_acumulado_segundos or 0) + decorrido
@@ -365,8 +404,60 @@ def parar_cronometro(atividade: AtividadeDiaria) -> AtividadeDiaria:
 
 def alternar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
     if atividade.cronometro_inicio:
-        return parar_cronometro(atividade)
+        return parar_cronometro(atividade, ator=ator)
     return iniciar_cronometro(atividade, ator)
+
+
+def tempo_por_funcionario_periodo(
+    funcionario: Funcionario,
+    inicio,
+    fim,
+) -> list[dict]:
+    """Tempo em atividades no período (sessões + cronômetro aberto)."""
+    from datetime import datetime, time as time_cls
+
+    tz = timezone.get_current_timezone()
+    ini_dt = timezone.make_aware(datetime.combine(inicio, time_cls.min), tz)
+    fim_dt = timezone.make_aware(datetime.combine(fim, time_cls.max), tz)
+
+    sessoes = (
+        SessaoTempoAtividade.objects.filter(funcionario=funcionario)
+        .filter(inicio__lte=fim_dt)
+        .filter(Q(fim__gte=ini_dt) | Q(fim__isnull=True))
+        .select_related("atividade", "atividade__cliente_rsc", "atividade__responsavel")
+        .order_by("atividade_id", "inicio")
+    )
+    por_atividade: dict[int, dict] = {}
+    for sessao in sessoes:
+        # Recorta a sessão ao período
+        s_ini = max(sessao.inicio, ini_dt)
+        s_fim = sessao.fim or timezone.now()
+        s_fim = min(s_fim, fim_dt)
+        segs = max(0, int((s_fim - s_ini).total_seconds()))
+        if segs <= 0:
+            continue
+        aid = sessao.atividade_id
+        row = por_atividade.get(aid)
+        if row is None:
+            at = sessao.atividade
+            row = {
+                "atividade": at,
+                "titulo": at.titulo,
+                "empresa": at.empresa_label,
+                "status": at.status,
+                "status_label": at.get_status_display(),
+                "segundos": 0,
+            }
+            por_atividade[aid] = row
+        row["segundos"] += segs
+
+    itens = sorted(
+        por_atividade.values(),
+        key=lambda r: (-r["segundos"], r["titulo"].lower()),
+    )
+    for row in itens:
+        row["tempo_fmt"] = formatar_tempo(row["segundos"])
+    return itens
 
 
 def formatar_tempo(segundos: int) -> str:

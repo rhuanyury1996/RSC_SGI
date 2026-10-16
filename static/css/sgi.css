@@ -3575,6 +3575,87 @@ button.link-btn.danger:focus-visible,
   background: #f8fafc;
   border-color: #cfd5e2;
 }
+.cal-visao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+  margin-bottom: 0.55rem;
+}
+.cal-visao .chip.is-on,
+.cal-visao .chip:has(input:checked) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+.ev-dot.is-readonly {
+  opacity: 0.88;
+  cursor: default;
+}
+
+.rel-horas-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+.rel-horas-filtros .field {
+  display: grid;
+  gap: 0.3rem;
+}
+.rel-horas-filtros label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.rel-horas-filtros input,
+.rel-horas-filtros select {
+  min-height: 2.4rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+  background: #fff;
+}
+.rel-horas-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+@media (min-width: 960px) {
+  .rel-horas-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.rel-horas-grid h3 {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+}
+.rel-horas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.rel-horas-table th,
+.rel-horas-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.rel-horas-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.rel-horas-marcs {
+  color: #475569;
+  font-size: 0.82rem;
+}
+.rel-horas-bloco {
+  margin-bottom: 0.85rem;
+}
 
 .cal-agenda {
   list-style: none;

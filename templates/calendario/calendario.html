@@ -16,8 +16,8 @@
       <div class="cal-mini-head">
         <strong>{{ mes_nome }} {{ ano }}</strong>
         <div class="navs">
-          <a href="?ano={{ mes_anterior.0 }}&mes={{ mes_anterior.1 }}">‹</a>
-          <a href="?ano={{ mes_seguinte.0 }}&mes={{ mes_seguinte.1 }}">›</a>
+          <a href="?ano={{ mes_anterior.0 }}&mes={{ mes_anterior.1 }}&visao={{ visao }}">‹</a>
+          <a href="?ano={{ mes_seguinte.0 }}&mes={{ mes_seguinte.1 }}&visao={{ visao }}">›</a>
         </div>
       </div>
       <div class="cal-mini-grid">
@@ -37,6 +37,17 @@
     <form method="get" class="cal-filters">
       <input type="hidden" name="ano" value="{{ ano }}">
       <input type="hidden" name="mes" value="{{ mes }}">
+      <p class="label">Visão</p>
+      <div class="cal-visao">
+        <label class="chip {% if visao == 'minhas' %}is-on{% endif %}">
+          <input type="radio" name="visao" value="minhas" {% if visao == 'minhas' %}checked{% endif %} onchange="this.form.submit()">
+          Só as minhas
+        </label>
+        <label class="chip {% if visao == 'equipe' %}is-on{% endif %}">
+          <input type="radio" name="visao" value="equipe" {% if visao == 'equipe' %}checked{% endif %} onchange="this.form.submit()">
+          Toda a equipe
+        </label>
+      </div>
       <p class="label">Categorias</p>
       {% for value, label in tipos.choices %}
         <label class="chip tipo-{{ value }}">
@@ -59,10 +70,16 @@
             <div class="time">
               {% if ev.dia_inteiro %}Dia{% else %}{{ ev.inicio|date:"H:i" }}{% endif %}
             </div>
+            {% with rotulo=ev.titulo_exibicao|default:ev.titulo %}
             {% if ev.tipo == "atividade" %}
             <div class="item" style="--ev: {{ ev.cor }}">
-              <a href="{{ ev.href }}"><strong>{{ ev.titulo }}</strong></a>
+              <a href="{{ ev.href }}"><strong>{{ rotulo }}</strong></a>
               <span>{{ ev.get_tipo_display }}</span>
+            </div>
+            {% elif ev._editavel == False %}
+            <div class="item is-readonly" style="--ev: {{ ev.cor }}">
+              <strong>{{ rotulo }}</strong>
+              <span>{{ ev.get_tipo_display }} · leitura</span>
             </div>
             {% else %}
             <button
@@ -81,10 +98,11 @@
               data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
               data-tipo-label="{{ ev.get_tipo_display }}"
             >
-              <strong>{{ ev.titulo }}</strong>
+              <strong>{{ rotulo }}</strong>
               <span>{{ ev.get_tipo_display }}</span>
             </button>
             {% endif %}
+            {% endwith %}
           </li>
           {% endfor %}
         </ul>
@@ -136,7 +154,7 @@
     <div class="cal-main-head">
       <div>
         <h2>{{ mes_nome }} {{ ano }}</h2>
-        <p class="muted">Clique em um evento para ver, editar, duplicar ou excluir.</p>
+        <p class="muted">{% if ver_equipe %}Marcações de toda a equipe (só as suas são editáveis).{% else %}Clique em um evento seu para editar, duplicar ou excluir.{% endif %}</p>
       </div>
       <div class="view-toggle">
         <span class="active">Mês</span>
@@ -153,16 +171,21 @@
           <div class="cal-cell {% if cel.is_today %}is-today{% endif %}">
             <div class="daynum">{{ cel.day }}</div>
             {% for ev in cel.eventos %}
+              {% with rotulo=ev.titulo_exibicao|default:ev.titulo %}
               {% if ev.tipo == "atividade" %}
-                <a class="ev-dot ev-atividade {% if ev.status %}st-{{ ev.status }}{% endif %}" style="--ev:{{ ev.cor }}" href="{{ ev.href }}" title="{{ ev.titulo }} · {{ ev.get_tipo_display }}">
-                  <i></i><span>{{ ev.titulo }}</span>
+                <a class="ev-dot ev-atividade {% if ev.status %}st-{{ ev.status }}{% endif %}" style="--ev:{{ ev.cor }}" href="{{ ev.href }}" title="{{ rotulo }} · {{ ev.get_tipo_display }}">
+                  <i></i><span>{{ rotulo }}</span>
                 </a>
+              {% elif ev._editavel == False %}
+                <span class="ev-dot is-readonly" style="--ev:{{ ev.cor }}" title="{{ rotulo }} · {{ ev.get_tipo_display }} (somente leitura)">
+                  <i></i><span>{{ rotulo }}</span>
+                </span>
               {% elif ev.tipo == "ferias" or ev.tipo == "day_off" %}
                 <button
                   type="button"
                   class="ev-bar js-open-evento"
                   style="background:{{ ev.cor }}"
-                  title="{{ ev.titulo }} — clique para editar"
+                  title="{{ rotulo }} — clique para editar"
                   data-id="{{ ev.pk }}"
                   data-tipo="{{ ev.tipo }}"
                   data-titulo="{{ ev.titulo|escape }}"
@@ -174,13 +197,13 @@
                   data-rec-ini="{% if ev.recuperacao_inicio %}{{ ev.recuperacao_inicio|date:'Y-m-d' }}{% endif %}"
                   data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
                   data-tipo-label="{{ ev.get_tipo_display }}"
-                >{{ ev.titulo }}</button>
+                >{{ rotulo }}</button>
               {% else %}
                 <button
                   type="button"
                   class="ev-dot js-open-evento"
                   style="--ev:{{ ev.cor }}"
-                  title="{{ ev.titulo }} — clique para editar"
+                  title="{{ rotulo }} — clique para editar"
                   data-id="{{ ev.pk }}"
                   data-tipo="{{ ev.tipo }}"
                   data-titulo="{{ ev.titulo|escape }}"
@@ -193,9 +216,10 @@
                   data-rec-fim="{% if ev.recuperacao_fim %}{{ ev.recuperacao_fim|date:'Y-m-d' }}{% endif %}"
                   data-tipo-label="{{ ev.get_tipo_display }}"
                 >
-                  <i></i><span>{{ ev.titulo }}</span>
+                  <i></i><span>{{ rotulo }}</span>
                 </button>
               {% endif %}
+              {% endwith %}
             {% endfor %}
           </div>
           {% else %}
@@ -212,6 +236,7 @@
     {% csrf_token %}
     <input type="hidden" name="ano" value="{{ ano }}">
     <input type="hidden" name="mes" value="{{ mes }}">
+    <input type="hidden" name="visao" value="{{ visao }}">
     <input type="hidden" name="evento_id" id="campoEventoId" value="{% if evento_edit %}{{ evento_edit.pk }}{% endif %}">
     <input type="hidden" name="acao" id="campoAcao" value="salvar">
 

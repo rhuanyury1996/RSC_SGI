@@ -401,32 +401,81 @@ def resumo_horas(request):
     if funcionario is None:
         return redirect("home")
 
-    inicio, fim = _parse_periodo(request)
+    from atividades.permissions import pode_dirigir_atividades
+    from atividades.services import formatar_tempo, tempo_por_funcionario_periodo
+    from funcionarios.models import Funcionario
 
-    marcacoes = list(
-        MarcacaoPonto.objects.filter(
-            funcionario=funcionario,
-            data_hora__date__gte=inicio,
-            data_hora__date__lte=fim,
-        ).order_by("data_hora")
+    inicio, fim = _parse_periodo(request)
+    pode_equipe = pode_dirigir_atividades(funcionario) or pode_aprovar_edicoes_marcacao(
+        request.user
+    )
+    equipe = list(
+        Funcionario.objects.filter(ativo=True).order_by("nome", "sobrenome")
     )
 
-    por_dia: dict[date, list] = defaultdict(list)
-    for m in marcacoes:
-        por_dia[timezone.localtime(m.data_hora).date()].append(m)
+    resp_raw = (request.GET.get("resp") or "").strip()
+    if pode_equipe:
+        if not resp_raw or resp_raw == "todos":
+            alvo = None
+            resp_raw = "todos"
+        else:
+            try:
+                alvo = next(f for f in equipe if str(f.pk) == resp_raw)
+            except StopIteration:
+                alvo = None
+                resp_raw = "todos"
+    else:
+        alvo = funcionario
+        resp_raw = str(funcionario.pk)
 
-    resumo = []
-    total_segundos = 0
-    for dia, itens in sorted(por_dia.items()):
-        segundos = segundos_trabalhados(itens)
-        total_segundos += segundos
-        resumo.append(
-            {
-                "dia": dia,
-                "marcacoes": itens,
-                "horas": formatar_duracao(segundos),
-            }
+    def _bloco_pessoa(pessoa: Funcionario) -> dict:
+        marcacoes = list(
+            MarcacaoPonto.objects.filter(
+                funcionario=pessoa,
+                data_hora__date__gte=inicio,
+                data_hora__date__lte=fim,
+            ).order_by("data_hora")
         )
+        por_dia: dict[date, list] = defaultdict(list)
+        for m in marcacoes:
+            por_dia[timezone.localtime(m.data_hora).date()].append(m)
+
+        dias = []
+        total_ponto = 0
+        for dia, itens in sorted(por_dia.items()):
+            segundos = segundos_trabalhados(itens)
+            total_ponto += segundos
+            dias.append(
+                {
+                    "dia": dia,
+                    "marcacoes": itens,
+                    "horas": formatar_duracao(segundos),
+                    "segundos": segundos,
+                }
+            )
+        atividades = tempo_por_funcionario_periodo(pessoa, inicio, fim)
+        total_ativ = sum(a["segundos"] for a in atividades)
+        return {
+            "pessoa": pessoa,
+            "dias": dias,
+            "total_ponto": total_ponto,
+            "total_ponto_fmt": formatar_duracao(total_ponto),
+            "atividades": atividades,
+            "total_ativ": total_ativ,
+            "total_ativ_fmt": formatar_tempo(total_ativ),
+        }
+
+    if alvo is None:
+        blocos = [
+            b
+            for b in (_bloco_pessoa(p) for p in equipe)
+            if b["total_ponto"] or b["total_ativ"] or b["dias"]
+        ]
+    else:
+        blocos = [_bloco_pessoa(alvo)]
+
+    total_ponto = sum(b["total_ponto"] for b in blocos)
+    total_ativ = sum(b["total_ativ"] for b in blocos)
 
     return render(
         request,
@@ -434,7 +483,13 @@ def resumo_horas(request):
         {
             "inicio": inicio,
             "fim": fim,
-            "resumo": resumo,
-            "total_horas": formatar_duracao(total_segundos),
+            "blocos": blocos,
+            "pode_equipe": pode_equipe,
+            "equipe": equipe,
+            "resp_id": resp_raw if pode_equipe else str(funcionario.pk),
+            "alvo": alvo,
+            "eu": funcionario,
+            "total_ponto_fmt": formatar_duracao(total_ponto),
+            "total_ativ_fmt": formatar_tempo(total_ativ),
         },
     )
