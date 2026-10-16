@@ -3,7 +3,7 @@
 {% block breadcrumb %}Atividades · Planner{% endblock %}
 {% block page_title %}Daily Productivity Planner{% endblock %}
 {% block page_actions %}
-  <span class="status-pill">{{ dia|date:"l, d \d\e F Y" }}</span>
+  <span class="status-pill">{% if not eh_meu_planner %}{{ alvo.nome_completo }} · {% endif %}{{ dia|date:"l, d \d\e F Y" }}</span>
 {% endblock %}
 
 {% block content %}
@@ -14,17 +14,32 @@
       <div class="cu-views" role="tablist" aria-label="Organização">
         <a class="cu-view" href="?org=status&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Lista</a>
         <a class="cu-view" href="?org=prioridade&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Prioridade</a>
-        <a class="cu-view active" href="?org=planner&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Planner</a>
+        <a class="cu-view active" href="?org=planner&data={{ dia|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">Planner</a>
       </div>
       <div class="cu-nav">
-        <a class="btn secondary" href="?org=planner&data={{ dia_anterior|date:'Y-m-d' }}">‹</a>
+        {% if pode_dirigir and equipe %}
+        <form method="get" class="pp-pessoa-form" aria-label="Ver planner de">
+          <input type="hidden" name="org" value="planner">
+          <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+          <select name="resp" onchange="this.form.submit()" class="pp-pessoa-select" title="Ver planner de">
+            <option value="">Meu planner</option>
+            {% for f in equipe %}
+              {% if f.pk != eu.pk %}
+              <option value="{{ f.pk }}" {% if resp_id == f.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </form>
+        {% endif %}
+        <a class="btn secondary" href="?org=planner&data={{ dia_anterior|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">‹</a>
         <form method="get" class="cu-date-form">
           <input type="hidden" name="org" value="planner">
+          {% if resp_id %}<input type="hidden" name="resp" value="{{ resp_id }}">{% endif %}
           <input type="date" name="data" value="{{ dia|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Dia">
         </form>
-        <a class="btn secondary" href="?org=planner&data={{ dia_seguinte|date:'Y-m-d' }}">›</a>
+        <a class="btn secondary" href="?org=planner&data={{ dia_seguinte|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">›</a>
         {% if not eh_hoje %}
-        <a class="btn ghost" href="?org=planner&data={{ hoje|date:'Y-m-d' }}">Hoje</a>
+        <a class="btn ghost" href="?org=planner&data={{ hoje|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">Hoje</a>
         {% endif %}
       </div>
     </div>
@@ -86,13 +101,18 @@
           <span class="pp-hour-label">{{ slot.hora }}</span>
           <div class="pp-hour-track">
             {% for b in slot.blocos %}
-            <div class="pp-block">{{ b.titulo }}{% if b.fim %} · {{ b.fim|time:"H:i" }}{% endif %}</div>
+            <div class="pp-block {% if b.tipo != 'atividade' %}is-cal tipo-{{ b.tipo }}{% endif %}"
+                 {% if b.cor %}style="--ev:{{ b.cor }}"{% endif %}
+                 title="{{ b.tipo_label }}{% if b.inicio %} · {{ b.inicio|time:'H:i' }}{% endif %}{% if b.fim %}–{{ b.fim|time:'H:i' }}{% endif %}">
+              {% if b.tipo != 'atividade' %}<span class="pp-block-tag">{{ b.tipo_label }}</span>{% endif %}
+              {{ b.titulo }}{% if b.fim %} · {{ b.fim|time:"H:i" }}{% endif %}
+            </div>
             {% endfor %}
           </div>
         </div>
         {% endfor %}
       </div>
-      <p class="muted pp-hint">Tarefas com horário na Lista aparecem aqui.</p>
+      <p class="muted pp-hint">Tarefas com horário e eventos do Calendário (reuniões, day off…) aparecem aqui.</p>
     </section>
 
     <section class="pp-card pp-pomodoro pp-zone-pomo" id="pomodoro-card">

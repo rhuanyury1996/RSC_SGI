@@ -785,8 +785,30 @@ def agua_copos_ui(copos: int) -> list[dict]:
     ]
 
 
-def agenda_por_hora(itens, inicio: int = 6, fim: int = 22) -> list[dict]:
+def eventos_calendario_do_dia(funcionario: Funcionario, dia: date) -> list:
+    """Eventos do calendário (reuniões etc.) no dia, para a agenda do planner."""
+    from calendario.models import EventoCalendario
+
+    return list(
+        EventoCalendario.objects.filter(
+            funcionario=funcionario,
+            inicio__date__lte=dia,
+            fim__date__gte=dia,
+        )
+        .exclude(status="cancelado")
+        .order_by("inicio")
+    )
+
+
+def agenda_por_hora(
+    itens,
+    inicio: int = 6,
+    fim: int = 22,
+    *,
+    eventos=None,
+) -> list[dict]:
     from collections import defaultdict
+    from datetime import time as time_cls
 
     buckets: dict[int, list] = defaultdict(list)
     for item in itens:
@@ -800,8 +822,43 @@ def agenda_por_hora(itens, inicio: int = 6, fim: int = 22) -> list[dict]:
                     "inicio": item.hora_inicio,
                     "fim": item.hora_fim,
                     "pk": item.pk,
+                    "tipo": "atividade",
+                    "tipo_label": "Tarefa",
+                    "cor": "",
                 }
             )
+
+    for ev in eventos or []:
+        ini_local = timezone.localtime(ev.inicio)
+        fim_local = timezone.localtime(ev.fim)
+        if getattr(ev, "dia_inteiro", False):
+            h = inicio
+            hora_ini = time_cls(inicio, 0)
+            hora_fim = None
+        else:
+            h = ini_local.hour
+            if h < inicio or h > fim:
+                continue
+            hora_ini = ini_local.time()
+            hora_fim = fim_local.time() if fim_local.date() == ini_local.date() else None
+        tipo = getattr(ev, "tipo", "") or "evento"
+        buckets[h].append(
+            {
+                "titulo": ev.titulo,
+                "inicio": hora_ini,
+                "fim": hora_fim,
+                "pk": ev.pk,
+                "tipo": tipo,
+                "tipo_label": (
+                    ev.get_tipo_display() if hasattr(ev, "get_tipo_display") else tipo
+                ),
+                "cor": getattr(ev, "cor", "") or "",
+            }
+        )
+
+    for h, lista in buckets.items():
+        lista.sort(key=lambda b: (b["inicio"] is None, b["inicio"] or time_cls.min))
+
     return [
         {
             "hora": f"{h:02d}:00",

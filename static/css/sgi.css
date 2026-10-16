@@ -6861,6 +6861,33 @@ button.pp-drop:focus-visible {
   font-weight: 650;
   margin-bottom: 0.2rem;
 }
+.pp-block.is-cal {
+  background: color-mix(in srgb, var(--ev, #7c6cf0) 18%, #fff);
+  color: #312e81;
+  border-left: 3px solid var(--ev, #7c6cf0);
+}
+.pp-block-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin-right: 0.25rem;
+}
+.pp-pessoa-form { margin: 0; }
+.pp-pessoa-select {
+  min-height: 2.2rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  background: #fff;
+  color: var(--text);
+  max-width: 12rem;
+}
 .pp-hint { margin: 0.55rem 0 0; font-size: 0.78rem; }
 
 .pp-pomodoro { text-align: center; }
