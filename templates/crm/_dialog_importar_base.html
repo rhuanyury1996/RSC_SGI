@@ -1,0 +1,58 @@
+<dialog class="com-dialog" id="dialogImportarBase">
+  <form method="post"
+        action="{% url 'crm_importar_base' %}"
+        enctype="multipart/form-data"
+        class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <div class="com-dialog-head">
+      <span class="com-dialog-badge">CRM</span>
+      <h3>Importar base Excel</h3>
+      <p class="com-dialog-sub">
+        Envie as planilhas de empresas e contatos (.xlsx). Registros existentes com o mesmo nome são atualizados.
+      </p>
+      <button type="button" class="sgi-dialog-close" id="btnFecharImportarBase" aria-label="Fechar"></button>
+    </div>
+    <div class="empresa-grid">
+      <div class="field span-2">
+        <label for="arquivoEmpresas">Base de empresas</label>
+        <input type="file"
+               id="arquivoEmpresas"
+               name="arquivo_empresas"
+               accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+               required>
+      </div>
+      <div class="field span-2">
+        <label for="arquivoContatos">Base de contatos</label>
+        <input type="file"
+               id="arquivoContatos"
+               name="arquivo_contatos"
+               accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+               required>
+      </div>
+    </div>
+    <p class="muted" style="margin:0.35rem 0 0;">
+      Colunas esperadas: Nome da Empresa, Nicho, Classificação, Cidade, Estado… e Nome, Sobrenome, E-mail, Empresa…
+    </p>
+    <div class="empresa-form-actions">
+      <button type="button" class="btn ghost" id="btnCancelarImportarBase">Cancelar</button>
+      <button class="btn" type="submit">Importar</button>
+    </div>
+  </form>
+</dialog>
+<script>
+(function () {
+  var dialog = document.getElementById("dialogImportarBase");
+  if (!dialog) return;
+  document.querySelectorAll("[data-open-importar-base]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      try { dialog.showModal(); } catch (e) {}
+    });
+  });
+  var fechar = function () { try { dialog.close(); } catch (e) {} };
+  var btnClose = document.getElementById("btnFecharImportarBase");
+  var btnCancel = document.getElementById("btnCancelarImportarBase");
+  if (btnClose) btnClose.addEventListener("click", fechar);
+  if (btnCancel) btnCancel.addEventListener("click", fechar);
+})();
+</script>

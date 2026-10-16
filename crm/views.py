@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
 from funcionarios.models import Funcionario
 from funcionarios.utils import obter_funcionario
@@ -21,6 +21,7 @@ from .forms import (
     ItemListaForm,
     OportunidadeForm,
 )
+from .importacao import ImportacaoErro, importar_empresas_contatos
 from .models import (
     Contato,
     Empresa,
@@ -96,6 +97,60 @@ def empresas(request):
         )
     )
     return render(request, "crm/empresas.html", {"itens": itens, "form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def importar_base(request):
+    """Upload de Excel de empresas + contatos (mesmo formato das bases Bitrix)."""
+    next_url = request.POST.get("next") or request.GET.get("next") or reverse(
+        "crm_empresas"
+    )
+    if request.method == "GET":
+        return redirect(next_url)
+
+    arq_emp = request.FILES.get("arquivo_empresas")
+    arq_con = request.FILES.get("arquivo_contatos")
+    if not arq_emp or not arq_con:
+        messages.error(
+            request,
+            "Envie as duas planilhas: Base de empresas e Base de contatos (.xlsx).",
+        )
+        return redirect(next_url)
+
+    for arq, rotulo in (
+        (arq_emp, "empresas"),
+        (arq_con, "contatos"),
+    ):
+        nome = (arq.name or "").lower()
+        if not nome.endswith((".xlsx", ".xlsm")):
+            messages.error(
+                request,
+                f"Arquivo de {rotulo} inválido. Use Excel .xlsx.",
+            )
+            return redirect(next_url)
+
+    try:
+        resultado = importar_empresas_contatos(arq_emp, arq_con)
+    except ImportacaoErro as exc:
+        messages.error(request, str(exc))
+        return redirect(next_url)
+    except Exception:
+        messages.error(
+            request,
+            "Não foi possível ler as planilhas. Verifique se são arquivos .xlsx válidos.",
+        )
+        return redirect(next_url)
+
+    messages.success(request, resultado.mensagem())
+    for aviso in resultado.avisos[:8]:
+        messages.warning(request, aviso)
+    if len(resultado.avisos) > 8:
+        messages.warning(
+            request,
+            f"… e mais {len(resultado.avisos) - 8} contato(s) sem empresa.",
+        )
+    return redirect(next_url)
 
 
 @login_required

@@ -8,6 +8,7 @@ urlpatterns = [
     path("empresas/<int:pk>/", views.empresa_editar, name="crm_empresa_editar"),
     path("contatos/", views.contatos, name="crm_contatos"),
     path("contatos/<int:pk>/", views.contato_editar, name="crm_contato_editar"),
+    path("importar/", views.importar_base, name="crm_importar_base"),
     path("funis/", views.funis, name="crm_funis"),
     path("funis/<int:pk>/", views.funil_detalhe, name="crm_funil_detalhe"),
     path("funis/<int:pk>/mover/", views.funil_mover_card, name="crm_funil_mover"),

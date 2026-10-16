@@ -3,6 +3,7 @@
 {% block breadcrumb %}Área Comercial <span>/</span> Contatos{% endblock %}
 {% block page_title %}Contatos{% endblock %}
 {% block page_actions %}
+  <button type="button" class="btn secondary" data-open-importar-base>Importar Excel</button>
   <a class="btn secondary" href="{% url 'crm_empresas' %}">Empresas</a>
   <a class="btn ghost" href="{% url 'crm' %}">Visão geral</a>
 {% endblock %}
@@ -262,4 +263,5 @@
     });
   });
 </script>
+{% include "crm/_dialog_importar_base.html" %}
 {% endblock %}
