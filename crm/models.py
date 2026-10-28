@@ -399,11 +399,27 @@ class Oportunidade(models.Model):
         blank=True,
     )
     fator_comissionamento = models.CharField(
-        "Fator de comissionamento",
+        "Fator de comissionamento (legado)",
         max_length=20,
         choices=FatorComissionamento.choices,
         blank=True,
-        help_text="Percentuais de comissão recebido de acordo com a situação.",
+        help_text="Legado. Preferir percentual_comissao informado manualmente.",
+    )
+    percentual_comissao = models.DecimalField(
+        "Percentual de comissão (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Informe o % de comissão sobre o valor final fechado.",
+    )
+    percentual_bonus = models.DecimalField(
+        "Percentual de bônus do agente (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="De 12% a 35% da comissão, conforme performance.",
     )
     comissao = models.DecimalField(
         "Comissão",
@@ -411,6 +427,7 @@ class Oportunidade(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
+        help_text="Calculada: percentual × valor final fechado.",
     )
     bonus_agente = models.DecimalField(
         "Bônus para agente",
@@ -418,7 +435,7 @@ class Oportunidade(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Valor destinado ao agente responsável pela oportunidade.",
+        help_text="Calculado: percentual de bônus × comissão (12%–35%).",
     )
     # Pós-vendas · Serviço finalizado
     atc_enviado = models.BooleanField("ATC enviado", default=False)

@@ -120,12 +120,12 @@
           {% if "ganha" in etapa.nome|lower %}
           <div class="kanban-card-field">
             <span class="com-escopo-label">Valor final fechado</span>
-            <strong class="com-value">{% if opp.valor_negocio %}R$ {{ opp.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <strong class="com-value">{% if opp.valor_negocio is not None %}R$ {{ opp.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
           </div>
           {% else %}
           <div class="kanban-card-field">
             <span class="com-escopo-label">Valor da proposta</span>
-            <strong class="com-value">{% if opp.valor %}R$ {{ opp.valor|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <strong class="com-value">{% if opp.valor is not None %}R$ {{ opp.valor|floatformat:2 }}{% else %}—{% endif %}</strong>
           </div>
           {% endif %}
           {% if opp.data_contato_follow_up %}
@@ -190,7 +190,7 @@
         </div>
         <div>
           <span class="muted">Valor do negócio</span>
-          <strong>{% if card_ativo.valor_negocio %}R$ {{ card_ativo.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
+          <strong>{% if card_ativo.valor_negocio is not None %}R$ {{ card_ativo.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
         </div>
         <div>
           <span class="muted">Nesta etapa</span>
@@ -365,4 +365,59 @@
 </dialog>
 
 {% include "crm/_kanban_board_js.html" %}
+<script>
+(function () {
+  function parseBR(raw) {
+    var t = String(raw == null ? "" : raw).trim().replace(/R\$/g, "").replace(/\s/g, "");
+    if (!t) return null;
+    if (t.indexOf(",") >= 0 && t.indexOf(".") >= 0) {
+      t = t.replace(/\./g, "").replace(",", ".");
+    } else if (t.indexOf(",") >= 0) {
+      t = t.replace(",", ".");
+    }
+    var n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function fmtBR(n) {
+    return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function recalc(form) {
+    var valorEl = form.querySelector('[data-calc="valor"]');
+    var pctComEl = form.querySelector('[data-calc="pct-comissao"]');
+    var pctBonEl = form.querySelector('[data-calc="pct-bonus"]');
+    var comOut = form.querySelector(".js-comissao-out");
+    var bonOut = form.querySelector(".js-bonus-out");
+    if (!valorEl || !pctComEl || !comOut) return;
+
+    var valor = parseBR(valorEl.value);
+    var pctCom = parseBR(pctComEl.value);
+    var pctBon = pctBonEl ? parseBR(pctBonEl.value) : null;
+
+    if (valor != null && pctCom != null) {
+      var comissao = Math.round((valor * pctCom / 100) * 100) / 100;
+      comOut.value = fmtBR(comissao);
+      if (bonOut && pctBon != null) {
+        bonOut.value = fmtBR(Math.round((comissao * pctBon / 100) * 100) / 100);
+      } else if (bonOut) {
+        bonOut.value = "";
+      }
+    } else {
+      comOut.value = "";
+      if (bonOut) bonOut.value = "";
+    }
+  }
+
+  document.querySelectorAll(".deal-edit-form").forEach(function (form) {
+    if (!form.querySelector(".js-calc-comissao")) return;
+    form.addEventListener("input", function (ev) {
+      if (ev.target && ev.target.classList && ev.target.classList.contains("js-calc-comissao")) {
+        recalc(form);
+      }
+    });
+    recalc(form);
+  });
+})();
+</script>
 {% endblock %}

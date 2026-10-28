@@ -666,6 +666,20 @@ def _fase_campos_pre_vendas(etapa_nome: str) -> str:
     return "geral"
 
 
+def _parse_decimal_br(raw) -> Decimal | None:
+    """Aceita 1234.56, 1.234,56 ou 1234,56."""
+    texto = (str(raw) if raw is not None else "").strip()
+    if texto == "":
+        return None
+    texto = texto.replace("R$", "").replace(" ", "")
+    if "," in texto and "." in texto:
+        # 1.234,56 → 1234.56
+        texto = texto.replace(".", "").replace(",", ".")
+    elif "," in texto:
+        texto = texto.replace(",", ".")
+    return Decimal(texto)
+
+
 def _fase_campos_negociacoes(etapa_nome: str) -> str:
     nome = (etapa_nome or "").lower()
     if "enviada" in nome:
@@ -752,19 +766,15 @@ def _funil_negociacoes(request, funil: Funil):
                 "aguardando",
                 "",
             ) or ("valor" in request.POST and fase not in ("ganha", "follow_up", "perdida")):
-                valor_raw = (request.POST.get("valor") or "").strip().replace(",", ".")
-                if valor_raw == "":
-                    if "valor" in request.POST:
-                        card_ativo.valor = None
-                        update_fields.append("valor")
-                else:
+                if "valor" in request.POST:
                     try:
-                        card_ativo.valor = Decimal(valor_raw)
+                        card_ativo.valor = _parse_decimal_br(request.POST.get("valor"))
                         update_fields.append("valor")
                     except (InvalidOperation, ValueError):
                         messages.error(request, "Valor da proposta inválido.")
                         return redirect(f"{request.path}?card={card_ativo.pk}")
 
+            arquivo_salvo = False
             if fase == "proposta_enviada":
                 intl = request.POST.get("proposta_internacional")
                 if intl in ("1", "true", "sim", "Sim"):
@@ -778,6 +788,7 @@ def _funil_negociacoes(request, funil: Funil):
                 if arquivo:
                     card_ativo.proposta_arquivo = arquivo
                     update_fields.append("proposta_arquivo")
+                    arquivo_salvo = True
 
             if fase == "follow_up":
                 data_raw = (request.POST.get("data_contato_follow_up") or "").strip()
@@ -789,24 +800,65 @@ def _funil_negociacoes(request, funil: Funil):
                 update_fields.append("observacoes")
 
             if fase == "ganha":
-                def _dec(nome):
-                    raw = (request.POST.get(nome) or "").strip().replace(",", ".")
-                    if raw == "":
-                        return None
-                    return Decimal(raw)
-
                 try:
-                    card_ativo.valor_final_fechado = _dec("valor_final_fechado")
-                    card_ativo.desconto_concedido = _dec("desconto_concedido")
-                    card_ativo.comissao = _dec("comissao")
-                    card_ativo.bonus_agente = _dec("bonus_agente")
+                    card_ativo.valor_final_fechado = _parse_decimal_br(
+                        request.POST.get("valor_final_fechado")
+                    )
+                    card_ativo.desconto_concedido = _parse_decimal_br(
+                        request.POST.get("desconto_concedido")
+                    )
+                    pct_comissao = _parse_decimal_br(
+                        request.POST.get("percentual_comissao")
+                    )
+                    pct_bonus = _parse_decimal_br(request.POST.get("percentual_bonus"))
                 except (InvalidOperation, ValueError):
-                    messages.error(request, "Revise os valores numéricos da proposta ganha.")
+                    messages.error(
+                        request, "Revise os valores numéricos da proposta ganha."
+                    )
                     return redirect(f"{request.path}?card={card_ativo.pk}")
 
-                fator = (request.POST.get("fator_comissionamento") or "").strip()
-                fatores_ok = {c.value for c in FatorComissionamento}
-                card_ativo.fator_comissionamento = fator if fator in fatores_ok else ""
+                if pct_comissao is not None and (
+                    pct_comissao < 0 or pct_comissao > 100
+                ):
+                    messages.error(request, "Percentual de comissão deve estar entre 0 e 100.")
+                    return redirect(f"{request.path}?card={card_ativo.pk}")
+                if pct_bonus is not None and (pct_bonus < 12 or pct_bonus > 35):
+                    messages.error(
+                        request,
+                        "Percentual de bônus do agente deve estar entre 12% e 35%.",
+                    )
+                    return redirect(f"{request.path}?card={card_ativo.pk}")
+
+                card_ativo.percentual_comissao = pct_comissao
+                card_ativo.percentual_bonus = pct_bonus
+
+                # Comissão = % × valor final; bônus = % × comissão
+                if (
+                    card_ativo.valor_final_fechado is not None
+                    and pct_comissao is not None
+                ):
+                    card_ativo.comissao = (
+                        card_ativo.valor_final_fechado * pct_comissao / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+                else:
+                    try:
+                        card_ativo.comissao = _parse_decimal_br(
+                            request.POST.get("comissao")
+                        )
+                    except (InvalidOperation, ValueError):
+                        card_ativo.comissao = None
+
+                if card_ativo.comissao is not None and pct_bonus is not None:
+                    card_ativo.bonus_agente = (
+                        card_ativo.comissao * pct_bonus / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+                else:
+                    try:
+                        card_ativo.bonus_agente = _parse_decimal_br(
+                            request.POST.get("bonus_agente")
+                        )
+                    except (InvalidOperation, ValueError):
+                        card_ativo.bonus_agente = None
 
                 # Valor do negócio = valor final fechado
                 card_ativo.valor = card_ativo.valor_final_fechado
@@ -814,7 +866,8 @@ def _funil_negociacoes(request, funil: Funil):
                     [
                         "valor_final_fechado",
                         "desconto_concedido",
-                        "fator_comissionamento",
+                        "percentual_comissao",
+                        "percentual_bonus",
                         "comissao",
                         "bonus_agente",
                         "valor",
@@ -827,13 +880,23 @@ def _funil_negociacoes(request, funil: Funil):
                 ).strip()
                 update_fields.append("escopo_solicitado")
 
-            card_ativo.save(update_fields=list(dict.fromkeys(update_fields)))
+            # FileField: save completo garante gravação do arquivo no disco
+            campos = list(dict.fromkeys(update_fields))
+            if arquivo_salvo:
+                card_ativo.save()
+            else:
+                card_ativo.save(update_fields=campos)
             registrar_historico(
                 card_ativo,
                 tipo=TipoHistoricoOpp.ATUALIZADO,
                 descricao="Campos da fase de negociação atualizados.",
                 autor=funcionario,
             )
+            if arquivo_salvo:
+                messages.success(
+                    request,
+                    f"Proposta salva: {card_ativo.proposta_arquivo.name.split('/')[-1]}.",
+                )
             if fase == "ganha":
                 filho = criar_card_pos_vendas(card_ativo, autor=funcionario)
                 if filho:

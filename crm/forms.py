@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django import forms
 
 from funcionarios.models import Funcionario
@@ -227,13 +229,23 @@ class EtapaFunilForm(forms.ModelForm):
 
 
 class OportunidadeForm(forms.ModelForm):
+    # CharField evita rejeição do DecimalField com vírgula (pt-BR).
+    valor = forms.CharField(
+        required=False,
+        label="Valor da proposta",
+        widget=forms.TextInput(
+            attrs={
+                "inputmode": "decimal",
+                "placeholder": "0,00",
+                "class": "js-money",
+            }
+        ),
+    )
+
     class Meta:
         model = Oportunidade
         fields = ("funil", "etapa", "empresa", "titulo", "valor", "responsavel")
         widgets = {
-            "valor": forms.NumberInput(
-                attrs={"step": "0.01", "min": "0", "placeholder": "0,00"}
-            ),
             "titulo": forms.TextInput(
                 attrs={"placeholder": "Ex.: Projeto BlendDyn — Acme"}
             ),
@@ -250,8 +262,9 @@ class OportunidadeForm(forms.ModelForm):
         )
         self.fields["responsavel"].empty_label = "Responsável"
         self.fields["responsavel"].required = False
-        self.fields["valor"].required = False
         self.fields["etapa"].required = False
+        if self.instance and self.instance.pk and self.instance.valor is not None:
+            self.initial.setdefault("valor", str(self.instance.valor).replace(".", ","))
 
         if funil is not None:
             self.fields["funil"].initial = funil.pk
@@ -264,6 +277,22 @@ class OportunidadeForm(forms.ModelForm):
             self.fields["etapa"].queryset = self.instance.funil.etapas.all()
         else:
             self.fields["etapa"].queryset = EtapaFunil.objects.none()
+
+    def clean_valor(self):
+        raw = self.cleaned_data.get("valor")
+        if raw in (None, ""):
+            return None
+        if isinstance(raw, Decimal):
+            return raw
+        texto = str(raw).strip().replace("R$", "").replace(" ", "")
+        if "," in texto and "." in texto:
+            texto = texto.replace(".", "").replace(",", ".")
+        elif "," in texto:
+            texto = texto.replace(",", ".")
+        try:
+            return Decimal(texto)
+        except (InvalidOperation, ValueError) as exc:
+            raise forms.ValidationError("Informe um valor válido.") from exc
 
     def clean(self):
         cleaned = super().clean()
