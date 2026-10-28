@@ -86,6 +86,7 @@ TEMPLATES = [
                 "django.template.context_processors.media",
                 "funcionarios.context_processors.colaborador",
                 "crm.context_processors.funis_nav",
+                "crm.context_processors.gmail_vinculo",
                 "config.context_processors.topbar",
             ],
         },
@@ -165,13 +166,19 @@ GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_REDIRECT_URI",
     "http://127.0.0.1:8000/calendario/google/callback/",
 )
+# OAuth Gmail (fluxo próprio do CRM — independente do calendário)
+GOOGLE_GMAIL_REDIRECT_URI = os.getenv(
+    "GOOGLE_GMAIL_REDIRECT_URI",
+    "http://127.0.0.1:8000/comercial/gmail/callback/",
+)
 
-# Webhook: e-mail Workspace → card em RSC Pré-vendas (Prospecções)
+# Webhook / OAuth Gmail → card em RSC Pré-vendas (Prospecções)
 CRM_GMAIL_WEBHOOK_TOKEN = os.getenv("CRM_GMAIL_WEBHOOK_TOKEN", "")
 CRM_GMAIL_ASSUNTO_GATILHO = os.getenv(
     "CRM_GMAIL_ASSUNTO_GATILHO",
     "RSC: Agenda de final do ano CAPEX",
 )
+CRM_GMAIL_LABEL = os.getenv("CRM_GMAIL_LABEL", "Oportunidades/Quentes")
 CRM_PROSPECCAO_CLIENTE_RSC = os.getenv("CRM_PROSPECCAO_CLIENTE_RSC", "RSC")
 # Permite OAuth em http://localhost durante o desenvolvimento
 if DEBUG:

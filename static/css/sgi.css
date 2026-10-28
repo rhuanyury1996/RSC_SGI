@@ -3997,6 +3997,21 @@ button.cal-agenda .item,
   color: #15803d;
   font-weight: 650;
 }
+.google-link-dialog .google-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+.google-link-dialog .google-link-actions .btn-google {
+  width: auto;
+  flex: 1 1 220px;
+}
+.google-link-dialog .google-link-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.82rem;
+}
 .btn-google {
   display: inline-flex;
   align-items: center;

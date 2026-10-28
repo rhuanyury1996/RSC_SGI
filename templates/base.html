@@ -324,6 +324,34 @@
       </div>
     </div>
   </div>
+
+  {% if mostrar_popup_google_gmail %}
+  <dialog class="com-dialog google-link-dialog" id="dialogGoogleGmail" open>
+    <form method="post" action="{% url 'crm_gmail_adiar' %}" class="com-dialog-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="com-dialog-head">
+        <span class="com-dialog-badge">Gmail</span>
+        <h3>Conectar seu Gmail ao SGI</h3>
+        <p class="com-dialog-sub">
+          Vincule sua conta Google Workspace. E-mails com o assunto
+          <strong>RSC: Agenda de final do ano CAPEX</strong>
+          no marcador <strong>Oportunidades/Quentes</strong> criam cards
+          automaticamente em RSC · Pré-vendas.
+        </p>
+      </div>
+      <div class="google-link-actions">
+        <a class="btn-google" href="{% url 'crm_gmail_conectar' %}?next={{ request.get_full_path|urlencode }}">
+          <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 12.3 3 3 12.3 3 24s9.3 21 21 21 21-9.3 21-21c0-1.4-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.1 29.3 3 24 3 16.1 3 9.3 7.5 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 36.3 26.7 37 24 37c-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.2 40.5 16 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l.1.1 6.2 5.2C39.2 37.2 45 32 45 24c0-1.4-.1-2.7-.4-3.5z"/></svg>
+          Conectar Gmail
+        </a>
+        <button type="submit" class="btn secondary">Agora não</button>
+      </div>
+      <p class="muted google-link-hint">Só pedimos leitura do Gmail para criar os cards de prospecção.</p>
+    </form>
+  </dialog>
+  {% endif %}
+
   <script>
   (function () {
     var layout = document.getElementById("app-layout");

@@ -5,6 +5,7 @@ from .models import (
     Empresa,
     EtapaFunil,
     Funil,
+    GmailVinculo,
     HistoricoOportunidade,
     ItemLista,
     Oportunidade,
@@ -73,6 +74,13 @@ class HistoricoInline(admin.TabularInline):
     extra = 0
     readonly_fields = ("tipo", "descricao", "etapa_de", "etapa_para", "autor", "criado_em")
     can_delete = False
+
+
+@admin.register(GmailVinculo)
+class GmailVinculoAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "email", "conectado_em", "atualizado_em")
+    search_fields = ("usuario__username", "email")
+    readonly_fields = ("conectado_em", "atualizado_em")
 
 
 @admin.register(Oportunidade)

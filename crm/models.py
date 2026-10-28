@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -607,3 +608,37 @@ class HistoricoOportunidade(models.Model):
 
     def __str__(self) -> str:
         return f"{self.oportunidade} · {self.get_tipo_display()}"
+
+
+class GmailVinculo(models.Model):
+    """OAuth Gmail por usuário — independente do Google Calendar."""
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="gmail_vinculo",
+        verbose_name="Usuário",
+    )
+    email = models.EmailField("E-mail Google", blank=True)
+    token = models.TextField("Access token")
+    refresh_token = models.TextField("Refresh token", blank=True)
+    token_uri = models.CharField(
+        max_length=255, default="https://oauth2.googleapis.com/token"
+    )
+    client_id = models.CharField(max_length=255, blank=True)
+    client_secret = models.CharField(max_length=255, blank=True)
+    scopes = models.TextField(blank=True)
+    expiry = models.DateTimeField(null=True, blank=True)
+    conectado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Vínculo Gmail"
+        verbose_name_plural = "Vínculos Gmail"
+
+    def __str__(self) -> str:
+        return self.email or f"Gmail de {self.usuario}"
+
+    @property
+    def conectado(self) -> bool:
+        return bool(self.refresh_token or self.token)

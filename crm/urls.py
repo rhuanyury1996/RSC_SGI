@@ -19,4 +19,13 @@ urlpatterns = [
         views.webhook_prospeccao_gmail,
         name="crm_webhook_prospeccao_gmail",
     ),
+    path(
+        "api/sincronizar-gmail/",
+        views.webhook_sincronizar_gmail_oauth,
+        name="crm_webhook_sincronizar_gmail",
+    ),
+    path("gmail/conectar/", views.gmail_conectar, name="crm_gmail_conectar"),
+    path("gmail/callback/", views.gmail_callback, name="crm_gmail_callback"),
+    path("gmail/adiar/", views.gmail_adiar_popup, name="crm_gmail_adiar"),
+    path("gmail/desconectar/", views.gmail_desconectar, name="crm_gmail_desconectar"),
 ]

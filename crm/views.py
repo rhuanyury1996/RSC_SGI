@@ -25,6 +25,12 @@ from .forms import (
     OportunidadeForm,
 )
 from .cnpj import CnpjErro, consultar_cnpj
+from .gmail_oauth import (
+    build_gmail_flow,
+    fetch_google_email,
+    gmail_oauth_configurado,
+    save_gmail_credentials,
+)
 from .importacao import ImportacaoErro, importar_empresas_contatos
 from .models import (
     Contato,
@@ -33,6 +39,7 @@ from .models import (
     FatorComissionamento,
     FormaContato,
     Funil,
+    GmailVinculo,
     ItemLista,
     MotivoFaltaRetorno,
     Oportunidade,
@@ -110,6 +117,108 @@ def webhook_prospeccao_gmail(request):
     if resultado.get("created"):
         status = 201
     return JsonResponse(resultado, status=status)
+
+
+@csrf_exempt
+@require_POST
+def webhook_sincronizar_gmail_oauth(request):
+    """Cron/Render: sincroniza Gmail de todos os funcionários já vinculados via OAuth."""
+    if not (getattr(settings, "CRM_GMAIL_WEBHOOK_TOKEN", "") or "").strip():
+        return JsonResponse(
+            {"ok": False, "mensagem": "Webhook desabilitado (token não configurado)."},
+            status=503,
+        )
+    if not _token_webhook_gmail_ok(request):
+        return JsonResponse({"ok": False, "mensagem": "Não autorizado."}, status=401)
+
+    from .gmail_sync import sincronizar_todas_contas
+
+    resultado = sincronizar_todas_contas()
+    return JsonResponse({"ok": True, **resultado})
+
+
+def _safe_next_path(request, default_name: str = "home") -> str:
+    nxt = (request.GET.get("next") or request.POST.get("next") or "").strip()
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return nxt
+    return reverse(default_name)
+
+
+@login_required
+def gmail_conectar(request):
+    if not gmail_oauth_configurado():
+        messages.error(
+            request,
+            "Gmail não configurado. Defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.",
+        )
+        return redirect(_safe_next_path(request))
+
+    flow = build_gmail_flow(request)
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+    request.session["gmail_oauth_state"] = state
+    request.session["gmail_oauth_next"] = _safe_next_path(request)
+    return redirect(auth_url)
+
+
+@login_required
+def gmail_callback(request):
+    destino = request.session.pop("gmail_oauth_next", None) or reverse("home")
+    if not gmail_oauth_configurado():
+        messages.error(request, "Gmail não configurado.")
+        return redirect(destino)
+
+    state = request.session.get("gmail_oauth_state")
+    if not state or state != request.GET.get("state"):
+        messages.error(request, "Falha na autenticação Gmail (state inválido).")
+        return redirect(destino)
+
+    if request.GET.get("error"):
+        messages.error(request, "Autorização Gmail cancelada.")
+        return redirect(destino)
+
+    try:
+        flow = build_gmail_flow(request, state=state)
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        credentials = flow.credentials
+        email = fetch_google_email(credentials)
+        save_gmail_credentials(request.user, credentials, email=email)
+        request.session["gmail_popup_dismissed"] = True
+        messages.success(
+            request,
+            f"Gmail conectado{f' ({email})' if email else ''}. "
+            "E-mails de prospecção serão sincronizados com o SGI.",
+        )
+        # Sincroniza na hora
+        from .gmail_sync import sincronizar_usuario
+
+        sync = sincronizar_usuario(request.user)
+        if sync.get("criados"):
+            messages.info(
+                request,
+                f"{sync['criados']} card(s) de prospecção criado(s) agora.",
+            )
+    except Exception:
+        messages.error(request, "Não foi possível concluir a conexão do Gmail.")
+    return redirect(destino)
+
+
+@login_required
+@require_POST
+def gmail_adiar_popup(request):
+    request.session["gmail_popup_dismissed"] = True
+    return redirect(_safe_next_path(request))
+
+
+@login_required
+def gmail_desconectar(request):
+    GmailVinculo.objects.filter(usuario=request.user).delete()
+    request.session.pop("gmail_popup_dismissed", None)
+    messages.info(request, "Gmail desconectado deste usuário.")
+    return redirect(_safe_next_path(request))
 
 
 @login_required

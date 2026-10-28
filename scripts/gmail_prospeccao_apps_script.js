@@ -1,19 +1,18 @@
 /**
- * Google Apps Script — ao ENVIAR e-mail com assunto exato
- * "RSC: Agenda de final do ano CAPEX", cria card no SGI (RSC · Pré-vendas).
+ * Google Apps Script — e-mails no marcador Oportunidades/Quentes
+ * com assunto "RSC: Agenda de final do ano CAPEX" → card no SGI.
  *
- * Instalação (conta Workspace):
- * 1. https://script.google.com → Novo projeto
- * 2. Cole este arquivo no editor (Code.gs)
- * 3. Projeto → Configurações → propriedades do script:
- *      SGI_WEBHOOK_URL  = https://SEU-DOMINIO/comercial/api/prospeccao-email/
- *      SGI_WEBHOOK_TOKEN = (mesmo valor de CRM_GMAIL_WEBHOOK_TOKEN no Render)
- *      SGI_ASSUNTO_GATILHO = RSC: Agenda de final do ano CAPEX
- * 4. Executar uma vez a função instalarTriggerEnviado() e autorizar Gmail
- * 5. Envie um e-mail de teste com o assunto gatilho
+ * Propriedades do script:
+ *   SGI_WEBHOOK_URL     = https://rsc-sgi.onrender.com/comercial/api/prospeccao-email/
+ *   SGI_WEBHOOK_TOKEN   = (mesmo CRM_GMAIL_WEBHOOK_TOKEN do Render)
+ *   SGI_ASSUNTO_GATILHO = RSC: Agenda de final do ano CAPEX
+ *   SGI_GMAIL_LABEL     = Oportunidades/Quentes
+ *
+ * Rode instalarTriggerEnviado() uma vez.
  */
 
 var ASSUNTO_PADRAO = 'RSC: Agenda de final do ano CAPEX';
+var LABEL_PADRAO = 'Oportunidades/Quentes';
 
 function _prop(chave, fallback) {
   var v = PropertiesService.getScriptProperties().getProperty(chave);
@@ -27,24 +26,18 @@ function instalarTriggerEnviado() {
     }
   });
   ScriptApp.newTrigger('onGmailEnviadoProspeccao')
-    .forUser()
     .timeBased()
     .everyMinutes(5)
     .create();
-  // Marca a partir de agora para não reprocessar histórico antigo
-  PropertiesService.getUserProperties().setProperty(
-    'SGI_LAST_SENT_MS',
-    String(Date.now())
-  );
-  Logger.log('Trigger instalado: varre e-mails enviados a cada 5 min.');
+  Logger.log('Trigger instalado: varre o marcador a cada 5 min.');
 }
 
 /**
- * Varre "Enviados" recentes e posta no SGI os que baterem o assunto gatilho.
- * (Gmail não tem trigger nativo "onSend"; polling curto é o caminho estável.)
+ * Varre o marcador Oportunidades/Quentes + assunto gatilho e posta no SGI.
  */
 function onGmailEnviadoProspeccao() {
   var assuntoGatilho = _prop('SGI_ASSUNTO_GATILHO', ASSUNTO_PADRAO);
+  var label = _prop('SGI_GMAIL_LABEL', LABEL_PADRAO);
   var webhookUrl = _prop('SGI_WEBHOOK_URL', '');
   var token = _prop('SGI_WEBHOOK_TOKEN', '');
   if (!webhookUrl || !token) {
@@ -53,30 +46,25 @@ function onGmailEnviadoProspeccao() {
   }
 
   var props = PropertiesService.getUserProperties();
-  var lastMs = Number(props.getProperty('SGI_LAST_SENT_MS') || '0');
-  var agora = Date.now();
-  // Janela de segurança: últimos 15 minutos (ou desde a última execução)
-  var desdeMs = Math.max(lastMs - 60 * 1000, agora - 15 * 60 * 1000);
-  var desde = new Date(desdeMs);
-  var query =
-    'in:sent subject:"' +
-    assuntoGatilho.replace(/"/g, '') +
-    '" after:' +
-    Utilities.formatDate(desde, Session.getScriptTimeZone(), 'yyyy/MM/dd');
-
-  var threads = GmailApp.search(query, 0, 20);
   var processados = JSON.parse(props.getProperty('SGI_PROCESSED_IDS') || '{}');
+  var agora = Date.now();
   var mudou = false;
-  var maxSent = lastMs;
+
+  // Gmail: label aninhado → "Oportunidades/Quentes"
+  var query =
+    'label:' +
+    label.replace(/"/g, '') +
+    ' subject:"' +
+    assuntoGatilho.replace(/"/g, '') +
+    '"';
+
+  Logger.log('Busca Gmail: ' + query);
+  var threads = GmailApp.search(query, 0, 30);
 
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       var subject = (msg.getSubject() || '').trim();
       if (subject.toLowerCase() !== assuntoGatilho.toLowerCase()) return;
-
-      var sentAt = msg.getDate().getTime();
-      if (sentAt < desdeMs) return;
-      if (sentAt > maxSent) maxSent = sentAt;
 
       var mid = msg.getId();
       if (processados[mid]) return;
@@ -108,7 +96,6 @@ function onGmailEnviadoProspeccao() {
   });
 
   if (mudou) {
-    // Mantém só os últimos ~200 ids
     var ids = Object.keys(processados);
     if (ids.length > 200) {
       ids
@@ -121,8 +108,9 @@ function onGmailEnviadoProspeccao() {
         });
     }
     props.setProperty('SGI_PROCESSED_IDS', JSON.stringify(processados));
+  } else {
+    Logger.log('Nenhum e-mail novo no marcador com o assunto gatilho.');
   }
-  props.setProperty('SGI_LAST_SENT_MS', String(Math.max(maxSent, agora)));
 }
 
 function _extractEmail(fromHeader) {
@@ -176,7 +164,6 @@ function _guessEmpresa(body, toList) {
   return '';
 }
 
-/** Teste manual: usa o último enviado com o assunto gatilho. */
 function testarUltimoEnviado() {
   onGmailEnviadoProspeccao();
 }
