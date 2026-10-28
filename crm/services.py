@@ -1,5 +1,7 @@
+import re
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import (
     Count,
     DecimalField,
@@ -12,13 +14,19 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from funcionarios.models import Funcionario
+
 from .models import (
     ORDEM_TIPO_SUBFUNIL,
+    Contato,
+    Empresa,
     EtapaFunil,
+    FormaContato,
     Funil,
     HistoricoOportunidade,
     ItemLista,
     Oportunidade,
+    OrigemLead,
     TipoHistoricoOpp,
     TipoLista,
     TipoSubfunil,
@@ -623,3 +631,240 @@ def nav_funis_sidebar(funil_ativo_id: int | None = None) -> list[dict]:
         if funil_ativo_id and funil.pk == funil_ativo_id:
             grupos[cid]["aberto"] = True
     return [grupos[i] for i in ordem]
+
+
+_EMPRESA_BODY_PATTERNS = (
+    re.compile(
+        r"(?:nós e a|nós e o|entre nós e a|entre nós e o|com a empresa|com a|com o)\s+"
+        r"([A-ZÁÉÍÓÚÂÊÔÃÕÜ][\w\-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÜ][\w\-]*){0,3})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"empresa\s+([A-ZÁÉÍÓÚÂÊÔÃÕÜ][\w\-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÜ][\w\-]*){0,3})",
+        re.IGNORECASE,
+    ),
+)
+
+
+def assunto_gatilho_prospeccao() -> str:
+    return (getattr(settings, "CRM_GMAIL_ASSUNTO_GATILHO", "") or "").strip()
+
+
+def assunto_bate_gatilho(assunto: str) -> bool:
+    esperado = assunto_gatilho_prospeccao().casefold()
+    recebido = (assunto or "").strip().casefold()
+    return bool(esperado) and recebido == esperado
+
+
+def _extrair_empresa_do_corpo(corpo: str) -> str:
+    texto = (corpo or "").replace("\r\n", "\n")
+    for pattern in _EMPRESA_BODY_PATTERNS:
+        m = pattern.search(texto)
+        if m:
+            nome = re.sub(r"\s+", " ", m.group(1)).strip(" .,;:")
+            if len(nome) >= 2:
+                return nome[:200]
+    return ""
+
+
+def _parse_nome_pessoa(nome: str, email: str) -> tuple[str, str]:
+    nome = (nome or "").strip()
+    if nome:
+        partes = nome.split()
+        if len(partes) == 1:
+            return partes[0][:100], ""
+        return partes[0][:100], " ".join(partes[1:])[:100]
+    local = (email or "").split("@")[0].replace(".", " ").replace("_", " ").strip()
+    if not local:
+        return "Contato", ""
+    partes = local.split()
+    return (partes[0][:100].title(), " ".join(partes[1:])[:100].title() if len(partes) > 1 else "")
+
+
+def _empresa_por_dominio(email: str) -> str:
+    dominio = (email or "").split("@")[-1].strip().lower()
+    if not dominio or dominio in {"gmail.com", "hotmail.com", "outlook.com", "yahoo.com"}:
+        return ""
+    base = dominio.split(".")[0]
+    if base in {"mail", "email", "smtp"}:
+        return ""
+    return base.replace("-", " ").title()[:200]
+
+
+def criar_prospeccao_from_email(payload: dict) -> dict:
+    """
+    Cria card em Pré-vendas (Captura) a partir de e-mail enviado no Workspace.
+
+    Retorno: {ok, created, oportunidade_id, funil_id, empresa, mensagem}
+    """
+    assunto = (payload.get("subject") or payload.get("assunto") or "").strip()
+    if not assunto_bate_gatilho(assunto):
+        return {
+            "ok": False,
+            "created": False,
+            "skipped": True,
+            "mensagem": (
+                f"Assunto fora do gatilho. Esperado: “{assunto_gatilho_prospeccao()}”."
+            ),
+        }
+
+    message_id = (payload.get("message_id") or payload.get("messageId") or "").strip()
+    corpo = (payload.get("body") or payload.get("corpo") or "").strip()
+    from_email = (payload.get("from_email") or payload.get("from") or "").strip().lower()
+    from_name = (payload.get("from_name") or "").strip()
+
+    destinatarios = payload.get("to") or payload.get("destinatarios") or []
+    if isinstance(destinatarios, str):
+        destinatarios = [{"email": destinatarios}]
+
+    cliente_nome = (
+        getattr(settings, "CRM_PROSPECCAO_CLIENTE_RSC", "RSC") or "RSC"
+    ).strip()
+    cliente = (
+        ItemLista.objects.filter(
+            tipo=TipoLista.CLIENTES_RSC, ativo=True, nome__iexact=cliente_nome
+        ).first()
+        or ItemLista.objects.filter(tipo=TipoLista.CLIENTES_RSC, ativo=True)
+        .order_by("ordem", "nome")
+        .first()
+    )
+    if cliente is None:
+        return {
+            "ok": False,
+            "created": False,
+            "mensagem": "Nenhum Cliente RSC cadastrado nas listas.",
+        }
+
+    funis = garantir_funis_para_cliente(cliente)
+    funil = next((f for f in funis if f.tipo == TipoSubfunil.PRE_VENDAS), None)
+    if funil is None:
+        return {
+            "ok": False,
+            "created": False,
+            "mensagem": f"Funil de pré-vendas não encontrado para {cliente.nome}.",
+        }
+
+    if message_id:
+        marker = f"[gmail:{message_id}]"
+        existente = (
+            Oportunidade.objects.filter(funil=funil, observacoes__contains=marker)
+            .order_by("-pk")
+            .first()
+        )
+        if existente:
+            return {
+                "ok": True,
+                "created": False,
+                "oportunidade_id": existente.pk,
+                "funil_id": funil.pk,
+                "empresa": existente.empresa.nome,
+                "mensagem": "Card já existia para este e-mail (idempotente).",
+            }
+
+    nome_empresa = (payload.get("empresa") or payload.get("company") or "").strip()
+    if not nome_empresa:
+        nome_empresa = _extrair_empresa_do_corpo(corpo)
+    if not nome_empresa and destinatarios:
+        primeiro = destinatarios[0] if isinstance(destinatarios[0], dict) else {}
+        nome_empresa = _empresa_por_dominio(
+            (primeiro.get("email") or str(destinatarios[0])).strip()
+        )
+    if not nome_empresa:
+        nome_empresa = "Prospecção CAPEX"
+
+    empresa = Empresa.objects.filter(nome__iexact=nome_empresa, ativa=True).first()
+    if empresa is None:
+        empresa = Empresa.objects.create(nome=nome_empresa[:200])
+    if not empresa.clientes_rsc.filter(pk=cliente.pk).exists():
+        empresa.clientes_rsc.add(cliente)
+
+    contato = None
+    if destinatarios:
+        dest = destinatarios[0] if isinstance(destinatarios[0], dict) else {"email": destinatarios[0]}
+        email_contato = (dest.get("email") or "").strip().lower()
+        if email_contato:
+            contato = Contato.objects.filter(
+                empresa=empresa, email__iexact=email_contato, ativo=True
+            ).first()
+            if contato is None:
+                nome_c, sobrenome_c = _parse_nome_pessoa(
+                    dest.get("name") or dest.get("nome") or "", email_contato
+                )
+                contato = Contato.objects.create(
+                    empresa=empresa,
+                    nome=nome_c,
+                    sobrenome=sobrenome_c,
+                    email=email_contato,
+                )
+                contato.clientes_rsc.add(cliente)
+
+    responsavel = None
+    if from_email:
+        responsavel = (
+            Funcionario.objects.filter(ativo=True, usuario__email__iexact=from_email)
+            .select_related("usuario")
+            .first()
+        )
+
+    etapa = (
+        funil.etapas.filter(nome="Captura").first()
+        or funil.etapas.order_by("ordem", "pk").first()
+    )
+
+    marker_line = f"[gmail:{message_id}]" if message_id else ""
+    to_resumo = []
+    for d in destinatarios[:8]:
+        if isinstance(d, dict):
+            to_resumo.append(d.get("email") or d.get("name") or "")
+        else:
+            to_resumo.append(str(d))
+    obs_parts = [
+        marker_line,
+        f"Assunto: {assunto}",
+        f"De: {from_name or from_email}",
+        f"Para: {', '.join(x for x in to_resumo if x)}",
+        "",
+        corpo[:4000],
+    ]
+    observacoes = "\n".join(p for p in obs_parts if p is not None).strip()
+
+    opp = Oportunidade.objects.create(
+        funil=funil,
+        etapa=etapa,
+        empresa=empresa,
+        contato=contato,
+        titulo=assunto[:200],
+        responsavel=responsavel,
+        origem=OrigemLead.EMAIL,
+        formas_contato=[FormaContato.EMAIL],
+        observacoes=observacoes,
+        etapa_desde=timezone.now(),
+        contato_email=(contato.email if contato else ""),
+        contato_nome=(contato.nome_completo if contato else ""),
+    )
+    registrar_historico(
+        opp,
+        tipo=TipoHistoricoOpp.CRIADO,
+        descricao=(
+            "Card criado automaticamente a partir de e-mail Workspace "
+            f"(assunto gatilho “{assunto_gatilho_prospeccao()}”)."
+        ),
+        autor=responsavel,
+        etapa_para=etapa,
+    )
+    if corpo:
+        registrar_historico(
+            opp,
+            tipo=TipoHistoricoOpp.NOTA,
+            descricao=corpo[:2000],
+            autor=responsavel,
+        )
+
+    return {
+        "ok": True,
+        "created": True,
+        "oportunidade_id": opp.pk,
+        "funil_id": funil.pk,
+        "empresa": empresa.nome,
+        "mensagem": "Card criado em RSC · Pré-vendas (Captura).",
+    }

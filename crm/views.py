@@ -1,6 +1,8 @@
+import hmac
 import json
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Sum
@@ -8,6 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from funcionarios.models import Funcionario
@@ -43,6 +46,7 @@ from .services import (
     DESCRICOES_ETAPAS_PRE_VENDAS,
     ETAPAS_POR_TIPO,
     criar_card_pos_vendas,
+    criar_prospeccao_from_email,
     css_coluna_negociacoes,
     css_coluna_pos_vendas,
     css_coluna_pre_vendas,
@@ -57,6 +61,55 @@ from .services import (
     soma_pipeline_qs,
     tempo_na_etapa,
 )
+
+
+def _token_webhook_gmail_ok(request) -> bool:
+    esperado = (getattr(settings, "CRM_GMAIL_WEBHOOK_TOKEN", "") or "").strip()
+    if not esperado:
+        return False
+    recebido = (
+        request.headers.get("X-SGI-Token")
+        or request.META.get("HTTP_X_SGI_TOKEN")
+        or request.GET.get("token")
+        or ""
+    ).strip()
+    if not recebido and request.body:
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            recebido = str(data.get("token") or "").strip()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            recebido = ""
+    return hmac.compare_digest(recebido, esperado)
+
+
+@csrf_exempt
+@require_POST
+def webhook_prospeccao_gmail(request):
+    """
+    Recebe e-mails enviados no Workspace (Apps Script) e cria card
+    em RSC · Pré-vendas quando o assunto = gatilho configurado.
+    """
+    if not (getattr(settings, "CRM_GMAIL_WEBHOOK_TOKEN", "") or "").strip():
+        return JsonResponse(
+            {"ok": False, "mensagem": "Webhook desabilitado (token não configurado)."},
+            status=503,
+        )
+    if not _token_webhook_gmail_ok(request):
+        return JsonResponse({"ok": False, "mensagem": "Não autorizado."}, status=401)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "mensagem": "JSON inválido."}, status=400)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({"ok": False, "mensagem": "Payload inválido."}, status=400)
+
+    resultado = criar_prospeccao_from_email(payload)
+    status = 200 if resultado.get("ok") else (422 if resultado.get("skipped") else 400)
+    if resultado.get("created"):
+        status = 201
+    return JsonResponse(resultado, status=status)
 
 
 @login_required

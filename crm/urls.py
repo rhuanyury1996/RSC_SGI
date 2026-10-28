@@ -14,4 +14,9 @@ urlpatterns = [
     path("funis/<int:pk>/", views.funil_detalhe, name="crm_funil_detalhe"),
     path("funis/<int:pk>/mover/", views.funil_mover_card, name="crm_funil_mover"),
     path("listas/", views.listas, name="crm_listas"),
+    path(
+        "api/prospeccao-email/",
+        views.webhook_prospeccao_gmail,
+        name="crm_webhook_prospeccao_gmail",
+    ),
 ]

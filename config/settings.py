@@ -165,6 +165,14 @@ GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_REDIRECT_URI",
     "http://127.0.0.1:8000/calendario/google/callback/",
 )
+
+# Webhook: e-mail Workspace → card em RSC Pré-vendas (Prospecções)
+CRM_GMAIL_WEBHOOK_TOKEN = os.getenv("CRM_GMAIL_WEBHOOK_TOKEN", "")
+CRM_GMAIL_ASSUNTO_GATILHO = os.getenv(
+    "CRM_GMAIL_ASSUNTO_GATILHO",
+    "RSC: Agenda de final do ano CAPEX",
+)
+CRM_PROSPECCAO_CLIENTE_RSC = os.getenv("CRM_PROSPECCAO_CLIENTE_RSC", "RSC")
 # Permite OAuth em http://localhost durante o desenvolvimento
 if DEBUG:
     os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
