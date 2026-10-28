@@ -3997,6 +3997,10 @@ button.cal-agenda .item,
   color: #15803d;
   font-weight: 650;
 }
+.google-link-dialog {
+  margin: auto;
+  max-width: min(520px, calc(100vw - 2rem));
+}
 .google-link-dialog .google-link-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4011,6 +4015,22 @@ button.cal-agenda .item,
 .google-link-dialog .google-link-hint {
   margin: 0.85rem 0 0;
   font-size: 0.82rem;
+}
+.topbar-gmail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbar-gmail-chip:hover {
+  background: #ffedd5;
 }
 .btn-google {
   display: inline-flex;

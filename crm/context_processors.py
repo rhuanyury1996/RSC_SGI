@@ -19,18 +19,22 @@ def funis_nav(request):
 
 def gmail_vinculo(request):
     """Pop-up de vínculo Gmail após o login (fluxo próprio do CRM)."""
-    if not getattr(request, "user", None) or not request.user.is_authenticated:
-        return {
-            "mostrar_popup_google_gmail": False,
-            "google_gmail_conectado": False,
-            "google_oauth_configurado": False,
-        }
-    configurado = gmail_oauth_configurado()
-    conectado = gmail_conectado(request.user) if configurado else False
-    precisa = configurado and usuario_precisa_conectar_gmail(request.user)
-    dismissed = bool(request.session.get("gmail_popup_dismissed"))
-    return {
-        "google_oauth_configurado": configurado,
-        "google_gmail_conectado": conectado,
-        "mostrar_popup_google_gmail": bool(precisa and not dismissed),
+    vazio = {
+        "mostrar_popup_google_gmail": False,
+        "google_gmail_conectado": False,
+        "google_oauth_configurado": False,
     }
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return vazio
+    try:
+        configurado = gmail_oauth_configurado()
+        conectado = gmail_conectado(request.user) if configurado else False
+        precisa = configurado and usuario_precisa_conectar_gmail(request.user)
+        dismissed = bool(request.session.get("gmail_popup_dismissed"))
+        return {
+            "google_oauth_configurado": configurado,
+            "google_gmail_conectado": conectado,
+            "mostrar_popup_google_gmail": bool(precisa and not dismissed),
+        }
+    except Exception:
+        return vazio

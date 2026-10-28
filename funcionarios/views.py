@@ -245,6 +245,12 @@ class AcessoLoginView(LoginView):
     authentication_form = LoginForm
     redirect_authenticated_user = True
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # Reabre o convite de Gmail em cada login até vincular
+        self.request.session.pop("gmail_popup_dismissed", None)
+        return response
+
 
 def logout_view(request: HttpRequest) -> HttpResponse:
     logout(request)

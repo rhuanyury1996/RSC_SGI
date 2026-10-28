@@ -61,6 +61,12 @@
           <span class="topbar-prod-track" aria-hidden="true"><i style="width:{{ topbar_produtividade.percentual|default:0 }}%"></i></span>
         </a>
 
+        {% if google_oauth_configurado and not google_gmail_conectado %}
+        <a class="topbar-gmail-chip" href="{% url 'crm_gmail_conectar' %}?next={{ request.get_full_path|urlencode }}" title="Conectar Gmail ao SGI">
+          Conectar Gmail
+        </a>
+        {% endif %}
+
         <details class="topbar-notify">
           <summary class="topbar-icon-btn" aria-label="Notificações de informativos">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4a5 5 0 0 0-5 5v2.2c0 .7-.2 1.4-.6 2L5 15h14l-1.4-1.8c-.4-.6-.6-1.3-.6-2V9a5 5 0 0 0-5-5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 18a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
@@ -326,7 +332,7 @@
   </div>
 
   {% if mostrar_popup_google_gmail %}
-  <dialog class="com-dialog google-link-dialog" id="dialogGoogleGmail" open>
+  <dialog class="com-dialog google-link-dialog" id="dialogGoogleGmail">
     <form method="post" action="{% url 'crm_gmail_adiar' %}" class="com-dialog-form">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -354,6 +360,11 @@
 
   <script>
   (function () {
+    var gmailDlg = document.getElementById("dialogGoogleGmail");
+    if (gmailDlg && typeof gmailDlg.showModal === "function") {
+      try { gmailDlg.showModal(); } catch (e) { gmailDlg.setAttribute("open", "open"); }
+    }
+
     var layout = document.getElementById("app-layout");
     var btn = document.getElementById("sidebar-toggle");
     if (layout && btn) {
