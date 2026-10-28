@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load crm_format %}
 {% block title %}{{ funil.get_tipo_display }} · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
 {% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Carteira</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
 {% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · {{ funil.get_tipo_display }}{% endblock %}
 {% block page_actions %}
   <span class="status-pill">{{ total_cards }} card(s)</span>
-  <span class="status-pill">Pipeline R$ {{ pipeline|floatformat:2 }}</span>
+  <span class="status-pill">Pipeline {{ pipeline|moeda }}</span>
   <a class="btn secondary" href="{% url 'crm_funis' %}">Todos os funis</a>
 {% endblock %}
 
@@ -104,10 +105,10 @@
             <p>{{ opp.escopo_solicitado|truncatechars:120 }}</p>
           </div>
           {% endif %}
-          {% if opp.valor %}
+          {% if opp.valor is not None %}
           <div class="kanban-card-field">
             <span class="com-escopo-label">{% if is_pos_vendas %}Valor do negócio{% else %}Valor{% endif %}</span>
-            <strong class="com-value">R$ {{ opp.valor|floatformat:2 }}</strong>
+            <strong class="com-value">{% moeda_html opp.valor %}</strong>
           </div>
           {% endif %}
           {% if opp.responsavel %}
@@ -163,7 +164,7 @@
         </div>
         <div>
           <span class="muted">{% if is_pos_vendas %}Valor do negócio{% else %}Valor{% endif %}</span>
-          <strong>{% if card_ativo.valor %}R$ {{ card_ativo.valor|floatformat:2 }}{% else %}—{% endif %}</strong>
+          <strong>{% moeda_html card_ativo.valor %}</strong>
         </div>
         <div>
           <span class="muted">Nesta etapa</span>

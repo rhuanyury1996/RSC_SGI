@@ -1,4 +1,4 @@
-{% load l10n %}
+{% load l10n crm_format %}
 {# Campos da fase de Negociações. Espera: fase, card_ativo #}
 {% if fase == "proposta_enviada" %}
 <div class="field span-2">
@@ -20,7 +20,7 @@
 </div>
 <div class="field">
   <label for="valor_proposta_{{ fase }}">Valor da proposta</label>
-  <input id="valor_proposta_{{ fase }}" type="text" inputmode="decimal" name="valor" class="js-money" value="{% if card_ativo.valor is not None %}{% localize off %}{{ card_ativo.valor }}{% endlocalize %}{% endif %}" placeholder="0,00">
+  <input id="valor_proposta_{{ fase }}" type="text" inputmode="decimal" name="valor" class="js-money" value="{{ card_ativo.valor|moeda_input }}" placeholder="0,00">
 </div>
 
 {% elif fase == "follow_up" %}
@@ -32,19 +32,19 @@
 {% if card_ativo.valor is not None %}
 <div class="field">
   <span class="com-escopo-label">Valor da proposta</span>
-  <strong class="com-value">R$ {{ card_ativo.valor|floatformat:2 }}</strong>
+  <strong class="com-value">{% moeda_html card_ativo.valor %}</strong>
 </div>
 {% endif %}
 
 {% elif fase == "ganha" %}
 <div class="field">
   <label for="valor_final_fechado_{{ fase }}">Valor final fechado</label>
-  <input id="valor_final_fechado_{{ fase }}" type="text" inputmode="decimal" name="valor_final_fechado" class="js-money js-calc-comissao" data-calc="valor" value="{% if card_ativo.valor_final_fechado is not None %}{% localize off %}{{ card_ativo.valor_final_fechado }}{% endlocalize %}{% elif card_ativo.valor is not None %}{% localize off %}{{ card_ativo.valor }}{% endlocalize %}{% endif %}" placeholder="0,00">
+  <input id="valor_final_fechado_{{ fase }}" type="text" inputmode="decimal" name="valor_final_fechado" class="js-money js-calc-comissao" data-calc="valor" value="{% if card_ativo.valor_final_fechado is not None %}{{ card_ativo.valor_final_fechado|moeda_input }}{% else %}{{ card_ativo.valor|moeda_input }}{% endif %}" placeholder="0,00">
   <p class="field-hint muted">Este é o valor do negócio.</p>
 </div>
 <div class="field">
   <label for="desconto_concedido_{{ fase }}">Desconto concedido</label>
-  <input id="desconto_concedido_{{ fase }}" type="text" inputmode="decimal" name="desconto_concedido" class="js-money" value="{% if card_ativo.desconto_concedido is not None %}{% localize off %}{{ card_ativo.desconto_concedido }}{% endlocalize %}{% endif %}" placeholder="0,00">
+  <input id="desconto_concedido_{{ fase }}" type="text" inputmode="decimal" name="desconto_concedido" class="js-money" value="{{ card_ativo.desconto_concedido|moeda_input }}" placeholder="0,00">
 </div>
 <div class="field">
   <label for="percentual_comissao_{{ fase }}">Fator de comissão (%)</label>
@@ -58,12 +58,12 @@
 </div>
 <div class="field">
   <label for="comissao_{{ fase }}">Comissão</label>
-  <input id="comissao_{{ fase }}" type="text" name="comissao" class="js-comissao-out" readonly value="{% if card_ativo.comissao is not None %}{% localize off %}{{ card_ativo.comissao }}{% endlocalize %}{% endif %}" placeholder="Calculado automaticamente">
+  <input id="comissao_{{ fase }}" type="text" name="comissao" class="js-money js-comissao-out" readonly value="{{ card_ativo.comissao|moeda_input }}" placeholder="Calculado automaticamente">
   <p class="field-hint muted">% de comissão × valor final fechado.</p>
 </div>
 <div class="field">
   <label for="bonus_agente_{{ fase }}">Bônus para agente</label>
-  <input id="bonus_agente_{{ fase }}" type="text" name="bonus_agente" class="js-bonus-out" readonly value="{% if card_ativo.bonus_agente is not None %}{% localize off %}{{ card_ativo.bonus_agente }}{% endlocalize %}{% endif %}" placeholder="Calculado automaticamente">
+  <input id="bonus_agente_{{ fase }}" type="text" name="bonus_agente" class="js-money js-bonus-out" readonly value="{{ card_ativo.bonus_agente|moeda_input }}" placeholder="Calculado automaticamente">
   <p class="field-hint muted">% de bônus × valor da comissão.</p>
 </div>
 
@@ -75,7 +75,7 @@
 {% if card_ativo.valor is not None %}
 <div class="field">
   <span class="com-escopo-label">Valor da proposta</span>
-  <strong class="com-value">R$ {{ card_ativo.valor|floatformat:2 }}</strong>
+  <strong class="com-value">{% moeda_html card_ativo.valor %}</strong>
 </div>
 {% endif %}
 
@@ -87,6 +87,6 @@
 </div>
 <div class="field">
   <label for="valor_proposta_{{ fase }}">Valor da proposta</label>
-  <input id="valor_proposta_{{ fase }}" type="text" inputmode="decimal" name="valor" class="js-money" value="{% if card_ativo.valor is not None %}{% localize off %}{{ card_ativo.valor }}{% endlocalize %}{% endif %}" placeholder="0,00">
+  <input id="valor_proposta_{{ fase }}" type="text" inputmode="decimal" name="valor" class="js-money" value="{{ card_ativo.valor|moeda_input }}" placeholder="0,00">
 </div>
 {% endif %}

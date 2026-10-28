@@ -4534,6 +4534,39 @@ a.info-post-main:hover { background: #fafbfc; }
   font-weight: 750;
   color: var(--coral-dark, #9a3412);
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.money {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+.money-curr {
+  font-size: 0.78em;
+  font-weight: 650;
+  opacity: 0.72;
+}
+.money-amt {
+  font-weight: 750;
+}
+.money-empty {
+  color: #94a3b8;
+  font-weight: 600;
+}
+.kanban-card-field .money,
+.lp-meta-grid .money,
+.com-value .money {
+  color: #0f766e;
+}
+.kanban-card-field .money-amt {
+  font-size: 1.05rem;
+}
+.lp-meta-grid .money-amt {
+  font-size: 1.02rem;
 }
 .com-move { margin-top: 0.45rem; }
 .com-move select {
@@ -4707,7 +4740,21 @@ a.info-post-main:hover { background: #fafbfc; }
   font-weight: 500;
 }
 .kanban-card-field {
-  margin-top: 0.25rem;
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fffc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+}
+.kanban-card-field .com-escopo-label {
+  margin-bottom: 0.12rem;
+  color: #64748b;
+}
+.kanban-card-field .com-value {
+  display: block;
+  color: #0f766e;
+  font-size: 1.02rem;
+  line-height: 1.25;
 }
 .badge-ganha {
   background: #d1fae5 !important;

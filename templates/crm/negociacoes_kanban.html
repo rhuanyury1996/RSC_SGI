@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load l10n %}
+{% load l10n crm_format %}
 {% block title %}Negociações · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
 {% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Carteira</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> Negociações{% endblock %}
 {% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Negociações{% endblock %}
 {% block page_actions %}
   <span class="status-pill">{{ total_cards }} card(s)</span>
-  <span class="status-pill">Pipeline R$ {{ pipeline|floatformat:2 }}</span>
+  <span class="status-pill">Pipeline {{ pipeline|moeda }}</span>
   <a class="btn secondary" href="{% url 'crm_funis' %}">Todos os funis</a>
 {% endblock %}
 
@@ -89,7 +89,7 @@
           <strong>{{ etapa.nome }}</strong>
           <div class="kanban-col-stats">
             <span class="kanban-stat"><span class="kanban-count">{{ etapa.cards_count|default:0 }}</span> cards</span>
-            <span class="kanban-stat kanban-valor">R$ <span class="kanban-valor-total">{{ etapa.valor_acumulado|default:0|floatformat:2 }}</span></span>
+            <span class="kanban-stat kanban-valor"><span class="kanban-valor-total">{{ etapa.valor_acumulado|default:0|moeda }}</span></span>
           </div>
           {% if etapa.descricao_fase %}
           <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
@@ -120,12 +120,12 @@
           {% if "ganha" in etapa.nome|lower %}
           <div class="kanban-card-field">
             <span class="com-escopo-label">Valor final fechado</span>
-            <strong class="com-value">{% if opp.valor_negocio is not None %}R$ {{ opp.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <strong class="com-value">{% moeda_html opp.valor_negocio %}</strong>
           </div>
           {% else %}
           <div class="kanban-card-field">
             <span class="com-escopo-label">Valor da proposta</span>
-            <strong class="com-value">{% if opp.valor is not None %}R$ {{ opp.valor|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <strong class="com-value">{% moeda_html opp.valor %}</strong>
           </div>
           {% endif %}
           {% if opp.data_contato_follow_up %}
@@ -190,7 +190,7 @@
         </div>
         <div>
           <span class="muted">Valor do negócio</span>
-          <strong>{% if card_ativo.valor_negocio is not None %}R$ {{ card_ativo.valor_negocio|floatformat:2 }}{% else %}—{% endif %}</strong>
+          <strong>{% moeda_html card_ativo.valor_negocio %}</strong>
         </div>
         <div>
           <span class="muted">Nesta etapa</span>
@@ -368,7 +368,7 @@
 <script>
 (function () {
   function parseBR(raw) {
-    var t = String(raw == null ? "" : raw).trim().replace(/R\$/g, "").replace(/\s/g, "");
+    var t = String(raw == null ? "" : raw).trim().replace(/R\$/gi, "").replace(/\s/g, "");
     if (!t) return null;
     if (t.indexOf(",") >= 0 && t.indexOf(".") >= 0) {
       t = t.replace(/\./g, "").replace(",", ".");
@@ -382,6 +382,44 @@
   function fmtBR(n) {
     return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+
+  function onlyDigits(raw) {
+    return String(raw == null ? "" : raw).replace(/\D/g, "");
+  }
+
+  function maskMoneyFromDigits(digits) {
+    if (!digits) return "";
+    var cents = digits.replace(/^0+(?=\d)/, "");
+    if (!cents) cents = "0";
+    while (cents.length < 3) cents = "0" + cents;
+    var intPart = cents.slice(0, -2);
+    var decPart = cents.slice(-2);
+    intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return intPart + "," + decPart;
+  }
+
+  function applyMoneyMask(el) {
+    if (!el || el.readOnly) return;
+    var masked = maskMoneyFromDigits(onlyDigits(el.value));
+    el.value = masked;
+  }
+
+  document.querySelectorAll(".js-money").forEach(function (el) {
+    if (el.readOnly) return;
+    el.addEventListener("input", function () {
+      applyMoneyMask(el);
+      var form = el.closest("form");
+      if (form && form.querySelector(".js-calc-comissao")) recalc(form);
+    });
+    el.addEventListener("blur", function () {
+      var n = parseBR(el.value);
+      el.value = n == null ? "" : fmtBR(n);
+    });
+    if (el.value) {
+      var n0 = parseBR(el.value);
+      if (n0 != null) el.value = fmtBR(n0);
+    }
+  });
 
   function recalc(form) {
     var valorEl = form.querySelector('[data-calc="valor"]');
@@ -412,7 +450,8 @@
   document.querySelectorAll(".deal-edit-form").forEach(function (form) {
     if (!form.querySelector(".js-calc-comissao")) return;
     form.addEventListener("input", function (ev) {
-      if (ev.target && ev.target.classList && ev.target.classList.contains("js-calc-comissao")) {
+      if (ev.target && ev.target.classList && ev.target.classList.contains("js-calc-comissao")
+          && !ev.target.classList.contains("js-money")) {
         recalc(form);
       }
     });
