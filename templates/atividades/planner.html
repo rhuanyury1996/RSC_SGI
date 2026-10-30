@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Planner · SGI RSC{% endblock %}
 {% block breadcrumb %}Atividades · Planner{% endblock %}
 {% block page_title %}Daily Productivity Planner{% endblock %}
@@ -154,7 +155,7 @@
       <ul class="pp-check">
         {% for item in checklist %}
         <li class="{% if item.status == status_realizado %}is-done{% endif %}">
-          <form method="post" action="{% url 'planner_checklist' item.pk %}">
+          <form method="post" action="{% url 'planner_checklist' item.pk %}" class="js-async">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
             <button type="submit" class="pp-check-btn" aria-label="Alternar">
@@ -162,7 +163,7 @@
             </button>
           </form>
             <span class="pp-check-main">
-              <form method="post" action="{% url 'planner_quadrante' item.pk %}" class="eisen-form">
+              <form method="post" action="{% url 'planner_quadrante' item.pk %}" class="eisen-form js-async">
                 {% csrf_token %}
                 <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
                 <button type="submit" class="eisen-badge q-{{ item.quadrante }}" title="{{ item.get_quadrante_display }} — clique para alterar">
@@ -203,7 +204,7 @@
         <ol class="pp-goals">
           {% for m in metas %}
           <li class="{% if m.concluida %}is-done{% endif %}">
-            <form method="post" action="{% url 'planner_meta_toggle' m.pk %}">
+            <form method="post" action="{% url 'planner_meta_toggle' m.pk %}" class="js-async">
               {% csrf_token %}
               <button type="submit" class="pp-goal-num">{% if m.concluida %}✓{% else %}{{ forloop.counter|stringformat:"02d" }}{% endif %}</button>
             </form>
@@ -214,7 +215,7 @@
           {% endfor %}
         </ol>
         {% if metas|length < 4 %}
-        <form method="post" action="{% url 'planner_meta_add' %}" class="pp-inline-add">
+        <form method="post" action="{% url 'planner_meta_add' %}" class="pp-inline-add js-async">
           {% csrf_token %}
           <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
           <input type="text" name="texto" placeholder="Nova meta de foco" required maxlength="200">
@@ -236,7 +237,7 @@
           <div class="pp-habits-row">
             <span class="pp-habit-name">{{ linha.nome }}</span>
             {% for d in linha.dias %}
-            <form method="post" action="{% url 'planner_habito' %}">
+            <form method="post" action="{% url 'planner_habito' %}" class="js-async">
               {% csrf_token %}
               <input type="hidden" name="data" value="{{ d.data|date:'Y-m-d' }}">
               <input type="hidden" name="voltar" value="{{ dia|date:'Y-m-d' }}">
@@ -264,7 +265,7 @@
           </div>
           <div class="pp-water">
             {% for c in agua_copos %}
-            <form method="post" action="{% url 'planner_agua' %}" class="pp-drop-form">
+            <form method="post" action="{% url 'planner_agua' %}" class="pp-drop-form js-async">
               {% csrf_token %}
               <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
               <input type="hidden" name="copos" value="{{ c.definir }}">
@@ -399,4 +400,5 @@
   paint();
 })();
 </script>
+<script src="{% static 'js/atividades.js' %}"></script>
 {% endblock %}

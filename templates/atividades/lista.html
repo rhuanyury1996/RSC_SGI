@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Atividades · SGI RSC{% endblock %}
 {% block breadcrumb %}Atividades{% endblock %}
 {% block page_title %}Atividades{% endblock %}
@@ -571,7 +572,7 @@
     var m = Math.floor((sec % 3600) / 60);
     var s = sec % 60;
     var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-    return h ? h + ":" + pad(m) + ":" + pad(s) : pad(m) + ":" + pad(s);
+    return h + ":" + pad(m) + ":" + pad(s);
   }
   function tick() {
     document.querySelectorAll(".cu-timer-btn.is-running").forEach(function (btn) {
@@ -607,4 +608,5 @@
   setInterval(tick, 1000);
 })();
 </script>
+<script src="{% static 'js/atividades.js' %}"></script>
 {% endblock %}

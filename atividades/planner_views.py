@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import F, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -83,6 +84,10 @@ def _resolver_alvo(request):
             pass
     request.session.pop("planner_resp", None)
     return eu, eu, None
+
+
+def _ajax(request) -> bool:
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
 def _redirect_planner(request, dia):
@@ -185,6 +190,8 @@ def agua(request):
     except (TypeError, ValueError):
         copos = 0
     definir_agua(dia_obj, copos)
+    if _ajax(request):
+        return JsonResponse({"ok": True, "copos": dia_obj.agua_copos})
     return _redirect_planner(request, dia)
 
 
@@ -197,9 +204,13 @@ def habito(request):
     dia = _parse_data(request.POST.get("data"))
     voltar = _parse_data(request.POST.get("voltar") or request.POST.get("data"))
     chave = (request.POST.get("chave") or "").strip()
+    feito = None
     if chave:
         dia_obj = obter_ou_criar_dia(alvo, dia)
-        alternar_habito(dia_obj, chave)
+        habito = alternar_habito(dia_obj, chave)
+        feito = habito.feito
+    if _ajax(request):
+        return JsonResponse({"ok": True, "feito": bool(feito), "chave": chave})
     return _redirect_planner(request, voltar)
 
 
@@ -215,6 +226,13 @@ def meta_add(request):
         dia_obj = obter_ou_criar_dia(alvo, dia)
         adicionar_meta(dia_obj, texto)
         messages.success(request, "Meta adicionada.")
+        if _ajax(request):
+            meta = dia_obj.metas.order_by("-id").first()
+            return JsonResponse(
+                {"ok": True, "id": meta.pk if meta else None, "texto": texto}
+            )
+    if _ajax(request):
+        return JsonResponse({"ok": False, "erro": "Informe a meta."}, status=400)
     return _redirect_planner(request, dia)
 
 
@@ -226,6 +244,8 @@ def meta_toggle(request, pk: int):
         return redirect("home")
     meta = get_object_or_404(MetaFoco, pk=pk, dia__funcionario=alvo)
     alternar_meta(meta)
+    if _ajax(request):
+        return JsonResponse({"ok": True, "concluida": meta.concluida})
     return _redirect_planner(request, meta.dia.data)
 
 
@@ -245,6 +265,16 @@ def checklist_toggle(request, pk: int):
         else StatusAtividade.REALIZADO
     )
     alterar_status(item, novo, autor=eu)
+    if _ajax(request):
+        item.refresh_from_db()
+        return JsonResponse(
+            {
+                "ok": True,
+                "status": item.status,
+                "label": item.get_status_display(),
+                "concluida": item.status == StatusAtividade.REALIZADO,
+            }
+        )
     dia = item.planejado_para or timezone.localdate()
     return _redirect_planner(request, dia)
 
@@ -299,6 +329,16 @@ def mudar_quadrante(request, pk: int):
         idx = 0
     item.quadrante = ordem[(idx + 1) % len(ordem)]
     item.save(update_fields=["quadrante", "atualizado_em"])
+    if _ajax(request):
+        rotulos = {"fazer": "Q1", "agendar": "Q2", "delegar": "Q3", "eliminar": "Q4"}
+        return JsonResponse(
+            {
+                "ok": True,
+                "quadrante": item.quadrante,
+                "sigla": rotulos.get(item.quadrante, "Q2"),
+                "label": item.get_quadrante_display(),
+            }
+        )
     dia = item.planejado_para or _parse_data(request.POST.get("data"))
     return _redirect_planner(request, dia)
 

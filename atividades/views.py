@@ -401,6 +401,11 @@ def mudar_status(request, pk: int):
                 "status": item.status,
                 "label": item.get_status_display(),
                 "cronometro_ativo": item.cronometro_ativo,
+                "segundos": item.tempo_atual_segundos(),
+                "acumulado": int(item.tempo_acumulado_segundos or 0),
+                "inicio": item.cronometro_inicio.isoformat()
+                if item.cronometro_inicio
+                else "",
                 "texto": formatar_tempo(item.tempo_atual_segundos()),
             }
         )
