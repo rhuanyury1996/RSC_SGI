@@ -182,6 +182,40 @@ def agrupar_por_prioridade(itens: QuerySet[AtividadeDiaria]) -> list[dict]:
     ]
 
 
+def montar_quadro(itens, agrupamento: str, membros: list[Funcionario]) -> list[dict]:
+    """Colunas de status, com faixas opcionais por pessoa ou prioridade."""
+    lista = list(itens)
+
+    def _faixa(ident, label, blocos, pessoa=None):
+        colunas = agrupar_por_status(blocos)
+        return {
+            "id": ident,
+            "label": label,
+            "pessoa": pessoa,
+            "count": len(list(blocos) if not isinstance(blocos, list) else blocos),
+            "colunas": colunas,
+        }
+
+    if agrupamento == "pessoa":
+        faixas = []
+        for grupo in agrupar_por_pessoa(lista, membros):
+            faixas.append(
+                _faixa(
+                    grupo["status"],
+                    grupo["label"],
+                    grupo["itens"],
+                    pessoa=grupo.get("pessoa"),
+                )
+            )
+        return faixas
+    if agrupamento == "prioridade":
+        return [
+            _faixa(grupo["status"], grupo["label"], grupo["itens"])
+            for grupo in agrupar_por_prioridade(lista)
+        ]
+    return [_faixa("status", "", lista)]
+
+
 def agrupar_por_pessoa(
     itens: QuerySet[AtividadeDiaria] | list[AtividadeDiaria],
     membros: list[Funcionario],
@@ -864,10 +898,11 @@ def semana_habitos(funcionario: Funcionario, dia: date) -> dict:
     }
     cols = []
     for d in dias:
+        letras = "STQQSSD"
         cols.append(
             {
                 "data": d,
-                "label": d.strftime("%a")[:1].upper(),
+                "label": letras[d.weekday()],
                 "eh_hoje": d == dia,
             }
         )
@@ -924,7 +959,7 @@ def resumo_agua_habitos_semana(funcionario: Funcionario, dia: date | None = None
             dias_feito.append(
                 {
                     "data": d,
-                    "label": d.strftime("%a")[:1].upper(),
+                    "label": "STQQSSD"[d.weekday()],
                     "feito": ok,
                     "eh_hoje": d == dia,
                 }
@@ -1013,6 +1048,14 @@ def agenda_por_hora(
             continue
         h = item.hora_inicio.hour
         if inicio <= h <= fim:
+            minutos = 60
+            if item.hora_fim:
+                minutos = (
+                    item.hora_fim.hour * 60
+                    + item.hora_fim.minute
+                    - (item.hora_inicio.hour * 60 + item.hora_inicio.minute)
+                )
+                minutos = max(30, minutos)
             buckets[h].append(
                 {
                     "titulo": item.titulo,
@@ -1022,6 +1065,12 @@ def agenda_por_hora(
                     "tipo": "atividade",
                     "tipo_label": "Tarefa",
                     "cor": "",
+                    "altura": max(32, int(minutos / 60 * 36)),
+                    "faixa": (
+                        f"{item.hora_inicio.strftime('%H:%M')}–{item.hora_fim.strftime('%H:%M')}"
+                        if item.hora_fim
+                        else item.hora_inicio.strftime("%H:%M")
+                    ),
                 }
             )
 
@@ -1039,6 +1088,13 @@ def agenda_por_hora(
             hora_ini = ini_local.time()
             hora_fim = fim_local.time() if fim_local.date() == ini_local.date() else None
         tipo = getattr(ev, "tipo", "") or "evento"
+        minutos = 60
+        if hora_fim and hora_ini:
+            minutos = max(
+                30,
+                (hora_fim.hour * 60 + hora_fim.minute)
+                - (hora_ini.hour * 60 + hora_ini.minute),
+            )
         buckets[h].append(
             {
                 "titulo": ev.titulo,
@@ -1050,6 +1106,12 @@ def agenda_por_hora(
                     ev.get_tipo_display() if hasattr(ev, "get_tipo_display") else tipo
                 ),
                 "cor": getattr(ev, "cor", "") or "",
+                "altura": max(32, int(minutos / 60 * 36)),
+                "faixa": (
+                    f"{hora_ini.strftime('%H:%M')}–{hora_fim.strftime('%H:%M')}"
+                    if hora_fim
+                    else hora_ini.strftime("%H:%M")
+                ),
             }
         )
 

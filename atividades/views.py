@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -41,6 +42,7 @@ from .services import (
     formatar_tempo,
     historico_planner,
     montar_arvore_atividades,
+    montar_quadro,
     registrar_evento,
     restaurar_atividade,
     resumo_visivel,
@@ -99,14 +101,36 @@ def lista(request):
         return redirect("home")
 
     pode_dirigir = pode_dirigir_atividades(funcionario)
-    organizacao = (request.GET.get("org") or "status").strip()
-    if organizacao not in ("status", "prioridade", "planner", "quadro"):
-        organizacao = "status"
+    organizacao = (request.GET.get("org") or "quadro").strip()
+    agrupar_implicito = ""
+    if organizacao == "status":
+        organizacao = "lista"
+    elif organizacao == "prioridade":
+        organizacao = "quadro"
+        agrupar_implicito = "prioridade"
+    if organizacao not in ("lista", "planner", "quadro"):
+        organizacao = "quadro"
     escopo = (request.GET.get("escopo") or "equipe").strip()
     if escopo not in ("minhas", "equipe"):
         escopo = "equipe"
     if request.GET.get("minhas") == "1":
         escopo = "minhas"
+    periodo = (request.GET.get("periodo") or "hoje").strip()
+    if periodo not in ("hoje", "semana", "abertas"):
+        periodo = "hoje"
+    texto = (request.GET.get("q") or "").strip()
+    pessoas_ids = []
+    for parte in (request.GET.get("pessoas") or "").split(","):
+        try:
+            pessoas_ids.append(int(parte))
+        except (TypeError, ValueError):
+            continue
+    empresa_id = None
+    if request.GET.get("empresa"):
+        try:
+            empresa_id = int(request.GET.get("empresa"))
+        except (TypeError, ValueError):
+            empresa_id = None
     dia = _parse_data(request.GET.get("data"))
     responsavel_id = None
     if escopo == "equipe" and request.GET.get("resp"):
@@ -149,9 +173,37 @@ def lista(request):
                 if aviso:
                     messages.warning(request, aviso)
                 messages.success(request, "Tarefa adicionada.")
+                if _quer_json(request):
+                    criada.filhos = []
+                    criada.tempo_fmt = formatar_tempo(0)
+                    criada.atrasada = False
+                    criada.atrasada_desde = None
+                    criada.pode_editar = True
+                    criada.sub_total = 0
+                    criada.sub_feitas = 0
+                    html = render_to_string(
+                        "atividades/_card_atividade.html",
+                        {
+                            "item": criada,
+                            "status_choices": StatusAtividade.choices,
+                            "eu": funcionario,
+                        },
+                        request=request,
+                    )
+                    return JsonResponse(
+                        {
+                            "ok": True,
+                            "pk": criada.pk,
+                            "status": criada.status,
+                            "html": html,
+                            "aviso": aviso,
+                        }
+                    )
             else:
                 erro = next(iter(form_rapida.errors.values()), ["Dados inválidos."])[0]
                 messages.error(request, erro)
+                if _quer_json(request):
+                    return JsonResponse({"ok": False, "erro": str(erro)}, status=400)
             return _redirect_lista(request)
 
         if acao == "criar":
@@ -195,24 +247,26 @@ def lista(request):
     else:
         form = AtividadeForm(ator=funcionario, initial={"planejado_para": dia})
 
+    dia_filtro = dia if periodo == "hoje" and organizacao == "lista" else (
+        timezone.localdate() if periodo == "hoje" else None
+    )
+    periodo_filtro = None if periodo == "hoje" else periodo
     itens = atividades_filtradas(
         funcionario,
         escopo=escopo,
         responsavel_id=responsavel_id,
-        dia=dia,
+        dia=dia_filtro,
         organizacao=organizacao,
+        pessoas_ids=pessoas_ids,
+        texto=texto,
+        empresa_id=empresa_id,
+        periodo=periodo_filtro,
     )
     equipe = list(funcionarios_para_equipe(funcionario))
-    agrupamento_pedido = (request.GET.get("agrupar") or "").strip()
-    if agrupamento_pedido == "pessoa":
-        grupos = agrupar_por_pessoa(itens, equipe)
-        agrupamento = "pessoa"
-    elif organizacao == "prioridade" or agrupamento_pedido == "prioridade":
-        grupos = agrupar_por_prioridade(itens)
-        agrupamento = "prioridade"
-    else:
-        grupos = agrupar_por_status(itens)
-        agrupamento = "status"
+    agrupamento_pedido = (request.GET.get("agrupar") or agrupar_implicito or "status").strip()
+    if agrupamento_pedido not in ("status", "pessoa", "prioridade"):
+        agrupamento_pedido = "status"
+    agrupamento = agrupamento_pedido
 
     hoje = timezone.localdate()
 
@@ -220,13 +274,35 @@ def lista(request):
         item.tempo_fmt = formatar_tempo(item.tempo_atual_segundos())
         item.atrasada_desde = item.data_atraso(hoje)
         item.atrasada = item.atrasada_desde is not None
-        for filho in getattr(item, "filhos", []) or []:
+        item.pode_editar = pode_gerenciar_atividade(funcionario, item)
+        filhos = list(getattr(item, "filhos", []) or [])
+        item.sub_total = len(filhos)
+        item.sub_feitas = sum(
+            1 for filho in filhos if filho.status == StatusAtividade.REALIZADO
+        )
+        for filho in filhos:
             _anotar(filho)
 
-    for g in grupos:
-        g["itens"] = montar_arvore_atividades(g["itens"])
-        for item in g["itens"]:
-            _anotar(item)
+    if organizacao == "quadro":
+        quadro = montar_quadro(itens, agrupamento, equipe)
+        grupos = []
+        for faixa in quadro:
+            for coluna in faixa["colunas"]:
+                coluna["itens"] = montar_arvore_atividades(coluna["itens"])
+                for item in coluna["itens"]:
+                    _anotar(item)
+    else:
+        quadro = []
+        if agrupamento == "pessoa":
+            grupos = agrupar_por_pessoa(itens, equipe)
+        elif agrupamento == "prioridade":
+            grupos = agrupar_por_prioridade(itens)
+        else:
+            grupos = agrupar_por_status(itens)
+        for g in grupos:
+            g["itens"] = montar_arvore_atividades(g["itens"])
+            for item in g["itens"]:
+                _anotar(item)
 
     return render(
         request,
@@ -235,11 +311,16 @@ def lista(request):
             "form": form,
             "form_rapida": AtividadeRapidaForm(ator=funcionario),
             "grupos": grupos,
+            "quadro": quadro,
             "resumo": resumo_visivel(
                 funcionario,
                 escopo=escopo,
                 responsavel_id=responsavel_id,
-                dia=dia,
+                dia=dia_filtro,
+                pessoas_ids=pessoas_ids,
+                texto=texto,
+                empresa_id=empresa_id,
+                periodo=periodo_filtro,
             ),
             "hoje": hoje,
             "dia": dia,
@@ -260,6 +341,11 @@ def lista(request):
             "eh_hoje": dia == hoje,
             "abrir_popup_tarefa": abrir_popup_tarefa,
             "desfazer_id": request.GET.get("desfazer") or "",
+            "periodo": periodo,
+            "texto": texto,
+            "pessoas_ids": pessoas_ids,
+            "empresa_id": empresa_id,
+            "querystring": request.GET.urlencode(),
         },
     )
 
@@ -320,8 +406,22 @@ def editar(request, pk: int):
         if aviso_hora:
             messages.warning(request, aviso_hora)
         messages.success(request, "Tarefa atualizada.")
+        if _quer_json(request):
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "pk": item.pk,
+                    "titulo": item.titulo,
+                    "status": item.status,
+                    "label": item.get_status_display(),
+                    "aviso": aviso_hora or getattr(form, "aviso", ""),
+                }
+            )
     else:
         messages.error(request, "Não foi possível atualizar a tarefa.")
+        if _quer_json(request):
+            erro = next(iter(form.errors.values()), ["Não foi possível atualizar a tarefa."])[0]
+            return JsonResponse({"ok": False, "erro": str(erro)}, status=400)
     return _redirect_lista(request)
 
 
@@ -504,3 +604,42 @@ def comentar(request, pk: int):
         )
     messages.success(request, "Comentário registrado.")
     return _redirect_lista(request)
+
+
+@login_required
+def detalhe(request, pk: int):
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return JsonResponse({"ok": False, "erro": "Sem perfil de funcionário."}, status=403)
+    item = _atividade_ativa(pk)
+    eventos = [
+        {
+            "id": ev.pk,
+            "tipo": ev.tipo,
+            "tipo_label": ev.get_tipo_display(),
+            "texto": ev.texto,
+            "autor": ev.autor.nome_completo if ev.autor_id else "Sistema",
+            "quando": timezone.localtime(ev.criado_em).strftime("%d/%m %H:%M"),
+        }
+        for ev in item.eventos.select_related("autor")
+    ]
+    subtarefas = []
+    for sub in item.subtarefas.filter(deletado_em__isnull=True).select_related("responsavel"):
+        subtarefas.append(
+            {
+                "id": sub.pk,
+                "titulo": sub.titulo,
+                "status": sub.status,
+                "responsavel": sub.responsavel.nome_completo if sub.responsavel_id else "",
+                "responsavel_id": sub.responsavel_id,
+                "pode_marcar": pode_alterar_status(funcionario, sub),
+            }
+        )
+    return JsonResponse(
+        {
+            "ok": True,
+            "pode_editar": pode_gerenciar_atividade(funcionario, item),
+            "eventos": eventos,
+            "subtarefas": subtarefas,
+        }
+    )

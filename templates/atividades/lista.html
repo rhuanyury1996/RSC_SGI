@@ -13,14 +13,28 @@
 <div class="cu-page" id="atividades-app"
      data-hoje="{{ hoje|date:'Y-m-d' }}">
 
+  <script>
+  (function () {
+    var key = "sgi-atividades-filtros";
+    try {
+      if (!location.search) {
+        var saved = localStorage.getItem(key);
+        if (saved) location.replace(location.pathname + "?" + saved);
+      } else {
+        localStorage.setItem(key, location.search.slice(1));
+      }
+    } catch (e) {}
+  })();
+  </script>
+
   <div class="cu-toolbar">
-    <div class="cu-views" role="tablist" aria-label="Organização">
-      <a class="cu-view {% if organizacao == 'status' %}active{% endif %}"
-         href="?org=status&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Lista</a>
-      <a class="cu-view {% if organizacao == 'prioridade' %}active{% endif %}"
-         href="?org=prioridade&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Prioridade</a>
-      <a class="cu-view {% if organizacao == 'planner' %}active{% endif %}"
-         href="?org=planner&escopo={{ escopo }}&data={{ dia|date:'Y-m-d' }}{% if responsavel_id %}&resp={{ responsavel_id }}{% endif %}">Planner</a>
+    <div class="cu-views" role="tablist" aria-label="Visão">
+      <a class="cu-view {% if organizacao == 'quadro' %}active{% endif %}"
+         href="?org=quadro&periodo={{ periodo }}&agrupar={{ agrupamento }}{% if texto %}&q={{ texto|urlencode }}{% endif %}{% if empresa_id %}&empresa={{ empresa_id }}{% endif %}{% if escopo == 'minhas' %}&minhas=1{% endif %}">Quadro</a>
+      <a class="cu-view {% if organizacao == 'lista' %}active{% endif %}"
+         href="?org=lista&periodo={{ periodo }}&agrupar={{ agrupamento }}&data={{ dia|date:'Y-m-d' }}{% if texto %}&q={{ texto|urlencode }}{% endif %}{% if escopo == 'minhas' %}&minhas=1{% endif %}">Lista</a>
+      <a class="cu-view"
+         href="?org=planner&data={{ dia|date:'Y-m-d' }}">Planner</a>
     </div>
 
     <div class="cu-toolbar-right">
@@ -60,21 +74,44 @@
     </div>
   </div>
 
-  <section class="cu-summary">
-    <div class="cu-metric"><span class="muted">Total</span><strong>{{ resumo.total }}</strong></div>
-    <div class="cu-metric"><span class="muted">Realizados</span><strong>{{ resumo.realizados }}</strong></div>
-    <div class="cu-metric"><span class="muted">Executando</span><strong>{{ resumo.executando }}</strong></div>
-    <div class="cu-metric"><span class="muted">Urgentes</span><strong>{{ resumo.urgentes }}</strong></div>
-    <div class="cu-metric cu-metric-pct">
-      <span class="muted">Progresso</span>
-      <strong>{{ resumo.percentual }}%</strong>
-      <span class="cu-bar"><i style="width:{{ resumo.percentual }}%"></i></span>
+  <form class="kb-filters" method="get" id="kbFilters">
+    <input type="hidden" name="org" value="{{ organizacao }}">
+    {% if organizacao == 'lista' %}<input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">{% endif %}
+    <input type="search" name="q" value="{{ texto }}" placeholder="Buscar tarefa" aria-label="Buscar tarefa">
+    <div class="kb-people" role="group" aria-label="Pessoas">
+      <a class="kb-mine{% if escopo == 'minhas' %} is-on{% endif %}" href="?org={{ organizacao }}&periodo={{ periodo }}&agrupar={{ agrupamento }}&minhas=1">Só minhas</a>
+      {% for f in equipe %}
+      <button type="button" class="kb-avatar{% if f.pk in pessoas_ids %} is-on{% endif %}" data-id="{{ f.pk }}" title="{{ f.nome_completo }}" aria-pressed="{% if f.pk in pessoas_ids %}true{% else %}false{% endif %}">
+        {{ f.nome|slice:":1" }}{{ f.sobrenome|slice:":1" }}
+      </button>
+      {% endfor %}
     </div>
+    <select name="empresa" aria-label="Empresa" onchange="this.form.submit()">
+      <option value="">Todas as empresas</option>
+      {% for cli in clientes_rsc %}
+      <option value="{{ cli.pk }}" {% if empresa_id == cli.pk %}selected{% endif %}>{{ cli.nome }}</option>
+      {% endfor %}
+    </select>
+    <div class="kb-period" role="group" aria-label="Período">
+      <a class="{% if periodo == 'hoje' %}is-on{% endif %}" href="?org={{ organizacao }}&periodo=hoje&agrupar={{ agrupamento }}{% if escopo == 'minhas' %}&minhas=1{% endif %}">Hoje</a>
+      <a class="{% if periodo == 'semana' %}is-on{% endif %}" href="?org={{ organizacao }}&periodo=semana&agrupar={{ agrupamento }}{% if escopo == 'minhas' %}&minhas=1{% endif %}">Esta semana</a>
+      <a class="{% if periodo == 'abertas' %}is-on{% endif %}" href="?org={{ organizacao }}&periodo=abertas&agrupar={{ agrupamento }}{% if escopo == 'minhas' %}&minhas=1{% endif %}">Todas em aberto</a>
+    </div>
+    <select name="agrupar" aria-label="Agrupamento" onchange="this.form.submit()">
+      <option value="status" {% if agrupamento == 'status' %}selected{% endif %}>Por status</option>
+      <option value="pessoa" {% if agrupamento == 'pessoa' %}selected{% endif %}>Por pessoa</option>
+      <option value="prioridade" {% if agrupamento == 'prioridade' %}selected{% endif %}>Por prioridade</option>
+    </select>
+  </form>
+
+  <section class="kb-summary" aria-label="Resumo">
+    <p>{{ resumo.total }} tarefa{{ resumo.total|pluralize }} · {{ resumo.atrasadas }} atrasada{{ resumo.atrasadas|pluralize }} · {{ resumo.urgentes }} urgente{{ resumo.urgentes|pluralize }} · {{ resumo.percentual }}% concluído</p>
+    <span class="cu-bar" aria-hidden="true"><i style="width:{{ resumo.percentual }}%"></i></span>
   </section>
 
-  {% if agrupamento == "pessoa" %}
-  <p class="muted cu-equipe-hint">Quadro da equipe por pessoa · {{ dia|date:"d/m/Y" }}. Filtre alguém no seletor para ver por status.</p>
-  {% endif %}
+  {% if organizacao == 'quadro' %}
+    {% include "atividades/_quadro.html" %}
+  {% else %}
 
   <div class="cu-board {% if agrupamento == 'pessoa' %}cu-board-pessoas{% endif %}">
     <div class="cu-cols-head">
@@ -151,6 +188,7 @@
     </details>
     {% endfor %}
   </div>
+  {% endif %}
 
   <dialog class="com-dialog" id="dialogTarefa" {% if abrir_popup_tarefa %}data-auto-open="1"{% endif %}>
     <form method="post" class="com-dialog-form empresa-form">

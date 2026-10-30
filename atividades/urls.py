@@ -4,6 +4,7 @@ from . import planner_views, views
 
 urlpatterns = [
     path("", views.lista, name="atividades"),
+    path("<int:pk>/", views.detalhe, name="atividade_detalhe"),
     path("<int:pk>/editar/", views.editar, name="atividade_editar"),
     path("<int:pk>/excluir/", views.excluir, name="atividade_excluir"),
     path("<int:pk>/restaurar/", views.restaurar, name="atividade_restaurar"),
