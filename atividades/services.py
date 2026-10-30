@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, timedelta
 
-from django.db.models import Case, Count, F, IntegerField, Q, QuerySet, When
+from django.db.models import Case, Count, F, IntegerField, Prefetch, Q, QuerySet, When
 from django.utils import timezone
 
 from funcionarios.models import Funcionario
@@ -15,13 +15,14 @@ from .models import (
     STATUS_ORDEM,
     AtividadeDiaria,
     DiaPlanner,
+    EventoAtividade,
     HabitoDia,
     MetaFoco,
     PrioridadeAtividade,
     QuadranteEisenhower,
     SessaoTempoAtividade,
     StatusAtividade,
-    quadrante_por_prioridade,
+    TipoEventoAtividade,
 )
 from .permissions import pode_dirigir_atividades
 
@@ -45,37 +46,92 @@ def _q_membro(funcionario_id: int) -> Q:
     )
 
 
+def q_aparece_no_dia(dia: date, hoje: date | None = None) -> Q:
+    """Tarefas do dia, mais as atrasadas em aberto quando o dia é hoje."""
+    hoje = hoje or timezone.localdate()
+    q = Q(planejado_para=dia) | Q(data_vencimento=dia)
+    if dia == hoje:
+        q = q | (
+            ~Q(status=StatusAtividade.REALIZADO)
+            & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje))
+        )
+    return q
+
+
 def queryset_visivel(
     ator: Funcionario,
     *,
-    escopo: str = "minhas",
+    escopo: str = "equipe",
     responsavel_id: int | None = None,
+    pessoas_ids: list[int] | None = None,
 ) -> QuerySet[AtividadeDiaria]:
+    """Leitura do time inteiro. 'minhas' e pessoas são filtros, não permissão."""
+    subtarefas = AtividadeDiaria.objects.filter(deletado_em__isnull=True).select_related(
+        "responsavel"
+    ).prefetch_related("participantes")
     qs = (
-        AtividadeDiaria.objects.select_related(
-            "responsavel", "criado_por", "cliente_rsc", "atividade_pai"
+        AtividadeDiaria.objects.ativas()
+        .select_related("responsavel", "criado_por", "cliente_rsc", "atividade_pai")
+        .prefetch_related(
+            "participantes",
+            Prefetch("subtarefas", queryset=subtarefas),
         )
-        .prefetch_related("participantes", "subtarefas__responsavel", "subtarefas__participantes")
     )
-    if escopo == "equipe" and pode_dirigir_atividades(ator):
-        if responsavel_id:
-            qs = qs.filter(_q_membro(responsavel_id)).distinct()
-        return qs
-    return qs.filter(_q_membro(ator.pk)).distinct()
+    if escopo == "minhas":
+        qs = qs.filter(_q_membro(ator.pk))
+    elif responsavel_id:
+        qs = qs.filter(_q_membro(responsavel_id))
+    if pessoas_ids:
+        q_pessoas = Q()
+        for pid in pessoas_ids:
+            q_pessoas |= _q_membro(pid)
+        qs = qs.filter(q_pessoas)
+    return qs.distinct()
 
 
 def atividades_filtradas(
     ator: Funcionario,
     *,
-    escopo: str = "minhas",
+    escopo: str = "equipe",
     responsavel_id: int | None = None,
     dia: date | None = None,
     organizacao: str = "status",
+    pessoas_ids: list[int] | None = None,
+    texto: str = "",
+    empresa_id: int | None = None,
+    periodo: str | None = None,
 ) -> QuerySet[AtividadeDiaria]:
-    qs = queryset_visivel(ator, escopo=escopo, responsavel_id=responsavel_id)
-    # Lista e Planner compartilham o mesmo recorte do dia
-    if dia is not None:
-        qs = qs.filter(Q(planejado_para=dia) | Q(data_vencimento=dia))
+    qs = queryset_visivel(
+        ator,
+        escopo=escopo,
+        responsavel_id=responsavel_id,
+        pessoas_ids=pessoas_ids,
+    )
+    hoje = timezone.localdate()
+    if periodo == "abertas":
+        qs = qs.filter(
+            ~Q(status=StatusAtividade.REALIZADO)
+            | Q(planejado_para=hoje)
+            | Q(data_vencimento=hoje)
+            | Q(concluida_em__date=hoje)
+        )
+    elif periodo == "semana":
+        inicio = hoje - timedelta(days=hoje.weekday())
+        fim = inicio + timedelta(days=6)
+        qs = qs.filter(
+            Q(planejado_para__range=(inicio, fim))
+            | Q(data_vencimento__range=(inicio, fim))
+            | (
+                ~Q(status=StatusAtividade.REALIZADO)
+                & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje))
+            )
+        )
+    elif dia is not None:
+        qs = qs.filter(q_aparece_no_dia(dia, hoje))
+    if texto:
+        qs = qs.filter(Q(titulo__icontains=texto) | Q(descricao__icontains=texto))
+    if empresa_id:
+        qs = qs.filter(cliente_rsc_id=empresa_id)
     # Subtarefas ficam aninhadas no pai (prefetch); evita linha duplicada na lista
     qs = qs.filter(atividade_pai__isnull=True)
     return qs.annotate(prio_rank=_prio_rank()).order_by(
@@ -218,6 +274,53 @@ def montar_arvore_atividades(itens) -> list:
     return raizes
 
 
+def registrar_evento(
+    atividade: AtividadeDiaria,
+    autor: Funcionario | None,
+    tipo: str,
+    *,
+    texto: str = "",
+    de_status: str = "",
+    para_status: str = "",
+) -> EventoAtividade:
+    return EventoAtividade.objects.create(
+        atividade=atividade,
+        autor=autor,
+        tipo=tipo,
+        texto=(texto or "").strip(),
+        de_status=de_status or "",
+        para_status=para_status or "",
+    )
+
+
+def aviso_sobreposicao(
+    responsavel: Funcionario | None,
+    dia: date | None,
+    inicio,
+    fim,
+    *,
+    ignorar_pk: int | None = None,
+) -> str:
+    """Aviso, sem bloquear, quando a mesma pessoa tem horários sobrepostos."""
+    if not responsavel or not dia or not inicio or not fim:
+        return ""
+    qs = AtividadeDiaria.objects.ativas().filter(
+        responsavel=responsavel,
+        planejado_para=dia,
+        hora_inicio__isnull=False,
+        hora_fim__isnull=False,
+    )
+    if ignorar_pk:
+        qs = qs.exclude(pk=ignorar_pk)
+    for outra in qs:
+        if inicio < outra.hora_fim and fim > outra.hora_inicio:
+            return (
+                f"{responsavel.nome_completo} já tem “{outra.titulo}” "
+                f"entre {outra.hora_inicio.strftime('%H:%M')} e {outra.hora_fim.strftime('%H:%M')}."
+            )
+    return ""
+
+
 def criar_atividade(
     ator: Funcionario,
     *,
@@ -227,6 +330,7 @@ def criar_atividade(
     atividade_pai: AtividadeDiaria | None = None,
     status: str = StatusAtividade.NAO_INICIADO,
     prioridade: str = PrioridadeAtividade.MEDIA,
+    quadrante: str | None = None,
     descricao: str = "",
     cliente_rsc=None,
     planejado_para: date | None = None,
@@ -244,6 +348,7 @@ def criar_atividade(
     # Novas tarefas ficam no topo do grupo (sem horário) ou na ordem do horário
     AtividadeDiaria.objects.filter(status=status).update(ordem=F("ordem") + 1)
     prio = prioridade or PrioridadeAtividade.MEDIA
+    quad = quadrante if quadrante in QuadranteEisenhower.values else QuadranteEisenhower.AGENDAR
     if isinstance(hora_inicio, str) and hora_inicio:
         hora_inicio = time_cls.fromisoformat(hora_inicio)
     if isinstance(hora_fim, str) and hora_fim:
@@ -261,7 +366,7 @@ def criar_atividade(
         cliente_rsc=cliente_rsc,
         status=status,
         prioridade=prio,
-        quadrante=quadrante_por_prioridade(prio),
+        quadrante=quad,
         ordem=0,
         planejado_para=dia,
         data_vencimento=data_vencimento,
@@ -272,6 +377,13 @@ def criar_atividade(
     item.save()
     if participantes is not None:
         definir_participantes(item, participantes)
+    registrar_evento(
+        item,
+        ator,
+        TipoEventoAtividade.CRIACAO,
+        texto="Criou a tarefa.",
+        para_status=item.status,
+    )
     return item
 
 
@@ -299,22 +411,83 @@ def atualizar_atividade(atividade: AtividadeDiaria, **campos) -> AtividadeDiaria
     return atividade
 
 
-def alterar_status(atividade: AtividadeDiaria, status: str) -> AtividadeDiaria:
+def alterar_status(
+    atividade: AtividadeDiaria,
+    status: str,
+    *,
+    autor: Funcionario | None = None,
+) -> AtividadeDiaria:
     if status not in StatusAtividade.values:
         return atividade
-    if status == StatusAtividade.REALIZADO and atividade.cronometro_inicio:
-        parar_cronometro(atividade)
+    anterior = atividade.status
+    if (
+        status in (StatusAtividade.REALIZADO, StatusAtividade.EM_REVISAO)
+        and atividade.cronometro_inicio
+    ):
+        parar_cronometro(atividade, ator=autor)
         atividade.refresh_from_db()
+    if anterior == status:
+        return atividade
     atividade.status = status
     atividade.sincronizar_conclusao()
     atividade.save(
         update_fields=["status", "concluida", "concluida_em", "atualizado_em"]
     )
+    registrar_evento(
+        atividade,
+        autor,
+        TipoEventoAtividade.STATUS,
+        texto=f"{StatusAtividade(anterior).label} → {StatusAtividade(status).label}",
+        de_status=anterior,
+        para_status=status,
+    )
     return atividade
 
 
-def excluir_atividade(atividade: AtividadeDiaria) -> None:
-    atividade.delete()
+def excluir_atividade(
+    atividade: AtividadeDiaria,
+    autor: Funcionario | None = None,
+) -> None:
+    if atividade.cronometro_inicio:
+        parar_cronometro(atividade, ator=autor)
+        atividade.refresh_from_db()
+    agora = timezone.now()
+    filhos = list(atividade.subtarefas.filter(deletado_em__isnull=True))
+    atividade.deletado_em = agora
+    atividade.deletado_por = autor
+    atividade.save(update_fields=["deletado_em", "deletado_por", "atualizado_em"])
+    for filho in filhos:
+        filho.deletado_em = agora
+        filho.deletado_por = autor
+        filho.save(update_fields=["deletado_em", "deletado_por", "atualizado_em"])
+    registrar_evento(
+        atividade,
+        autor,
+        TipoEventoAtividade.EXCLUSAO,
+        texto="Excluiu a tarefa.",
+    )
+
+
+def restaurar_atividade(
+    atividade: AtividadeDiaria,
+    autor: Funcionario | None = None,
+) -> AtividadeDiaria:
+    marco = atividade.deletado_em
+    atividade.deletado_em = None
+    atividade.deletado_por = None
+    atividade.save(update_fields=["deletado_em", "deletado_por", "atualizado_em"])
+    if marco is not None:
+        atividade.subtarefas.filter(deletado_em=marco).update(
+            deletado_em=None,
+            deletado_por=None,
+        )
+    registrar_evento(
+        atividade,
+        autor,
+        TipoEventoAtividade.RESTAURACAO,
+        texto="Desfez a exclusão.",
+    )
+    return atividade
 
 
 def _fechar_sessoes_abertas(
@@ -344,15 +517,16 @@ def _fechar_sessoes_abertas(
 
 
 def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
-    # Um cronômetro ativo por pessoa (em qualquer tarefa da equipe)
-    ativos = (
-        AtividadeDiaria.objects.filter(cronometro_inicio__isnull=False)
-        .filter(Q(responsavel=ator) | Q(participantes=ator))
-        .exclude(pk=atividade.pk)
-        .distinct()
+    if atividade.status == StatusAtividade.REALIZADO:
+        return atividade
+    # Um cronômetro por usuário: pausa só as sessões que esta pessoa abriu.
+    abertas = list(
+        SessaoTempoAtividade.objects.filter(funcionario=ator, fim__isnull=True)
+        .exclude(atividade_id=atividade.pk)
+        .select_related("atividade")
     )
-    for outro in ativos:
-        parar_cronometro(outro, ator=ator)
+    for sessao in abertas:
+        parar_cronometro(sessao.atividade, ator=ator)
 
     if atividade.cronometro_inicio:
         return atividade
@@ -464,32 +638,54 @@ def formatar_tempo(segundos: int) -> str:
     s = max(0, int(segundos or 0))
     h, rem = divmod(s, 3600)
     m, sec = divmod(rem, 60)
-    if h:
-        return f"{h:d}:{m:02d}:{sec:02d}"
-    return f"{m:02d}:{sec:02d}"
+    return f"{h:d}:{m:02d}:{sec:02d}"
 
 
 def resumo_visivel(
     ator: Funcionario,
     *,
-    escopo: str = "minhas",
+    escopo: str = "equipe",
     responsavel_id: int | None = None,
     dia: date | None = None,
+    pessoas_ids: list[int] | None = None,
+    texto: str = "",
+    empresa_id: int | None = None,
+    periodo: str | None = None,
 ) -> dict:
-    qs = queryset_visivel(ator, escopo=escopo, responsavel_id=responsavel_id)
-    # Mesmo recorte da lista (senão o Total fica maior que os grupos do dia)
-    if dia is not None:
-        qs = qs.filter(Q(planejado_para=dia) | Q(data_vencimento=dia))
+    hoje = timezone.localdate()
+    qs = atividades_filtradas(
+        ator,
+        escopo=escopo,
+        responsavel_id=responsavel_id,
+        dia=dia,
+        pessoas_ids=pessoas_ids,
+        texto=texto,
+        empresa_id=empresa_id,
+        periodo=periodo,
+    )
     agg = qs.aggregate(
-        total=Count("id"),
-        realizados=Count("id", filter=Q(status=StatusAtividade.REALIZADO)),
-        executando=Count("id", filter=Q(status=StatusAtividade.EXECUTANDO)),
+        total=Count("id", distinct=True),
+        realizados=Count(
+            "id",
+            filter=Q(status=StatusAtividade.REALIZADO),
+            distinct=True,
+        ),
+        executando=Count(
+            "id",
+            filter=Q(status=StatusAtividade.EXECUTANDO),
+            distinct=True,
+        ),
         urgentes=Count(
             "id",
-            filter=Q(
-                prioridade=PrioridadeAtividade.URGENTE,
-            )
+            filter=Q(prioridade=PrioridadeAtividade.URGENTE)
             & ~Q(status=StatusAtividade.REALIZADO),
+            distinct=True,
+        ),
+        atrasadas=Count(
+            "id",
+            filter=~Q(status=StatusAtividade.REALIZADO)
+            & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje)),
+            distinct=True,
         ),
     )
     total = agg["total"] or 0
@@ -499,6 +695,7 @@ def resumo_visivel(
         "realizados": feitos,
         "executando": agg["executando"] or 0,
         "urgentes": agg["urgentes"] or 0,
+        "atrasadas": agg["atrasadas"] or 0,
         "percentual": int(round((feitos / total) * 100)) if total else 0,
     }
 

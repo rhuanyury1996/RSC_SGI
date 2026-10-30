@@ -4,7 +4,13 @@ from django.utils import timezone
 from crm.models import ItemLista, TipoLista
 from funcionarios.models import Funcionario
 
-from .models import AtividadeDiaria, PrioridadeAtividade, StatusAtividade
+from .models import (
+    AtividadeDiaria,
+    PrioridadeAtividade,
+    QuadranteEisenhower,
+    StatusAtividade,
+    aviso_quadrante,
+)
 from .permissions import (
     funcionarios_atribuiveis,
     funcionarios_para_equipe,
@@ -16,6 +22,10 @@ def queryset_clientes_rsc():
     return ItemLista.objects.filter(
         tipo=TipoLista.CLIENTES_RSC, ativo=True
     ).order_by("ordem", "nome")
+
+
+def rotulo_empresa(obj) -> str:
+    return obj.nome
 
 
 class AtividadeForm(forms.ModelForm):
@@ -58,7 +68,8 @@ class AtividadeForm(forms.ModelForm):
         self.fields["descricao"].required = False
         self.fields["cliente_rsc"].required = False
         self.fields["cliente_rsc"].queryset = queryset_clientes_rsc()
-        self.fields["cliente_rsc"].empty_label = "RSC"
+        self.fields["cliente_rsc"].empty_label = "Sem empresa"
+        self.fields["cliente_rsc"].label_from_instance = rotulo_empresa
         self.fields["cliente_rsc"].label = "Empresa"
         self.fields["participantes"].required = False
         self.fields["participantes"].label = "Aparece também para"
@@ -81,17 +92,26 @@ class AtividadeForm(forms.ModelForm):
         self.fields["hora_inicio"].label = "Início"
         self.fields["hora_fim"].label = "Fim"
         if ator is not None:
-            self.fields["responsavel"].queryset = funcionarios_atribuiveis(ator)
+            atribuiveis = funcionarios_atribuiveis(ator)
+            if self.instance.pk and self.instance.responsavel_id:
+                self.fields["responsavel"].queryset = (
+                    atribuiveis
+                    | Funcionario.objects.filter(pk=self.instance.responsavel_id)
+                ).distinct()
+            else:
+                self.fields["responsavel"].queryset = atribuiveis
             self.fields["responsavel"].empty_label = "Selecione o responsável"
-            self.fields["participantes"].queryset = funcionarios_para_equipe(
-                ator
-            ).exclude(pk=ator.pk)
+            self.fields["participantes"].queryset = funcionarios_para_equipe(ator)
             if self.instance and self.instance.pk and self.instance.responsavel_id:
                 self.fields["participantes"].queryset = funcionarios_para_equipe(
                     ator
                 ).exclude(pk=self.instance.responsavel_id)
             if not pode_dirigir_atividades(ator):
-                self.fields["responsavel"].initial = ator.pk
+                self.fields["responsavel"].initial = (
+                    self.instance.responsavel_id
+                    if self.instance.pk and self.instance.responsavel_id
+                    else ator.pk
+                )
                 self.fields["responsavel"].widget = forms.HiddenInput()
             else:
                 self.fields["responsavel"].required = True
@@ -102,6 +122,7 @@ class AtividadeForm(forms.ModelForm):
             self.initial.setdefault("planejado_para", timezone.localdate())
             self.initial.setdefault("status", StatusAtividade.NAO_INICIADO)
             self.initial.setdefault("prioridade", PrioridadeAtividade.MEDIA)
+            self.initial.setdefault("quadrante", QuadranteEisenhower.AGENDAR)
             if ator is not None and not pode_dirigir_atividades(ator):
                 self.initial.setdefault("responsavel", ator.pk)
 
@@ -111,6 +132,23 @@ class AtividadeForm(forms.ModelForm):
         fim = cleaned.get("hora_fim")
         if inicio and fim and fim <= inicio:
             self.add_error("hora_fim", "O fim deve ser depois do início.")
+        planejado = cleaned.get("planejado_para")
+        vencimento = cleaned.get("data_vencimento")
+        if planejado and vencimento and vencimento < planejado:
+            self.add_error(
+                "data_vencimento",
+                "O vencimento não pode ser anterior à data planejada.",
+            )
+        responsavel = cleaned.get("responsavel")
+        participantes = cleaned.get("participantes")
+        if responsavel is not None and participantes is not None:
+            cleaned["participantes"] = [
+                p for p in participantes if getattr(p, "pk", p) != responsavel.pk
+            ]
+        self.aviso = aviso_quadrante(
+            cleaned.get("prioridade") or "",
+            cleaned.get("quadrante") or "",
+        )
         return cleaned
 
 
@@ -163,7 +201,7 @@ class AtividadeRapidaForm(forms.Form):
     cliente_rsc = forms.ModelChoiceField(
         queryset=ItemLista.objects.none(),
         required=False,
-        empty_label="RSC",
+        empty_label="Sem empresa",
         label="Empresa",
     )
 
@@ -171,6 +209,7 @@ class AtividadeRapidaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.ator = ator
         self.fields["cliente_rsc"].queryset = queryset_clientes_rsc()
+        self.fields["cliente_rsc"].label_from_instance = rotulo_empresa
         if status_padrao:
             self.fields["status"].initial = status_padrao
         if ator is not None:
@@ -191,4 +230,11 @@ class AtividadeRapidaForm(forms.Form):
         fim = cleaned.get("hora_fim")
         if inicio and fim and fim <= inicio:
             self.add_error("hora_fim", "O fim deve ser depois do início.")
+        planejado = cleaned.get("planejado_para")
+        vencimento = cleaned.get("data_vencimento")
+        if planejado and vencimento and vencimento < planejado:
+            self.add_error(
+                "data_vencimento",
+                "O vencimento não pode ser anterior à data planejada.",
+            )
         return cleaned

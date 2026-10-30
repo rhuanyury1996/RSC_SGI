@@ -44,6 +44,9 @@
       {% if item.data_vencimento %}
       <small class="{% if item.atrasada %}is-late{% endif %}">venc. {{ item.data_vencimento|date:"d/m" }}</small>
       {% endif %}
+      {% if item.atrasada %}
+      <small class="is-late">Atrasada desde {{ item.atrasada_desde|date:"d/m" }}</small>
+      {% endif %}
     </div>
   </div>
 

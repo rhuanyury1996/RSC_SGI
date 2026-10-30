@@ -27,14 +27,17 @@ def topbar(request):
     funcionario = obter_funcionario(request)
     if funcionario is not None:
         from atividades.models import AtividadeDiaria, StatusAtividade
-        from atividades.services import formatar_tempo, metricas_planner
+        from atividades.services import formatar_tempo, metricas_planner, q_aparece_no_dia
 
         from django.db.models import Q
 
         hoje = timezone.localdate()
         minhas = Q(responsavel=funcionario) | Q(participantes=funcionario)
         itens = list(
-            AtividadeDiaria.objects.filter(minhas, planejado_para=hoje)
+            AtividadeDiaria.objects.ativas()
+            .filter(minhas)
+            .filter(q_aparece_no_dia(hoje))
+            .filter(atividade_pai__isnull=True)
             .distinct()
             .order_by("ordem", "hora_inicio", "pk")
         )
@@ -50,7 +53,8 @@ def topbar(request):
         ativo = next((a for a in itens if a.cronometro_ativo), None)
         if ativo is None:
             ativo = (
-                AtividadeDiaria.objects.filter(
+                AtividadeDiaria.objects.ativas()
+                .filter(
                     minhas,
                     cronometro_inicio__isnull=False,
                 )
@@ -60,7 +64,7 @@ def topbar(request):
             )
 
         lista_href = (
-            f"{reverse('atividades')}?org=status&escopo=minhas&data={hoje.isoformat()}"
+            f"{reverse('atividades')}?org=status&data={hoje.isoformat()}"
         )
         if ativo is not None:
             segundos = ativo.tempo_atual_segundos()

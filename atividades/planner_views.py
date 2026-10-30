@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import F
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -21,7 +21,7 @@ from .models import (
     QuadranteEisenhower,
     StatusAtividade,
 )
-from .permissions import pode_dirigir_atividades
+from .permissions import pode_alterar_status, pode_dirigir_atividades, pode_gerenciar_atividade
 from .services import (
     adicionar_meta,
     agenda_por_hora,
@@ -36,6 +36,7 @@ from .services import (
     matriz_eisenhower,
     metricas_planner,
     obter_ou_criar_dia,
+    q_aparece_no_dia,
     semana_habitos,
 )
 
@@ -104,13 +105,19 @@ def planner(request, *, funcionario, dia):
     pode_dirigir = pode_dirigir_atividades(eu)
     dia_obj = obter_ou_criar_dia(alvo, dia)
     itens_qs = (
-        AtividadeDiaria.objects.filter(responsavel=alvo, planejado_para=dia)
-        .select_related("responsavel")
+        AtividadeDiaria.objects.ativas()
+        .filter(Q(responsavel=alvo) | Q(participantes=alvo))
+        .filter(q_aparece_no_dia(dia))
+        .filter(atividade_pai__isnull=True)
+        .select_related("responsavel", "cliente_rsc")
+        .distinct()
         .order_by(F("hora_inicio").asc(nulls_last=True), "ordem", "-criado_em")
     )
     itens = list(itens_qs)
     for item in itens:
         item.tempo_fmt = formatar_tempo(item.tempo_atual_segundos())
+        item.atrasada_desde = item.data_atraso()
+        item.atrasada = item.atrasada_desde is not None
 
     eventos = eventos_calendario_do_dia(alvo, dia)
     checklist = itens
@@ -228,13 +235,16 @@ def checklist_toggle(request, pk: int):
     eu, alvo, _ = _resolver_alvo(request)
     if eu is None:
         return redirect("home")
-    item = get_object_or_404(AtividadeDiaria, pk=pk, responsavel=alvo)
+    item = get_object_or_404(AtividadeDiaria.objects.ativas(), pk=pk)
+    if not pode_alterar_status(eu, item):
+        messages.error(request, "Sem permissão para alterar esta tarefa.")
+        return _redirect_planner(request, _parse_data(request.POST.get("data")))
     novo = (
         StatusAtividade.NAO_INICIADO
         if item.status == StatusAtividade.REALIZADO
         else StatusAtividade.REALIZADO
     )
-    alterar_status(item, novo)
+    alterar_status(item, novo, autor=eu)
     dia = item.planejado_para or timezone.localdate()
     return _redirect_planner(request, dia)
 
@@ -272,7 +282,10 @@ def mudar_quadrante(request, pk: int):
     eu, alvo, _ = _resolver_alvo(request)
     if eu is None:
         return redirect("home")
-    item = get_object_or_404(AtividadeDiaria, pk=pk, responsavel=alvo)
+    item = get_object_or_404(AtividadeDiaria.objects.ativas(), pk=pk)
+    if not pode_gerenciar_atividade(eu, item):
+        messages.error(request, "Sem permissão para alterar o quadrante.")
+        return _redirect_planner(request, _parse_data(request.POST.get("data")))
     ordem = [
         QuadranteEisenhower.FAZER,
         QuadranteEisenhower.AGENDAR,

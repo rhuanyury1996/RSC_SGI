@@ -85,6 +85,7 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
     from atividades.services import (
         formatar_tempo,
         metricas_planner,
+        q_aparece_no_dia,
         resumo_agua_habitos_semana,
     )
     from informativos.models import Informativo
@@ -95,10 +96,10 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
     nome = funcionario.nome or funcionario.nome_completo.split()[0]
 
     atividades = list(
-        AtividadeDiaria.objects.filter(
-            responsavel=funcionario,
-            planejado_para=hoje,
-        )
+        AtividadeDiaria.objects.ativas()
+        .filter(responsavel=funcionario)
+        .filter(q_aparece_no_dia(hoje))
+        .filter(atividade_pai__isnull=True)
         .select_related("responsavel")
         .order_by("ordem", "hora_inicio", "pk")
     )

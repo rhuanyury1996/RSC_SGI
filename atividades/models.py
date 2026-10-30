@@ -50,6 +50,20 @@ STATUS_COR = {
 }
 
 
+class AtividadeQuerySet(models.QuerySet):
+    def ativas(self):
+        return self.filter(deletado_em__isnull=True)
+
+
+class TipoEventoAtividade(models.TextChoices):
+    CRIACAO = "criacao", "Criação"
+    STATUS = "status", "Status"
+    COMENTARIO = "comentario", "Comentário"
+    EDICAO = "edicao", "Edição"
+    EXCLUSAO = "exclusao", "Exclusão"
+    RESTAURACAO = "restauracao", "Restauração"
+
+
 class AtividadeDiaria(models.Model):
     responsavel = models.ForeignKey(
         Funcionario,
@@ -91,7 +105,7 @@ class AtividadeDiaria(models.Model):
         blank=True,
         related_name="atividades",
         verbose_name="Empresa",
-        help_text="Em branco = RSC. Opções = Clientes RSC (ex.: DPR, OTILINE, CRITEQ).",
+        help_text="Em branco = sem empresa. Opções = clientes RSC (ex.: DPR, OTILINE, CRITEQ).",
         limit_choices_to={"tipo": "clientes_rsc", "ativo": True},
     )
     status = models.CharField(
@@ -136,8 +150,19 @@ class AtividadeDiaria(models.Model):
     )
     concluida = models.BooleanField("Concluída", default=False)
     concluida_em = models.DateTimeField("Concluída em", null=True, blank=True)
+    deletado_em = models.DateTimeField("Excluída em", null=True, blank=True, db_index=True)
+    deletado_por = models.ForeignKey(
+        Funcionario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades_excluidas",
+        verbose_name="Excluída por",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
+
+    objects = AtividadeQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Atividade"
@@ -178,7 +203,19 @@ class AtividadeDiaria(models.Model):
     def empresa_label(self) -> str:
         if self.cliente_rsc_id and self.cliente_rsc:
             return self.cliente_rsc.nome
-        return "RSC"
+        return "Sem empresa"
+
+    def data_atraso(self, hoje=None):
+        """Dia de origem quando a tarefa passou da data e ainda não foi realizada."""
+        hoje = hoje or timezone.localdate()
+        if self.status == StatusAtividade.REALIZADO:
+            return None
+        datas = []
+        if self.planejado_para and self.planejado_para < hoje:
+            datas.append(self.planejado_para)
+        if self.data_vencimento and self.data_vencimento < hoje:
+            datas.append(self.data_vencimento)
+        return min(datas) if datas else None
 
     @property
     def eh_trabalho_interno(self) -> bool:
@@ -245,13 +282,66 @@ class SessaoTempoAtividade(models.Model):
 
 
 def quadrante_por_prioridade(prioridade: str) -> str:
+    """Sugestão. O valor gravado é o escolhido no formulário, não este mapa."""
     mapa = {
         PrioridadeAtividade.URGENTE: QuadranteEisenhower.FAZER,
         PrioridadeAtividade.ALTA: QuadranteEisenhower.AGENDAR,
-        PrioridadeAtividade.MEDIA: QuadranteEisenhower.DELEGAR,
+        PrioridadeAtividade.MEDIA: QuadranteEisenhower.AGENDAR,
         PrioridadeAtividade.BAIXA: QuadranteEisenhower.ELIMINAR,
     }
     return mapa.get(prioridade, QuadranteEisenhower.AGENDAR)
+
+
+def aviso_quadrante(prioridade: str, quadrante: str) -> str:
+    """Aviso, sem bloquear, quando prioridade e quadrante se contradizem."""
+    if (
+        prioridade == PrioridadeAtividade.URGENTE
+        and quadrante == QuadranteEisenhower.ELIMINAR
+    ):
+        return "Urgente com Eliminar é contraditório. O quadrante escolhido foi mantido."
+    if (
+        prioridade == PrioridadeAtividade.BAIXA
+        and quadrante == QuadranteEisenhower.FAZER
+    ):
+        return "Prioridade baixa com Fazer primeiro é contraditório. O quadrante escolhido foi mantido."
+    return ""
+
+
+class EventoAtividade(models.Model):
+    """Histórico e comentários de uma tarefa."""
+
+    atividade = models.ForeignKey(
+        AtividadeDiaria,
+        on_delete=models.CASCADE,
+        related_name="eventos",
+        verbose_name="Atividade",
+    )
+    autor = models.ForeignKey(
+        Funcionario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="eventos_atividade",
+        verbose_name="Autor",
+    )
+    tipo = models.CharField(
+        "Tipo",
+        max_length=20,
+        choices=TipoEventoAtividade.choices,
+        default=TipoEventoAtividade.COMENTARIO,
+    )
+    texto = models.TextField("Texto", blank=True)
+    de_status = models.CharField("De", max_length=20, blank=True)
+    para_status = models.CharField("Para", max_length=20, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Evento da atividade"
+        verbose_name_plural = "Eventos da atividade"
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.get_tipo_display()} · {self.atividade_id}"
 
 
 class DiaPlanner(models.Model):

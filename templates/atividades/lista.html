@@ -23,14 +23,13 @@
     </div>
 
     <div class="cu-toolbar-right">
-      {% if pode_dirigir %}
       <div class="cu-escopo">
-        <a class="{% if escopo == 'minhas' %}active{% endif %}"
-           href="?org={{ organizacao }}&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Minhas</a>
         <a class="{% if escopo == 'equipe' %}active{% endif %}"
-           href="?org={{ organizacao }}&escopo=equipe&data={{ dia|date:'Y-m-d' }}">Equipe</a>
+           href="?org={{ organizacao }}&escopo=equipe&data={{ dia|date:'Y-m-d' }}">Time</a>
+        <a class="{% if escopo == 'minhas' %}active{% endif %}"
+           href="?org={{ organizacao }}&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Só minhas</a>
       </div>
-      {% if escopo == 'equipe' %}
+      {% if pode_dirigir and escopo == 'equipe' %}
       <form method="get" class="cu-resp-form">
         <input type="hidden" name="org" value="{{ organizacao }}">
         <input type="hidden" name="escopo" value="equipe">
@@ -42,7 +41,6 @@
           {% endfor %}
         </select>
       </form>
-      {% endif %}
       {% endif %}
 
       <div class="cu-nav">
@@ -115,7 +113,7 @@
         {% endif %}
         <input type="text" name="titulo" class="cu-quick-input" placeholder="+ Adicionar tarefa{% if grupo.kind == 'pessoa' %} para {{ grupo.label }}{% endif %}" autocomplete="off" required>
         <select name="cliente_rsc" class="cu-select-empresa" aria-label="Empresa" title="Empresa">
-          <option value="">RSC</option>
+          <option value="">Sem empresa</option>
           {% for cli in clientes_rsc %}
           <option value="{{ cli.pk }}">{{ cli.nome }}</option>
           {% endfor %}
@@ -314,7 +312,7 @@
         <div class="field">
           <label for="editCliente">Empresa</label>
           <select name="cliente_rsc" id="editCliente">
-            <option value="">RSC</option>
+            <option value="">Sem empresa</option>
             {% for cli in clientes_rsc %}
             <option value="{{ cli.pk }}">{{ cli.nome }}</option>
             {% endfor %}
@@ -351,9 +349,20 @@
         </div>
       </div>
       <div class="empresa-form-actions">
-        <button class="btn ghost" type="submit" formaction="" formmethod="post" id="btnExcluirTarefaDialog" onclick="return confirm('Remover esta tarefa?');">Excluir</button>
         <button class="btn" type="submit">Salvar</button>
       </div>
+    </form>
+    <form method="post" id="formExcluirTarefa" class="cu-delete-form" action="">
+      {% csrf_token %}
+      <input type="hidden" name="org" value="{{ organizacao }}">
+      <input type="hidden" name="escopo" value="{{ escopo }}">
+      <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+      <div class="cu-delete-confirm" id="confirmExcluir" hidden>
+        <p>Remover esta tarefa?</p>
+        <button type="button" class="btn secondary" id="btnCancelarExcluir">Cancelar</button>
+        <button class="btn ghost" type="submit">Excluir</button>
+      </div>
+      <button type="button" class="btn ghost" id="btnExcluirTarefaDialog">Excluir</button>
     </form>
   </dialog>
 
@@ -374,6 +383,19 @@
 
 </div>
 
+{% if desfazer_id %}
+<div class="sgi-toast" role="status">
+  <span>Tarefa removida.</span>
+  <form method="post" action="{% url 'atividade_restaurar' desfazer_id %}">
+    {% csrf_token %}
+    <input type="hidden" name="org" value="{{ organizacao }}">
+    <input type="hidden" name="escopo" value="{{ escopo }}">
+    <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
+    <button type="submit">Desfazer</button>
+  </form>
+</div>
+{% endif %}
+
 <script>
 (function () {
   var dialog = document.getElementById("dialogTarefa");
@@ -391,8 +413,11 @@
 
   var dialogEdit = document.getElementById("dialogEditarTarefa");
   var formEdit = document.getElementById("formEditarTarefa");
+  var formDelete = document.getElementById("formExcluirTarefa");
   var btnCloseEdit = document.getElementById("btnFecharEditarTarefa");
   var btnDeleteEdit = document.getElementById("btnExcluirTarefaDialog");
+  var confirmDelete = document.getElementById("confirmExcluir");
+  var btnCancelDelete = document.getElementById("btnCancelarExcluir");
   function setVal(id, value) {
     var el = document.getElementById(id);
     if (!el) return;
@@ -403,9 +428,11 @@
     if (!dialogEdit || !formEdit) return;
     formEdit.action = btn.getAttribute("data-edit-url") || "";
     subUrl = btn.getAttribute("data-sub-url") || "";
-    if (btnDeleteEdit) {
-      btnDeleteEdit.setAttribute("formaction", btn.getAttribute("data-delete-url") || "");
+    if (formDelete) {
+      formDelete.action = btn.getAttribute("data-delete-url") || "";
     }
+    if (confirmDelete) confirmDelete.hidden = true;
+    if (btnDeleteEdit) btnDeleteEdit.hidden = false;
     setVal("editTitulo", btn.getAttribute("data-titulo"));
     setVal("editStatus", btn.getAttribute("data-status"));
     setVal("editPrioridade", btn.getAttribute("data-prioridade"));
@@ -467,6 +494,35 @@
   });
   if (dialogEdit && btnCloseEdit) {
     btnCloseEdit.addEventListener("click", function () { dialogEdit.close(); });
+  }
+  if (btnDeleteEdit && confirmDelete) {
+    btnDeleteEdit.addEventListener("click", function () {
+      confirmDelete.hidden = false;
+      btnDeleteEdit.hidden = true;
+    });
+  }
+  if (btnCancelDelete && confirmDelete && btnDeleteEdit) {
+    btnCancelDelete.addEventListener("click", function () {
+      confirmDelete.hidden = true;
+      btnDeleteEdit.hidden = false;
+    });
+  }
+  function syncParticipantes(root, resp) {
+    if (!root) return;
+    root.querySelectorAll("input[name=participantes]").forEach(function (chk) {
+      var label = chk.closest("li") || chk.closest("label") || chk.parentElement;
+      var hide = String(chk.value) === String(resp || "");
+      if (label) label.style.display = hide ? "none" : "";
+      if (hide) chk.checked = false;
+    });
+  }
+  var createResp = document.getElementById("id_responsavel_manual");
+  var createBox = dialog ? dialog.querySelector(".cu-equipe-box") : null;
+  if (createResp) {
+    syncParticipantes(createBox || dialog, createResp.value);
+    createResp.addEventListener("change", function () {
+      syncParticipantes(createBox || dialog, createResp.value);
+    });
   }
   var btnAddSub = document.getElementById("btnAddSubtarefa");
   if (btnAddSub) {

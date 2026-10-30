@@ -170,6 +170,7 @@
                 </button>
               </form>
               <span class="pp-check-title">{{ item.titulo }}</span>
+              {% if item.atrasada %}<small class="is-late">Atrasada desde {{ item.atrasada_desde|date:"d/m" }}</small>{% endif %}
               {% if item.hora_inicio %}
               <small class="pp-check-hora">{{ item.hora_inicio|time:"H:i" }}{% if item.hora_fim %}–{{ item.hora_fim|time:"H:i" }}{% endif %}</small>
               {% endif %}
