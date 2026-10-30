@@ -23,7 +23,7 @@
         </a>
         <nav class="topbar-nav" aria-label="Atalhos">
           <a class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">Início</a>
-          <a class="{% if request.resolver_match.url_name == 'atividades' %}active{% endif %}" href="{% url 'atividades' %}?org=planner">Atividades</a>
+          <a class="{% if request.resolver_match.url_name == 'atividades' %}active{% endif %}" href="{% url 'atividades' %}">Atividades</a>
           <a class="{% if request.resolver_match.url_name == 'informativos' or request.resolver_match.url_name == 'informativo_detalhe' %}active{% endif %}" href="{% url 'informativos' %}">Informativos</a>
           <a class="{% if request.resolver_match.url_name == 'crm' %}active{% endif %}" href="{% url 'crm' %}">Comercial</a>
         </nav>
@@ -369,13 +369,28 @@
     var btn = document.getElementById("sidebar-toggle");
     if (layout && btn) {
       var key = "sgi-sidebar-collapsed";
+      var mobile = window.matchMedia("(max-width: 900px)");
       function apply(collapsed) {
+        if (mobile.matches) {
+          layout.classList.remove("sidebar-collapsed");
+          layout.classList.toggle("sidebar-open", !collapsed);
+          btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          return;
+        }
+        layout.classList.remove("sidebar-open");
         layout.classList.toggle("sidebar-collapsed", !!collapsed);
         btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
         try { localStorage.setItem(key, collapsed ? "1" : "0"); } catch (e) {}
       }
-      try { apply(localStorage.getItem(key) === "1"); } catch (e) { apply(false); }
+      if (mobile.matches) apply(true);
+      else {
+        try { apply(localStorage.getItem(key) === "1"); } catch (e) { apply(false); }
+      }
       btn.addEventListener("click", function () {
+        if (mobile.matches) {
+          apply(layout.classList.contains("sidebar-open"));
+          return;
+        }
         apply(!layout.classList.contains("sidebar-collapsed"));
       });
     }

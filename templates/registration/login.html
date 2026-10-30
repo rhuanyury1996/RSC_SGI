@@ -76,8 +76,11 @@
 </section>
 <script>
 (function () {
+  var user = document.getElementById("id_username");
+  if (user) user.setAttribute("autocomplete", "username");
   var btn = document.getElementById("togglePassword");
   var input = document.getElementById("id_password");
+  if (input) input.setAttribute("autocomplete", "current-password");
   if (!btn || !input) return;
   btn.addEventListener("click", function () {
     var show = input.type === "password";

@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}Planner · SGI RSC{% endblock %}
 {% block breadcrumb %}Atividades · Planner{% endblock %}
-{% block page_title %}Daily Productivity Planner{% endblock %}
+{% block page_title %}Planner do dia{% endblock %}
 {% block page_actions %}
   <span class="status-pill">{% if not eh_meu_planner %}{{ alvo.nome_completo }} · {% endif %}{{ dia|date:"l, d \d\e F Y" }}</span>
 {% endblock %}
@@ -13,8 +13,8 @@
   <header class="pp-top">
     <div class="pp-top-bar">
       <div class="cu-views" role="tablist" aria-label="Organização">
-        <a class="cu-view" href="?org=status&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Lista</a>
-        <a class="cu-view" href="?org=prioridade&escopo=minhas&data={{ dia|date:'Y-m-d' }}">Prioridade</a>
+        <a class="cu-view" href="?org=quadro&data={{ dia|date:'Y-m-d' }}">Quadro</a>
+        <a class="cu-view" href="?org=lista&data={{ dia|date:'Y-m-d' }}">Lista</a>
         <a class="cu-view active" href="?org=planner&data={{ dia|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">Planner</a>
       </div>
       <div class="cu-nav">
@@ -52,7 +52,7 @@
         <small>cronômetros do dia</small>
       </div>
       <div class="pp-time-card">
-        <span class="muted">Focus Score</span>
+        <span class="muted">Índice de foco</span>
         <strong>{{ metricas.focus_score }} <em>/ 10</em></strong>
       </div>
       <div class="pp-time-card">
@@ -103,10 +103,11 @@
           <div class="pp-hour-track">
             {% for b in slot.blocos %}
             <div class="pp-block {% if b.tipo != 'atividade' %}is-cal tipo-{{ b.tipo }}{% endif %}"
-                 {% if b.cor %}style="--ev:{{ b.cor }}"{% endif %}
-                 title="{{ b.tipo_label }}{% if b.inicio %} · {{ b.inicio|time:'H:i' }}{% endif %}{% if b.fim %}–{{ b.fim|time:'H:i' }}{% endif %}">
+                 style="min-height:{{ b.altura|default:32 }}px;{% if b.cor %}--ev:{{ b.cor }};{% endif %}"
+                 title="{{ b.tipo_label }}{% if b.faixa %} · {{ b.faixa }}{% endif %}">
               {% if b.tipo != 'atividade' %}<span class="pp-block-tag">{{ b.tipo_label }}</span>{% endif %}
-              {{ b.titulo }}{% if b.fim %} · {{ b.fim|time:"H:i" }}{% endif %}
+              {% if b.faixa %}<span class="pp-block-time">{{ b.faixa }}</span>{% endif %}
+              {{ b.titulo }}
             </div>
             {% endfor %}
           </div>
@@ -194,7 +195,7 @@
         </select>
         <input type="time" name="hora_inicio" aria-label="Início" title="Início">
         <input type="time" name="hora_fim" aria-label="Fim" title="Fim">
-        <button class="btn ghost" type="submit">Add</button>
+        <button class="btn ghost" type="submit">Adicionar</button>
       </form>
     </section>
 
@@ -219,7 +220,7 @@
           {% csrf_token %}
           <input type="hidden" name="data" value="{{ dia|date:'Y-m-d' }}">
           <input type="text" name="texto" placeholder="Nova meta de foco" required maxlength="200">
-          <button class="btn ghost" type="submit">Add</button>
+          <button class="btn ghost" type="submit">Adicionar</button>
         </form>
         {% endif %}
       </section>
