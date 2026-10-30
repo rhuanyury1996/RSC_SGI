@@ -200,6 +200,16 @@
     });
   });
 
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form || !form.classList || !form.classList.contains("cu-timer-form") || form.dataset.bound) return;
+    event.preventDefault();
+    var btn = form.querySelector(".cu-timer-btn");
+    post(form.action, {}).then(function (data) {
+      pintarTimer(btn, data);
+    }).catch(function (err) { toast(err.message || "Não foi possível usar o timer."); });
+  }, true);
+
   window.SGIAtividades = { post: post, fmt: fmt, toast: toast, pintarTimer: pintarTimer };
 
   document.querySelectorAll(".kb-avatar").forEach(function (btn) {

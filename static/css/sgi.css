@@ -5981,7 +5981,10 @@ button.lp-tab.active:focus-visible {
   grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 0.75rem;
   align-items: start;
+  overflow-x: auto;
+  max-width: 100%;
 }
+.cu-page { overflow-x: hidden; }
 .kb-col {
   background: #f8fafc;
   border: 1px solid var(--line);
