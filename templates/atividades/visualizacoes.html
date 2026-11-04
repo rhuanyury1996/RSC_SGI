@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Atividades · SGI RSC{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/atividades.css' %}">{% endblock %}
+{% block breadcrumb %}Atividades <span>/</span> Comercial{% endblock %}
+{% block page_title %}Atividades Comerciais{% endblock %}
+{% block page_actions %}
+  <div class="ca-members" id="caMembers" aria-label="Membros"></div>
+{% endblock %}
+
+{% block content %}
+<div class="ca" id="caApp">
+  <p class="ca-desc">Atividades pontuais da equipe comercial. Carteira: DPR/CRITEQ = Jordan · GEXCON = Denise · RSC = Leonardo · Hidryco = Rhuan.</p>
+
+  <section class="ca-resumo" id="caResumo" aria-label="Resumo"></section>
+
+  <nav class="ca-tabs" aria-label="Visualizações">
+    <a class="ca-tab" data-visao="lista" href="?org=lista">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Lista
+    </a>
+    <a class="ca-tab" data-visao="quadro" href="?org=quadro">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="11" rx="1.5"/></svg>Quadro
+    </a>
+    <a class="ca-tab" data-visao="gantt" href="?org=gantt">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h10M7 12h12M5 19h8"/></svg>Gantt
+    </a>
+    <a class="ca-tab" data-visao="mapa" href="?org=mapa">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="M6 6.5l3.5 3.5M18 6.5L14.5 10M6 17.5l3.5-3.5M18 17.5L14.5 14"/></svg>Mind Map
+    </a>
+    <a class="ca-tab ca-tab-planner" href="?org=planner">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Planner
+    </a>
+  </nav>
+
+  <div class="ca-toolbar">
+    <label class="ca-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="caBusca" placeholder="Buscar tarefas..." autocomplete="off" aria-label="Buscar tarefas">
+    </label>
+    <div class="ca-tools">
+      <button type="button" class="ca-chip" id="caAgrupar" data-so="lista gantt"></button>
+      <button type="button" class="ca-chip" id="caSubs" data-so="lista"></button>
+      <button type="button" class="ca-chip" id="caFechadas"></button>
+      <button type="button" class="ca-chip" id="caResp"></button>
+      <button type="button" class="ca-chip" id="caEu" aria-pressed="false">Eu</button>
+      <div class="ca-split">
+        <button type="button" class="ca-primary" id="caNova">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Tarefa
+        </button>
+        <button type="button" class="ca-primary ca-split-caret" id="caNovaMais" aria-label="Mais opções de criação">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ca-view" id="caView" aria-live="polite"></div>
+  <p class="ca-foot" id="caFoot"></p>
+</div>
+
+<div class="ca-backdrop" id="caBackdrop" hidden></div>
+<aside class="ca-drawer" id="caDrawer" hidden aria-label="Detalhe da tarefa"></aside>
+<div class="ca-menu" id="caMenu" hidden role="menu"></div>
+
+<dialog class="com-dialog" id="dialogTarefa" {% if abrir_popup_tarefa %}data-auto-open="1"{% endif %}>
+  <form method="post" class="com-dialog-form empresa-form">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="criar">
+    <input type="hidden" name="org" value="{{ organizacao }}">
+    <div class="com-dialog-head">
+      <span class="com-dialog-badge">Atividades</span>
+      <h3>Nova tarefa</h3>
+      <p class="com-dialog-sub">Preencha o essencial. O resto dá para ajustar depois no painel da tarefa.</p>
+      <button type="button" class="sgi-dialog-close" id="btnFecharTarefa" aria-label="Fechar"></button>
+    </div>
+    {{ form.non_field_errors }}
+    <div class="empresa-grid">
+      <div class="field span-2">
+        <label for="{{ form.titulo.id_for_label }}">Nome</label>
+        {{ form.titulo }}{{ form.titulo.errors }}
+      </div>
+      <div class="field">
+        <label for="id_responsavel_manual">Responsável principal</label>
+        {% if pode_dirigir %}
+        <select name="responsavel" id="id_responsavel_manual" required>
+          {% for f in equipe_opcoes %}
+          <option value="{{ f.pk }}" {% if form.responsavel.value|stringformat:"s" == f.pk|stringformat:"s" or not form.responsavel.value and f.pk == eu.pk %}selected{% endif %}>{{ f.nome_completo }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="hidden" name="responsavel" value="{{ eu.pk }}">
+        <span>{{ eu.nome_completo }}</span>
+        {% endif %}
+      </div>
+      <div class="field">
+        <label for="{{ form.cliente_rsc.id_for_label }}">Empresa</label>
+        {{ form.cliente_rsc }}{{ form.cliente_rsc.errors }}
+      </div>
+      <div class="field span-2">
+        <label>Outros responsáveis</label>
+        <div class="cu-equipe-box">{{ form.participantes }}</div>
+        {{ form.participantes.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.status.id_for_label }}">Status</label>
+        {{ form.status }}{{ form.status.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.prioridade.id_for_label }}">Prioridade</label>
+        {{ form.prioridade }}{{ form.prioridade.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.planejado_para.id_for_label }}">Dia no planner</label>
+        {{ form.planejado_para }}{{ form.planejado_para.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.data_vencimento.id_for_label }}">Data de entrega</label>
+        {{ form.data_vencimento }}{{ form.data_vencimento.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.hora_inicio.id_for_label }}">Início</label>
+        {{ form.hora_inicio }}{{ form.hora_inicio.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.hora_fim.id_for_label }}">Fim</label>
+        {{ form.hora_fim }}{{ form.hora_fim.errors }}
+      </div>
+      <div class="field span-2">
+        <label for="{{ form.quadrante.id_for_label }}">Eisenhower</label>
+        {{ form.quadrante }}{{ form.quadrante.errors }}
+      </div>
+      <div class="field span-2">
+        <label for="{{ form.descricao.id_for_label }}">Descrição</label>
+        {{ form.descricao }}{{ form.descricao.errors }}
+      </div>
+    </div>
+    <div class="empresa-form-actions">
+      <button class="btn" type="submit">Criar tarefa</button>
+    </div>
+  </form>
+</dialog>
+
+{{ dados|json_script:"ca-dados" }}
+<script src="{% static 'js/atividades.js' %}"></script>
+<script src="{% static 'js/atividades_views.js' %}"></script>
+{% endblock %}

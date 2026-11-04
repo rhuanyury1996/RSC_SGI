@@ -81,7 +81,12 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
         montar_dashboard,
         segundos_trabalhados,
     )
-    from atividades.models import AtividadeDiaria, PrioridadeAtividade, StatusAtividade
+    from atividades.models import (
+        STATUS_CONCLUIDOS,
+        AtividadeDiaria,
+        PrioridadeAtividade,
+        StatusAtividade,
+    )
     from atividades.services import (
         formatar_tempo,
         metricas_planner,
@@ -150,9 +155,9 @@ def _montar_contexto_dashboard(funcionario: Funcionario) -> dict:
         1
         for a in atividades
         if a.prioridade == PrioridadeAtividade.URGENTE
-        and a.status != StatusAtividade.REALIZADO
+        and a.status not in STATUS_CONCLUIDOS
     )
-    em_timer = next((a for a in atividades if a.cronometro_ativo), None)
+    em_timer = next((a for a in atividades if a.cronometro_ativo_para(funcionario)), None)
 
     inicio_periodo = limitar_ao_marco_zero(inicio_semana(hoje))
     marcacoes_periodo = list(

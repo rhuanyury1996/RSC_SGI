@@ -26,8 +26,8 @@ def topbar(request):
     timer = None
     funcionario = obter_funcionario(request)
     if funcionario is not None:
-        from atividades.models import AtividadeDiaria, StatusAtividade
-        from atividades.services import formatar_tempo, metricas_planner, q_aparece_no_dia
+        from atividades.models import AtividadeDiaria, SessaoTempoAtividade, StatusAtividade
+        from atividades.services import metricas_planner, q_aparece_no_dia, relogio_para
 
         from django.db.models import Q
 
@@ -50,35 +50,29 @@ def topbar(request):
             "focus_score": metricas["focus_score"],
         }
 
-        ativo = next((a for a in itens if a.cronometro_ativo), None)
+        ativo = next((a for a in itens if a.cronometro_ativo_para(funcionario)), None)
         if ativo is None:
-            ativo = (
-                AtividadeDiaria.objects.ativas()
-                .filter(
-                    minhas,
-                    cronometro_inicio__isnull=False,
+            minha_sessao = (
+                SessaoTempoAtividade.objects.filter(
+                    funcionario=funcionario,
+                    fim__isnull=True,
+                    atividade__deletado_em__isnull=True,
                 )
-                .distinct()
-                .order_by("-cronometro_inicio")
+                .select_related("atividade")
+                .order_by("-inicio")
                 .first()
             )
+            ativo = minha_sessao.atividade if minha_sessao else None
 
         lista_href = (
             f"{reverse('atividades')}?org=status&data={hoje.isoformat()}"
         )
         if ativo is not None:
-            segundos = ativo.tempo_atual_segundos()
-            acumulado = int(ativo.tempo_acumulado_segundos or 0)
             timer = {
                 "pk": ativo.pk,
                 "titulo": ativo.titulo,
+                **relogio_para(ativo, funcionario),
                 "ativo": True,
-                "segundos": segundos,
-                "acumulado": acumulado,
-                "texto": formatar_tempo(segundos),
-                "inicio": ativo.cronometro_inicio.isoformat()
-                if ativo.cronometro_inicio
-                else "",
                 "href": lista_href,
             }
         else:
@@ -96,14 +90,11 @@ def topbar(request):
                 None,
             )
             if sugestao is not None:
-                segundos = sugestao.tempo_atual_segundos()
                 timer = {
                     "pk": sugestao.pk,
                     "titulo": sugestao.titulo,
+                    **relogio_para(sugestao, funcionario),
                     "ativo": False,
-                    "segundos": segundos,
-                    "acumulado": int(sugestao.tempo_acumulado_segundos or 0),
-                    "texto": formatar_tempo(segundos),
                     "inicio": "",
                     "href": lista_href,
                 }

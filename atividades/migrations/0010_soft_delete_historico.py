@@ -28,6 +28,10 @@ def unificar_empresa_rsc(apps, schema_editor):
         dup.nome = f"RSC duplicado {dup.id}"[:150]
         dup.save(update_fields=["ativo", "nome"])
     Atividade.objects.filter(cliente_rsc__isnull=True).update(cliente_rsc_id=canon.id)
+    # Postgres: o UPDATE acima deixa gatilhos de FK pendentes, e o Django cria
+    # os índices adiados logo depois; sem isto: "pending trigger events".
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 class Migration(migrations.Migration):

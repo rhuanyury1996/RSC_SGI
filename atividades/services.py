@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import date, timedelta
 
-from django.db.models import Case, Count, F, IntegerField, Prefetch, Q, QuerySet, When
+from django.db.models import Case, F, IntegerField, Prefetch, Q, QuerySet, When
 from django.utils import timezone
 
 from funcionarios.models import Funcionario
@@ -12,7 +11,7 @@ from .models import (
     COPOS_AGUA_META,
     HABITOS_PADRAO,
     ML_POR_COPO,
-    STATUS_ORDEM,
+    STATUS_CONCLUIDOS,
     AtividadeDiaria,
     DiaPlanner,
     EventoAtividade,
@@ -32,7 +31,8 @@ def _prio_rank():
         When(prioridade=PrioridadeAtividade.URGENTE, then=0),
         When(prioridade=PrioridadeAtividade.ALTA, then=1),
         When(prioridade=PrioridadeAtividade.MEDIA, then=2),
-        default=3,
+        When(prioridade=PrioridadeAtividade.BAIXA, then=3),
+        default=4,
         output_field=IntegerField(),
     )
 
@@ -52,7 +52,7 @@ def q_aparece_no_dia(dia: date, hoje: date | None = None) -> Q:
     q = Q(planejado_para=dia) | Q(data_vencimento=dia)
     if dia == hoje:
         q = q | (
-            ~Q(status=StatusAtividade.REALIZADO)
+            ~Q(status__in=STATUS_CONCLUIDOS)
             & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje))
         )
     return q
@@ -66,14 +66,20 @@ def queryset_visivel(
     pessoas_ids: list[int] | None = None,
 ) -> QuerySet[AtividadeDiaria]:
     """Leitura do time inteiro. 'minhas' e pessoas são filtros, não permissão."""
+    sessoes = Prefetch(
+        "sessoes_tempo",
+        queryset=SessaoTempoAtividade.objects.order_by("inicio"),
+        to_attr="sessoes_pref",
+    )
     subtarefas = AtividadeDiaria.objects.filter(deletado_em__isnull=True).select_related(
         "responsavel"
-    ).prefetch_related("participantes")
+    ).prefetch_related("participantes", sessoes)
     qs = (
         AtividadeDiaria.objects.ativas()
         .select_related("responsavel", "criado_por", "cliente_rsc", "atividade_pai")
         .prefetch_related(
             "participantes",
+            sessoes,
             Prefetch("subtarefas", queryset=subtarefas),
         )
     )
@@ -89,180 +95,6 @@ def queryset_visivel(
     return qs.distinct()
 
 
-def atividades_filtradas(
-    ator: Funcionario,
-    *,
-    escopo: str = "equipe",
-    responsavel_id: int | None = None,
-    dia: date | None = None,
-    organizacao: str = "status",
-    pessoas_ids: list[int] | None = None,
-    texto: str = "",
-    empresa_id: int | None = None,
-    periodo: str | None = None,
-) -> QuerySet[AtividadeDiaria]:
-    qs = queryset_visivel(
-        ator,
-        escopo=escopo,
-        responsavel_id=responsavel_id,
-        pessoas_ids=pessoas_ids,
-    )
-    hoje = timezone.localdate()
-    if periodo == "abertas":
-        qs = qs.filter(
-            ~Q(status=StatusAtividade.REALIZADO)
-            | Q(planejado_para=hoje)
-            | Q(data_vencimento=hoje)
-            | Q(concluida_em__date=hoje)
-        )
-    elif periodo == "semana":
-        inicio = hoje - timedelta(days=hoje.weekday())
-        fim = inicio + timedelta(days=6)
-        qs = qs.filter(
-            Q(planejado_para__range=(inicio, fim))
-            | Q(data_vencimento__range=(inicio, fim))
-            | (
-                ~Q(status=StatusAtividade.REALIZADO)
-                & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje))
-            )
-        )
-    elif dia is not None:
-        qs = qs.filter(q_aparece_no_dia(dia, hoje))
-    if texto:
-        qs = qs.filter(Q(titulo__icontains=texto) | Q(descricao__icontains=texto))
-    if empresa_id:
-        qs = qs.filter(cliente_rsc_id=empresa_id)
-    # Subtarefas ficam aninhadas no pai (prefetch); evita linha duplicada na lista
-    qs = qs.filter(atividade_pai__isnull=True)
-    return qs.annotate(prio_rank=_prio_rank()).order_by(
-        F("hora_inicio").asc(nulls_last=True),
-        "ordem",
-        "prio_rank",
-        "-criado_em",
-        "-id",
-    )
-
-
-def agrupar_por_status(itens: QuerySet[AtividadeDiaria]) -> list[dict]:
-    buckets: dict[str, list] = defaultdict(list)
-    for item in itens:
-        buckets[item.status].append(item)
-    grupos = []
-    for status in STATUS_ORDEM:
-        grupos.append(
-            {
-                "status": status,
-                "label": StatusAtividade(status).label,
-                "itens": buckets.get(status, []),
-                "count": len(buckets.get(status, [])),
-            }
-        )
-    return grupos
-
-
-def agrupar_por_prioridade(itens: QuerySet[AtividadeDiaria]) -> list[dict]:
-    ordem = [
-        PrioridadeAtividade.URGENTE,
-        PrioridadeAtividade.ALTA,
-        PrioridadeAtividade.MEDIA,
-        PrioridadeAtividade.BAIXA,
-    ]
-    buckets: dict[str, list] = defaultdict(list)
-    for item in itens:
-        buckets[item.prioridade].append(item)
-    return [
-        {
-            "status": p,
-            "label": PrioridadeAtividade(p).label,
-            "itens": buckets.get(p, []),
-            "count": len(buckets.get(p, [])),
-            "kind": "prioridade",
-        }
-        for p in ordem
-    ]
-
-
-def montar_quadro(itens, agrupamento: str, membros: list[Funcionario]) -> list[dict]:
-    """Colunas de status, com faixas opcionais por pessoa ou prioridade."""
-    lista = list(itens)
-
-    def _faixa(ident, label, blocos, pessoa=None):
-        colunas = agrupar_por_status(blocos)
-        return {
-            "id": ident,
-            "label": label,
-            "pessoa": pessoa,
-            "count": len(list(blocos) if not isinstance(blocos, list) else blocos),
-            "colunas": colunas,
-        }
-
-    if agrupamento == "pessoa":
-        faixas = []
-        for grupo in agrupar_por_pessoa(lista, membros):
-            faixas.append(
-                _faixa(
-                    grupo["status"],
-                    grupo["label"],
-                    grupo["itens"],
-                    pessoa=grupo.get("pessoa"),
-                )
-            )
-        return faixas
-    if agrupamento == "prioridade":
-        return [
-            _faixa(grupo["status"], grupo["label"], grupo["itens"])
-            for grupo in agrupar_por_prioridade(lista)
-        ]
-    return [_faixa("status", "", lista)]
-
-
-def agrupar_por_pessoa(
-    itens: QuerySet[AtividadeDiaria] | list[AtividadeDiaria],
-    membros: list[Funcionario],
-) -> list[dict]:
-    """Quadro da equipe: seção por pessoa (inclui participação e subtarefas)."""
-    buckets: dict[int, list] = defaultdict(list)
-    responsaveis: dict[int, Funcionario] = {m.pk: m for m in membros}
-    for item in itens:
-        vistos: set[int] = set()
-        for membro in item.membros_equipe():
-            buckets[membro.pk].append(item)
-            responsaveis[membro.pk] = membro
-            vistos.add(membro.pk)
-        for sub in item.subtarefas.all():
-            for membro in sub.membros_equipe():
-                if membro.pk in vistos:
-                    continue
-                buckets[membro.pk].append(item)
-                responsaveis[membro.pk] = membro
-                vistos.add(membro.pk)
-
-    ordem_ids = [m.pk for m in membros]
-    for pk in buckets:
-        if pk not in ordem_ids:
-            ordem_ids.append(pk)
-
-    grupos = []
-    for pk in ordem_ids:
-        pessoa = responsaveis.get(pk)
-        if pessoa is None:
-            continue
-        lista = buckets.get(pk, [])
-        feitos = sum(1 for i in lista if i.status == StatusAtividade.REALIZADO)
-        grupos.append(
-            {
-                "status": f"pessoa_{pk}",
-                "label": pessoa.nome_completo,
-                "pessoa": pessoa,
-                "itens": lista,
-                "count": len(lista),
-                "realizados": feitos,
-                "kind": "pessoa",
-            }
-        )
-    return grupos
-
-
 def definir_participantes(
     atividade: AtividadeDiaria,
     participantes,
@@ -273,39 +105,6 @@ def definir_participantes(
         if pk and pk != atividade.responsavel_id:
             ids.append(pk)
     atividade.participantes.set(ids)
-
-
-def montar_arvore_atividades(itens) -> list:
-    """Raízes com .filhos anexados; subtarefas órfãs visíveis sobem como raiz."""
-    lista = list(itens)
-    by_id = {a.pk: a for a in lista}
-    for a in lista:
-        a.filhos = []
-    raizes = []
-    for a in lista:
-        if a.atividade_pai_id and a.atividade_pai_id in by_id:
-            by_id[a.atividade_pai_id].filhos.append(a)
-        else:
-            raizes.append(a)
-    from datetime import time as time_cls
-
-    # Anexa todas as subtarefas do prefetch (lista já exclui filhos no topo)
-    for a in raizes:
-        if hasattr(a, "_prefetched_objects_cache") and "subtarefas" in a._prefetched_objects_cache:
-            vistos = {f.pk for f in a.filhos}
-            for sub in a.subtarefas.all():
-                if sub.pk not in vistos:
-                    a.filhos.append(sub)
-                    vistos.add(sub.pk)
-        a.filhos.sort(
-            key=lambda s: (
-                s.hora_inicio is None,
-                s.hora_inicio or time_cls.min,
-                s.ordem,
-                s.pk,
-            )
-        )
-    return raizes
 
 
 def registrar_evento(
@@ -455,10 +254,16 @@ def alterar_status(
         return atividade
     anterior = atividade.status
     if (
-        status in (StatusAtividade.REALIZADO, StatusAtividade.EM_REVISAO)
+        status
+        in (
+            StatusAtividade.REALIZADO,
+            StatusAtividade.COMPLETE,
+            StatusAtividade.EM_REVISAO,
+            StatusAtividade.LIBERADO,
+        )
         and atividade.cronometro_inicio
     ):
-        parar_cronometro(atividade, ator=autor)
+        parar_cronometro(atividade, ator=None)
         atividade.refresh_from_db()
     if anterior == status:
         return atividade
@@ -483,7 +288,7 @@ def excluir_atividade(
     autor: Funcionario | None = None,
 ) -> None:
     if atividade.cronometro_inicio:
-        parar_cronometro(atividade, ator=autor)
+        parar_cronometro(atividade, ator=None)
         atividade.refresh_from_db()
     agora = timezone.now()
     filhos = list(atividade.subtarefas.filter(deletado_em__isnull=True))
@@ -524,24 +329,32 @@ def restaurar_atividade(
     return atividade
 
 
+def _sincronizar_inicio(atividade: AtividadeDiaria) -> None:
+    """cronometro_inicio = início da sessão aberta mais antiga (ou None)."""
+    abertas = SessaoTempoAtividade.objects.filter(
+        atividade=atividade, fim__isnull=True
+    ).order_by("inicio")
+    primeira = abertas.first()
+    atividade.cronometro_inicio = primeira.inicio if primeira else None
+
+
 def _fechar_sessoes_abertas(
     atividade: AtividadeDiaria,
     *,
     ator: Funcionario | None = None,
     fim=None,
 ) -> int:
-    """Fecha sessões abertas e devolve segundos creditados nesta parada."""
+    """Fecha as sessões abertas de `ator` (ou de todos, se None) nesta tarefa.
+
+    Devolve os segundos creditados. Nunca fecha a sessão de outra pessoa
+    quando `ator` é informado.
+    """
     agora = fim or timezone.now()
     qs = SessaoTempoAtividade.objects.filter(atividade=atividade, fim__isnull=True)
     if ator is not None:
-        preferida = qs.filter(funcionario=ator).order_by("-inicio").first()
-        abertas = [preferida] if preferida else list(qs.order_by("-inicio")[:1])
-    else:
-        abertas = list(qs.order_by("inicio"))
+        qs = qs.filter(funcionario=ator)
     total = 0
-    for sessao in abertas:
-        if sessao is None:
-            continue
+    for sessao in qs:
         decorrido = max(0, int((agora - sessao.inicio).total_seconds()))
         sessao.fim = agora
         sessao.segundos = decorrido
@@ -550,27 +363,43 @@ def _fechar_sessoes_abertas(
     return total
 
 
+def _tem_sessao_aberta(atividade: AtividadeDiaria, ator: Funcionario | None = None) -> bool:
+    qs = SessaoTempoAtividade.objects.filter(atividade=atividade, fim__isnull=True)
+    if ator is not None:
+        qs = qs.filter(funcionario=ator)
+    return qs.exists()
+
+
 def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
-    if atividade.status == StatusAtividade.REALIZADO:
+    """Inicia o cronômetro da pessoa nesta tarefa (outras pessoas seguem o delas)."""
+    if atividade.status in STATUS_CONCLUIDOS:
         return atividade
-    # Um cronômetro por usuário: pausa só as sessões que esta pessoa abriu.
-    abertas = list(
+    # Uma pessoa cronometra uma tarefa por vez: pausa as dela nas outras tarefas.
+    outras = list(
         SessaoTempoAtividade.objects.filter(funcionario=ator, fim__isnull=True)
         .exclude(atividade_id=atividade.pk)
         .select_related("atividade")
     )
-    for sessao in abertas:
+    for sessao in outras:
         parar_cronometro(sessao.atividade, ator=ator)
 
-    if atividade.cronometro_inicio:
+    if _tem_sessao_aberta(atividade, ator):
         return atividade
+    # Cronômetro antigo (sem sessão): encerra antes de abrir o por pessoa.
+    if atividade.cronometro_inicio and not _tem_sessao_aberta(atividade):
+        parar_cronometro(atividade, ator=None)
+        atividade.refresh_from_db()
 
-    if atividade.status == StatusAtividade.NAO_INICIADO:
+    if atividade.status in (StatusAtividade.NAO_INICIADO, StatusAtividade.ORGANIZANDO):
         atividade.status = StatusAtividade.EXECUTANDO
         atividade.sincronizar_conclusao()
 
-    agora = timezone.now()
-    atividade.cronometro_inicio = agora
+    SessaoTempoAtividade.objects.create(
+        atividade=atividade,
+        funcionario=ator,
+        inicio=timezone.now(),
+    )
+    _sincronizar_inicio(atividade)
     atividade.save(
         update_fields=[
             "cronometro_inicio",
@@ -580,11 +409,6 @@ def iniciar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> Ativida
             "atualizado_em",
         ]
     )
-    SessaoTempoAtividade.objects.create(
-        atividade=atividade,
-        funcionario=ator,
-        inicio=agora,
-    )
     return atividade
 
 
@@ -592,18 +416,16 @@ def parar_cronometro(
     atividade: AtividadeDiaria,
     ator: Funcionario | None = None,
 ) -> AtividadeDiaria:
-    if not atividade.cronometro_inicio:
-        _fechar_sessoes_abertas(atividade, ator=ator)
-        return atividade
+    """Para o cronômetro de `ator` nesta tarefa; com ator=None, para o de todos."""
     agora = timezone.now()
-    decorrido_sessao = _fechar_sessoes_abertas(atividade, ator=ator, fim=agora)
-    decorrido = decorrido_sessao or max(
-        0, int((agora - atividade.cronometro_inicio).total_seconds())
-    )
+    legado = atividade.cronometro_inicio is not None and not _tem_sessao_aberta(atividade)
+    decorrido = _fechar_sessoes_abertas(atividade, ator=ator, fim=agora)
+    if legado:
+        decorrido += max(0, int((agora - atividade.cronometro_inicio).total_seconds()))
     atividade.tempo_acumulado_segundos = (
         int(atividade.tempo_acumulado_segundos or 0) + decorrido
     )
-    atividade.cronometro_inicio = None
+    _sincronizar_inicio(atividade)
     atividade.save(
         update_fields=["tempo_acumulado_segundos", "cronometro_inicio", "atualizado_em"]
     )
@@ -611,8 +433,11 @@ def parar_cronometro(
 
 
 def alternar_cronometro(atividade: AtividadeDiaria, ator: Funcionario) -> AtividadeDiaria:
-    if atividade.cronometro_inicio:
+    """Liga/desliga só o cronômetro de quem clicou."""
+    if _tem_sessao_aberta(atividade, ator):
         return parar_cronometro(atividade, ator=ator)
+    if atividade.cronometro_inicio and not _tem_sessao_aberta(atividade):
+        return parar_cronometro(atividade, ator=None)
     return iniciar_cronometro(atividade, ator)
 
 
@@ -673,96 +498,6 @@ def formatar_tempo(segundos: int) -> str:
     h, rem = divmod(s, 3600)
     m, sec = divmod(rem, 60)
     return f"{h:d}:{m:02d}:{sec:02d}"
-
-
-def resumo_visivel(
-    ator: Funcionario,
-    *,
-    escopo: str = "equipe",
-    responsavel_id: int | None = None,
-    dia: date | None = None,
-    pessoas_ids: list[int] | None = None,
-    texto: str = "",
-    empresa_id: int | None = None,
-    periodo: str | None = None,
-) -> dict:
-    hoje = timezone.localdate()
-    qs = atividades_filtradas(
-        ator,
-        escopo=escopo,
-        responsavel_id=responsavel_id,
-        dia=dia,
-        pessoas_ids=pessoas_ids,
-        texto=texto,
-        empresa_id=empresa_id,
-        periodo=periodo,
-    )
-    agg = qs.aggregate(
-        total=Count("id", distinct=True),
-        realizados=Count(
-            "id",
-            filter=Q(status=StatusAtividade.REALIZADO),
-            distinct=True,
-        ),
-        executando=Count(
-            "id",
-            filter=Q(status=StatusAtividade.EXECUTANDO),
-            distinct=True,
-        ),
-        urgentes=Count(
-            "id",
-            filter=Q(prioridade=PrioridadeAtividade.URGENTE)
-            & ~Q(status=StatusAtividade.REALIZADO),
-            distinct=True,
-        ),
-        atrasadas=Count(
-            "id",
-            filter=~Q(status=StatusAtividade.REALIZADO)
-            & (Q(planejado_para__lt=hoje) | Q(data_vencimento__lt=hoje)),
-            distinct=True,
-        ),
-    )
-    total = agg["total"] or 0
-    feitos = agg["realizados"] or 0
-    return {
-        "total": total,
-        "realizados": feitos,
-        "executando": agg["executando"] or 0,
-        "urgentes": agg["urgentes"] or 0,
-        "atrasadas": agg["atrasadas"] or 0,
-        "percentual": int(round((feitos / total) * 100)) if total else 0,
-    }
-
-
-def historico_planner(ator: Funcionario, *, dias: int = 7) -> list[dict]:
-    hoje = timezone.localdate()
-    inicio = hoje - timedelta(days=dias - 1)
-    qs = queryset_visivel(ator, escopo="minhas").filter(
-        planejado_para__gte=inicio,
-        planejado_para__lte=hoje,
-    )
-    rows = (
-        qs.values("planejado_para")
-        .annotate(
-            total=Count("id"),
-            concluidas=Count("id", filter=Q(status=StatusAtividade.REALIZADO)),
-        )
-        .order_by("-planejado_para")
-    )
-    return [
-        {
-            "data": row["planejado_para"],
-            "total": row["total"],
-            "concluidas": row["concluidas"],
-            "percentual": (
-                int(round((row["concluidas"] / row["total"]) * 100))
-                if row["total"]
-                else 0
-            ),
-        }
-        for row in rows
-        if row["planejado_para"]
-    ]
 
 
 def obter_ou_criar_dia(funcionario: Funcionario, dia: date | None = None) -> DiaPlanner:
@@ -1129,3 +864,128 @@ def agenda_por_hora(
 
 def horas_timeline(inicio: int = 6, fim: int = 22) -> list[str]:
     return [f"{h:02d}:00" for h in range(inicio, fim + 1)]
+
+
+# ---------------------------------------------------------------------------
+# Visualizações (Lista, Quadro, Gantt, Mind Map): mesmos dados em JSON
+# ---------------------------------------------------------------------------
+
+
+def _iso(valor) -> str:
+    return valor.isoformat() if valor else ""
+
+
+def serializar_pessoa(f: Funcionario) -> dict:
+    return {
+        "id": f.pk,
+        "nome": f.nome_completo,
+        "iniciais": f"{(f.nome or '')[:1]}{(f.sobrenome or '')[:1]}".upper() or "?",
+        "ativo": bool(getattr(f, "ativo", True)),
+    }
+
+
+def serializar_atividade(
+    item: AtividadeDiaria,
+    ator: Funcionario,
+    *,
+    hoje: date | None = None,
+    com_subtarefas: bool = True,
+) -> dict:
+    hoje = hoje or timezone.localdate()
+    participantes = [
+        p.pk for p in item.participantes.all() if p.pk != item.responsavel_id
+    ]
+    # Mesmas regras de permissions.py, sem consulta extra por tarefa.
+    na_equipe = item.responsavel_id == ator.pk or ator.pk in participantes
+    pode_editar = na_equipe or pode_dirigir_atividades(ator)
+    pode_status = pode_editar or (bool(item.atividade_pai_id) and na_equipe)
+    dado = {
+        "id": item.pk,
+        "titulo": item.titulo,
+        "descricao": item.descricao or "",
+        "status": item.status,
+        "prioridade": item.prioridade,
+        "responsavel": item.responsavel_id,
+        "participantes": participantes,
+        "empresa": item.cliente_rsc_id,
+        "pai": item.atividade_pai_id,
+        "planejado": _iso(item.planejado_para),
+        "vencimento": _iso(item.data_vencimento),
+        "entrega": _iso(item.data_entrega),
+        "hora_inicio": item.hora_inicio.strftime("%H:%M") if item.hora_inicio else "",
+        "hora_fim": item.hora_fim.strftime("%H:%M") if item.hora_fim else "",
+        "quadrante": item.quadrante,
+        "ordem": item.ordem,
+        "atraso": _iso(item.data_atraso(hoje)),
+        "segundos": item.tempo_atual_segundos(),
+        # Base para o relógio ao vivo: total sem as sessões em andamento.
+        "acumulado": item.tempo_atual_segundos() - item.segundos_em_andamento(),
+        "rodando": [
+            {"id": sessao.funcionario_id, "inicio": sessao.inicio.isoformat()}
+            for sessao in item.sessoes_abertas()
+        ],
+        "timer_inicio": (
+            minha.inicio.isoformat()
+            if (minha := item.sessao_aberta_de(ator))
+            else ""
+        ),
+        "por_pessoa": {str(k): v for k, v in item.tempo_por_pessoa().items()},
+        "pode_editar": pode_editar,
+        "pode_status": pode_status,
+        "criado_em": item.criado_em.isoformat() if item.criado_em else "",
+    }
+    if com_subtarefas and not item.atividade_pai_id:
+        dado["subtarefas"] = [
+            serializar_atividade(sub, ator, hoje=hoje, com_subtarefas=False)
+            for sub in item.subtarefas.all()
+            if sub.deletado_em is None
+        ]
+    return dado
+
+
+def tarefas_para_visualizacoes(ator: Funcionario) -> list[dict]:
+    """Todas as tarefas raiz do time (subtarefas aninhadas), em ordem manual."""
+    hoje = timezone.localdate()
+    qs = (
+        queryset_visivel(ator, escopo="equipe")
+        .filter(atividade_pai__isnull=True)
+        .annotate(prio_rank=_prio_rank())
+        .order_by("ordem", "-criado_em", "-id")
+    )
+    return [serializar_atividade(item, ator, hoje=hoje) for item in qs]
+
+
+def reordenar_atividades(ids: list[int]) -> None:
+    """Grava a ordem manual (arrastar) de um grupo/coluna."""
+    for posicao, pk in enumerate(ids):
+        AtividadeDiaria.objects.filter(pk=pk).update(ordem=posicao)
+
+
+def relogio_para(item: AtividadeDiaria, funcionario: Funcionario | None) -> dict:
+    """Cronômetro da tarefa do ponto de vista de uma pessoa.
+
+    `ativo` diz se o cronômetro DESTA pessoa está rodando. `segundos` é o total
+    da tarefa (todos). `acumulado` + (agora - `inicio`) reproduz o total ao vivo
+    no navegador, avançando no ritmo da sessão desta pessoa.
+    """
+    minha = item.sessao_aberta_de(funcionario)
+    total = item.tempo_atual_segundos()
+    ativo = minha is not None or (
+        item._cronometro_legado() and item.faz_parte_da_equipe(funcionario)
+    )
+    if minha is not None:
+        inicio = minha.inicio
+    elif ativo:
+        inicio = item.cronometro_inicio
+    else:
+        inicio = None
+    decorrido = (
+        max(0, int((timezone.now() - inicio).total_seconds())) if inicio else 0
+    )
+    return {
+        "ativo": ativo,
+        "segundos": total,
+        "acumulado": max(0, total - decorrido),
+        "inicio": inicio.isoformat() if inicio else "",
+        "texto": formatar_tempo(total),
+    }

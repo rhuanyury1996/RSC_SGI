@@ -1,19 +1,20 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from funcionarios.models import Funcionario
 from funcionarios.utils import obter_funcionario
 
 from . import planner_views
 from .forms import AtividadeForm, AtividadeRapidaForm, queryset_clientes_rsc
 from .models import (
+    STATUS_CONCLUIDOS,
     AtividadeDiaria,
     PrioridadeAtividade,
     QuadranteEisenhower,
@@ -29,23 +30,21 @@ from .permissions import (
     funcionarios_para_equipe,
 )
 from .services import (
-    agrupar_por_pessoa,
-    agrupar_por_prioridade,
-    agrupar_por_status,
     alterar_status,
     alternar_cronometro,
     atualizar_atividade,
-    atividades_filtradas,
     aviso_sobreposicao,
     criar_atividade,
+    definir_participantes,
     excluir_atividade,
-    formatar_tempo,
-    historico_planner,
-    montar_arvore_atividades,
-    montar_quadro,
+    queryset_visivel,
     registrar_evento,
+    relogio_para,
+    reordenar_atividades,
     restaurar_atividade,
-    resumo_visivel,
+    serializar_atividade,
+    serializar_pessoa,
+    tarefas_para_visualizacoes,
 )
 
 
@@ -93,6 +92,57 @@ def _redirect_lista(request, **extra):
     return redirect(f"{base}?{qs}" if qs else base)
 
 
+VISOES = ("lista", "quadro", "gantt", "mapa")
+
+
+def _tarefa_json(item: AtividadeDiaria, funcionario) -> dict:
+    """Recarrega com os prefetches usados pelas visualizações."""
+    fresco = queryset_visivel(funcionario, escopo="equipe").filter(pk=item.pk).first()
+    return serializar_atividade(fresco or item, funcionario)
+
+
+def _criar_rapida(request, funcionario, dia):
+    form_rapida = AtividadeRapidaForm(request.POST, ator=funcionario)
+    if not form_rapida.is_valid():
+        erro = next(iter(form_rapida.errors.values()), ["Dados inválidos."])[0]
+        if _quer_json(request):
+            return JsonResponse({"ok": False, "erro": str(erro)}, status=400)
+        messages.error(request, erro)
+        return _redirect_lista(request)
+    dados = form_rapida.cleaned_data
+    vencimento = dados.get("data_vencimento")
+    planejado = dados.get("planejado_para") or dia
+    if vencimento and vencimento < planejado:
+        planejado = vencimento
+    criada = criar_atividade(
+        funcionario,
+        titulo=dados["titulo"],
+        responsavel=dados.get("responsavel"),
+        status=dados.get("status") or StatusAtividade.NAO_INICIADO,
+        prioridade=dados.get("prioridade") or PrioridadeAtividade.MEDIA,
+        cliente_rsc=dados.get("cliente_rsc"),
+        planejado_para=planejado,
+        data_vencimento=vencimento,
+        hora_inicio=dados.get("hora_inicio"),
+        hora_fim=dados.get("hora_fim"),
+    )
+    aviso = aviso_sobreposicao(
+        criada.responsavel,
+        criada.planejado_para,
+        criada.hora_inicio,
+        criada.hora_fim,
+        ignorar_pk=criada.pk,
+    )
+    if _quer_json(request):
+        return JsonResponse(
+            {"ok": True, "aviso": aviso, "tarefa": _tarefa_json(criada, funcionario)}
+        )
+    if aviso:
+        messages.warning(request, aviso)
+    messages.success(request, "Tarefa adicionada.")
+    return _redirect_lista(request)
+
+
 @login_required
 def lista(request):
     funcionario = obter_funcionario(request)
@@ -100,254 +150,241 @@ def lista(request):
         messages.error(request, "É necessário ter um perfil de funcionário vinculado.")
         return redirect("home")
 
-    pode_dirigir = pode_dirigir_atividades(funcionario)
-    organizacao = (request.GET.get("org") or "quadro").strip()
-    agrupar_implicito = ""
+    organizacao = (request.GET.get("org") or "lista").strip()
     if organizacao == "status":
         organizacao = "lista"
     elif organizacao == "prioridade":
         organizacao = "quadro"
-        agrupar_implicito = "prioridade"
-    if organizacao not in ("lista", "planner", "quadro"):
-        organizacao = "quadro"
-    escopo = (request.GET.get("escopo") or "equipe").strip()
-    if escopo not in ("minhas", "equipe"):
-        escopo = "equipe"
-    if request.GET.get("minhas") == "1":
-        escopo = "minhas"
-    periodo = (request.GET.get("periodo") or "hoje").strip()
-    if periodo not in ("hoje", "semana", "abertas"):
-        periodo = "hoje"
-    texto = (request.GET.get("q") or "").strip()
-    pessoas_ids = []
-    for parte in (request.GET.get("pessoas") or "").split(","):
-        try:
-            pessoas_ids.append(int(parte))
-        except (TypeError, ValueError):
-            continue
-    empresa_id = None
-    if request.GET.get("empresa"):
-        try:
-            empresa_id = int(request.GET.get("empresa"))
-        except (TypeError, ValueError):
-            empresa_id = None
+    if organizacao not in VISOES + ("planner",):
+        organizacao = "lista"
     dia = _parse_data(request.GET.get("data"))
-    responsavel_id = None
-    if escopo == "equipe" and request.GET.get("resp"):
-        try:
-            responsavel_id = int(request.GET.get("resp"))
-        except (TypeError, ValueError):
-            responsavel_id = None
 
     if organizacao == "planner" and request.method == "GET":
         return planner_views.planner(request, funcionario=funcionario, dia=dia)
 
     abrir_popup_tarefa = False
+    form = AtividadeForm(ator=funcionario, initial={"planejado_para": dia})
     if request.method == "POST":
         acao = request.POST.get("acao") or "criar"
         if acao == "criar_rapida":
-            form_rapida = AtividadeRapidaForm(request.POST, ator=funcionario)
-            if form_rapida.is_valid():
-                criada = criar_atividade(
-                    funcionario,
-                    titulo=form_rapida.cleaned_data["titulo"],
-                    responsavel=form_rapida.cleaned_data.get("responsavel"),
-                    status=form_rapida.cleaned_data.get("status")
-                    or StatusAtividade.NAO_INICIADO,
-                    prioridade=form_rapida.cleaned_data.get("prioridade")
-                    or PrioridadeAtividade.MEDIA,
-                    cliente_rsc=form_rapida.cleaned_data.get("cliente_rsc"),
-                    planejado_para=form_rapida.cleaned_data.get("planejado_para")
-                    or dia,
-                    data_vencimento=form_rapida.cleaned_data.get("data_vencimento"),
-                    hora_inicio=form_rapida.cleaned_data.get("hora_inicio"),
-                    hora_fim=form_rapida.cleaned_data.get("hora_fim"),
-                )
-                aviso = aviso_sobreposicao(
-                    criada.responsavel,
-                    criada.planejado_para,
-                    criada.hora_inicio,
-                    criada.hora_fim,
-                    ignorar_pk=criada.pk,
-                )
-                if aviso:
-                    messages.warning(request, aviso)
-                messages.success(request, "Tarefa adicionada.")
-                if _quer_json(request):
-                    criada.filhos = []
-                    criada.tempo_fmt = formatar_tempo(0)
-                    criada.atrasada = False
-                    criada.atrasada_desde = None
-                    criada.pode_editar = True
-                    criada.sub_total = 0
-                    criada.sub_feitas = 0
-                    html = render_to_string(
-                        "atividades/_card_atividade.html",
-                        {
-                            "item": criada,
-                            "status_choices": StatusAtividade.choices,
-                            "eu": funcionario,
-                        },
-                        request=request,
-                    )
-                    return JsonResponse(
-                        {
-                            "ok": True,
-                            "pk": criada.pk,
-                            "status": criada.status,
-                            "html": html,
-                            "aviso": aviso,
-                        }
-                    )
-            else:
-                erro = next(iter(form_rapida.errors.values()), ["Dados inválidos."])[0]
-                messages.error(request, erro)
-                if _quer_json(request):
-                    return JsonResponse({"ok": False, "erro": str(erro)}, status=400)
+            return _criar_rapida(request, funcionario, dia)
+        form = AtividadeForm(request.POST, ator=funcionario)
+        if form.is_valid():
+            criada = criar_atividade(
+                funcionario,
+                titulo=form.cleaned_data["titulo"],
+                responsavel=form.cleaned_data.get("responsavel"),
+                participantes=form.cleaned_data.get("participantes"),
+                status=form.cleaned_data.get("status") or StatusAtividade.NAO_INICIADO,
+                prioridade=form.cleaned_data.get("prioridade")
+                or PrioridadeAtividade.MEDIA,
+                quadrante=form.cleaned_data.get("quadrante")
+                or QuadranteEisenhower.AGENDAR,
+                descricao=form.cleaned_data.get("descricao") or "",
+                cliente_rsc=form.cleaned_data.get("cliente_rsc"),
+                planejado_para=form.cleaned_data.get("planejado_para") or dia,
+                data_vencimento=form.cleaned_data.get("data_vencimento"),
+                hora_inicio=form.cleaned_data.get("hora_inicio"),
+                hora_fim=form.cleaned_data.get("hora_fim"),
+            )
+            if getattr(form, "aviso", ""):
+                messages.warning(request, form.aviso)
+            aviso = aviso_sobreposicao(
+                criada.responsavel,
+                criada.planejado_para,
+                criada.hora_inicio,
+                criada.hora_fim,
+                ignorar_pk=criada.pk,
+            )
+            if aviso:
+                messages.warning(request, aviso)
+            messages.success(request, "Tarefa criada.")
             return _redirect_lista(request)
+        messages.error(request, "Revise os dados da tarefa.")
+        abrir_popup_tarefa = True
 
-        if acao == "criar":
-            form = AtividadeForm(request.POST, ator=funcionario)
-            if form.is_valid():
-                criada = criar_atividade(
-                    funcionario,
-                    titulo=form.cleaned_data["titulo"],
-                    responsavel=form.cleaned_data.get("responsavel"),
-                    participantes=form.cleaned_data.get("participantes"),
-                    status=form.cleaned_data.get("status")
-                    or StatusAtividade.NAO_INICIADO,
-                    prioridade=form.cleaned_data.get("prioridade")
-                    or PrioridadeAtividade.MEDIA,
-                    quadrante=form.cleaned_data.get("quadrante")
-                    or QuadranteEisenhower.AGENDAR,
-                    descricao=form.cleaned_data.get("descricao") or "",
-                    cliente_rsc=form.cleaned_data.get("cliente_rsc"),
-                    planejado_para=form.cleaned_data.get("planejado_para") or dia,
-                    data_vencimento=form.cleaned_data.get("data_vencimento"),
-                    hora_inicio=form.cleaned_data.get("hora_inicio"),
-                    hora_fim=form.cleaned_data.get("hora_fim"),
-                )
-                if getattr(form, "aviso", ""):
-                    messages.warning(request, form.aviso)
-                aviso = aviso_sobreposicao(
-                    criada.responsavel,
-                    criada.planejado_para,
-                    criada.hora_inicio,
-                    criada.hora_fim,
-                    ignorar_pk=criada.pk,
-                )
-                if aviso:
-                    messages.warning(request, aviso)
-                messages.success(request, "Tarefa criada.")
-                return _redirect_lista(request)
-            messages.error(request, "Revise os dados da tarefa.")
-            abrir_popup_tarefa = True
-        else:
-            form = AtividadeForm(ator=funcionario, initial={"planejado_para": dia})
-    else:
-        form = AtividadeForm(ator=funcionario, initial={"planejado_para": dia})
-
-    dia_filtro = dia if periodo == "hoje" and organizacao == "lista" else (
-        timezone.localdate() if periodo == "hoje" else None
-    )
-    periodo_filtro = None if periodo == "hoje" else periodo
-    itens = atividades_filtradas(
-        funcionario,
-        escopo=escopo,
-        responsavel_id=responsavel_id,
-        dia=dia_filtro,
-        organizacao=organizacao,
-        pessoas_ids=pessoas_ids,
-        texto=texto,
-        empresa_id=empresa_id,
-        periodo=periodo_filtro,
-    )
     equipe = list(funcionarios_para_equipe(funcionario))
-    agrupamento_pedido = (request.GET.get("agrupar") or agrupar_implicito or "status").strip()
-    if agrupamento_pedido not in ("status", "pessoa", "prioridade"):
-        agrupamento_pedido = "status"
-    agrupamento = agrupamento_pedido
+    tarefas = tarefas_para_visualizacoes(funcionario)
+    if request.GET.get("formato") == "json":
+        return JsonResponse({"ok": True, "tarefas": tarefas})
+    # Inclui quem saiu da equipe mas ainda aparece em alguma tarefa.
+    conhecidos = {f.pk for f in equipe}
+    faltando = set()
+    for t in tarefas:
+        for tarefa in [t] + t.get("subtarefas", []):
+            for pk in [tarefa["responsavel"]] + tarefa["participantes"]:
+                if pk and pk not in conhecidos:
+                    faltando.add(pk)
+    pessoas = [serializar_pessoa(f) for f in equipe]
+    if faltando:
+        pessoas += [
+            serializar_pessoa(f) for f in Funcionario.objects.filter(pk__in=faltando)
+        ]
 
     hoje = timezone.localdate()
-
-    def _anotar(item):
-        item.tempo_fmt = formatar_tempo(item.tempo_atual_segundos())
-        item.atrasada_desde = item.data_atraso(hoje)
-        item.atrasada = item.atrasada_desde is not None
-        item.pode_editar = pode_gerenciar_atividade(funcionario, item)
-        filhos = list(getattr(item, "filhos", []) or [])
-        item.sub_total = len(filhos)
-        item.sub_feitas = sum(
-            1 for filho in filhos if filho.status == StatusAtividade.REALIZADO
-        )
-        for filho in filhos:
-            _anotar(filho)
-
-    if organizacao == "quadro":
-        quadro = montar_quadro(itens, agrupamento, equipe)
-        grupos = []
-        for faixa in quadro:
-            for coluna in faixa["colunas"]:
-                coluna["itens"] = montar_arvore_atividades(coluna["itens"])
-                for item in coluna["itens"]:
-                    _anotar(item)
-    else:
-        quadro = []
-        if agrupamento == "pessoa":
-            grupos = agrupar_por_pessoa(itens, equipe)
-        elif agrupamento == "prioridade":
-            grupos = agrupar_por_prioridade(itens)
-        else:
-            grupos = agrupar_por_status(itens)
-        for g in grupos:
-            g["itens"] = montar_arvore_atividades(g["itens"])
-            for item in g["itens"]:
-                _anotar(item)
-
+    pode_dirigir = pode_dirigir_atividades(funcionario)
+    dados = {
+        "hoje": hoje.isoformat(),
+        "visao": organizacao,
+        "eu": funcionario.pk,
+        "pode_dirigir": pode_dirigir,
+        "tarefas": tarefas,
+        "pessoas": pessoas,
+        "empresas": [{"id": c.pk, "nome": c.nome} for c in queryset_clientes_rsc()],
+        "status": [{"valor": v, "label": l} for v, l in StatusAtividade.choices],
+        "prioridades": [
+            {"valor": v, "label": l} for v, l in PrioridadeAtividade.choices
+        ],
+        "urls": {
+            "criar": reverse("atividades"),
+            "reordenar": reverse("atividades_reordenar"),
+        },
+    }
     return render(
         request,
-        "atividades/lista.html",
+        "atividades/visualizacoes.html",
         {
             "form": form,
-            "form_rapida": AtividadeRapidaForm(ator=funcionario),
-            "grupos": grupos,
-            "quadro": quadro,
-            "resumo": resumo_visivel(
-                funcionario,
-                escopo=escopo,
-                responsavel_id=responsavel_id,
-                dia=dia_filtro,
-                pessoas_ids=pessoas_ids,
-                texto=texto,
-                empresa_id=empresa_id,
-                periodo=periodo_filtro,
-            ),
-            "hoje": hoje,
-            "dia": dia,
-            "dia_anterior": dia - timedelta(days=1),
-            "dia_seguinte": dia + timedelta(days=1),
+            "dados": dados,
             "organizacao": organizacao,
-            "agrupamento": agrupamento,
-            "escopo": escopo,
             "pode_dirigir": pode_dirigir,
             "eu": funcionario,
-            "equipe": equipe,
-            "responsavel_id": responsavel_id,
-            "historico": historico_planner(funcionario) if organizacao == "planner" else [],
-            "status_choices": StatusAtividade.choices,
-            "prioridade_choices": PrioridadeAtividade.choices,
-            "clientes_rsc": queryset_clientes_rsc(),
-            "equipe_opcoes": list(funcionarios_para_equipe(funcionario)),
-            "eh_hoje": dia == hoje,
+            "equipe_opcoes": equipe,
             "abrir_popup_tarefa": abrir_popup_tarefa,
-            "desfazer_id": request.GET.get("desfazer") or "",
-            "periodo": periodo,
-            "texto": texto,
-            "pessoas_ids": pessoas_ids,
-            "empresa_id": empresa_id,
-            "querystring": request.GET.urlencode(),
+            "dia": dia,
+            "hoje": hoje,
         },
     )
+
+
+@login_required
+@require_POST
+def atualizar_campos(request, pk: int):
+    """Edição de um ou mais campos (menus de status, prioridade, data, painel)."""
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return _negar(request, "Sem perfil de funcionário.")
+    item = get_object_or_404(
+        AtividadeDiaria.objects.ativas().prefetch_related("participantes"), pk=pk
+    )
+    if not pode_gerenciar_atividade(funcionario, item):
+        return _negar(request, "Sem permissão para editar esta tarefa.")
+
+    post = request.POST
+    alterados = []
+
+    def _data(nome):
+        valor = (post.get(nome) or "").strip()
+        if not valor:
+            return None
+        try:
+            return datetime.strptime(valor, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("Data inválida.") from exc
+
+    try:
+        if "titulo" in post:
+            titulo = (post.get("titulo") or "").strip()
+            if not titulo:
+                return _negar(request, "O nome da tarefa não pode ficar vazio.", 400)
+            item.titulo = titulo[:200]
+            alterados.append("titulo")
+        if "descricao" in post:
+            item.descricao = (post.get("descricao") or "").strip()
+            alterados.append("descricao")
+        if "prioridade" in post:
+            prio = post.get("prioridade") or PrioridadeAtividade.NENHUMA
+            if prio not in PrioridadeAtividade.values:
+                return _negar(request, "Prioridade inválida.", 400)
+            item.prioridade = prio
+            alterados.append("prioridade")
+        if "data_vencimento" in post:
+            item.data_vencimento = _data("data_vencimento")
+            alterados.append("data_vencimento")
+        if "planejado_para" in post:
+            item.planejado_para = _data("planejado_para")
+            alterados.append("planejado_para")
+    except ValueError as exc:
+        return _negar(request, str(exc), 400)
+    if "empresa" in post:
+        emp = (post.get("empresa") or "").strip()
+        if emp:
+            cliente = queryset_clientes_rsc().filter(pk=emp if emp.isdigit() else 0).first()
+            if cliente is None:
+                return _negar(request, "Empresa inválida.", 400)
+            item.cliente_rsc = cliente
+        else:
+            item.cliente_rsc = None
+        alterados.append("cliente_rsc")
+    if "responsavel" in post:
+        if not pode_dirigir_atividades(funcionario):
+            return _negar(request, "Só gestores trocam o responsável principal.")
+        resp_id = post.get("responsavel") or ""
+        novo = (
+            funcionarios_para_equipe(funcionario)
+            .filter(pk=resp_id if resp_id.isdigit() else 0)
+            .first()
+        )
+        if novo is None:
+            return _negar(request, "Responsável inválido.", 400)
+        item.responsavel = novo
+        alterados.append("responsavel")
+
+    rotulos = {
+        "titulo": "o nome",
+        "descricao": "a descrição",
+        "prioridade": "a prioridade",
+        "data_vencimento": "a data de entrega",
+        "planejado_para": "o dia planejado",
+        "cliente_rsc": "a empresa",
+        "responsavel": "o responsável",
+    }
+    if alterados:
+        item.save()
+        registrar_evento(
+            item,
+            funcionario,
+            TipoEventoAtividade.EDICAO,
+            texto="Atualizou " + ", ".join(rotulos[c] for c in alterados) + ".",
+        )
+    if post.get("participantes_enviados") == "1":
+        ids = [int(v) for v in post.getlist("participantes") if v.isdigit()]
+        validos = funcionarios_para_equipe(funcionario).filter(pk__in=ids)
+        definir_participantes(item, validos)
+    return JsonResponse({"ok": True, "tarefa": _tarefa_json(item, funcionario)})
+
+
+@login_required
+@require_POST
+def reordenar(request):
+    """Ordem manual após arrastar; muda o status quando a tarefa troca de grupo."""
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return _negar(request, "Sem perfil de funcionário.")
+    ids = [int(v) for v in request.POST.getlist("ids") if v.isdigit()]
+    movida_id = request.POST.get("movida") or ""
+    status = request.POST.get("status") or ""
+    resposta = {"ok": True}
+    if movida_id.isdigit() and status:
+        if status not in StatusAtividade.values:
+            return _negar(request, "Status inválido.", 400)
+        movida = _atividade_ativa(int(movida_id))
+        if not pode_alterar_status(funcionario, movida):
+            return _negar(request, "Sem permissão para mudar o status desta tarefa.")
+        alterar_status(movida, status, autor=funcionario)
+        movida.refresh_from_db()
+        resposta["tarefa"] = _tarefa_json(movida, funcionario)
+    # A ordem só vale para tarefas que a pessoa pode alterar.
+    permitidas = {
+        a.pk
+        for a in AtividadeDiaria.objects.ativas()
+        .filter(pk__in=ids)
+        .select_related("responsavel")
+        .prefetch_related("participantes")
+        if pode_alterar_status(funcionario, a)
+    }
+    reordenar_atividades([pk for pk in ids if pk in permitidas])
+    return JsonResponse(resposta)
 
 
 @login_required
@@ -435,6 +472,8 @@ def excluir(request, pk: int):
     if not pode_gerenciar_atividade(funcionario, item):
         return _negar(request, "Sem permissão para excluir esta tarefa.")
     excluir_atividade(item, funcionario)
+    if _quer_json(request):
+        return JsonResponse({"ok": True, "pk": item.pk})
     messages.success(request, "Tarefa removida.")
     return _redirect_lista(request, desfazer=item.pk)
 
@@ -449,6 +488,8 @@ def criar_subtarefa(request, pk: int):
         AtividadeDiaria.objects.ativas().prefetch_related("participantes"), pk=pk
     )
     if pai.eh_subtarefa:
+        if _quer_json(request):
+            return _negar(request, "Não é possível criar subtarefa de outra subtarefa.", 400)
         messages.error(request, "Não é possível criar subtarefa de outra subtarefa.")
         return _redirect_lista(request)
     if not pode_gerenciar_atividade(funcionario, pai):
@@ -456,6 +497,8 @@ def criar_subtarefa(request, pk: int):
 
     titulo = (request.POST.get("titulo") or "").strip()
     if not titulo:
+        if _quer_json(request):
+            return _negar(request, "Informe o título da subtarefa.", 400)
         messages.error(request, "Informe o título da subtarefa.")
         return _redirect_lista(request)
 
@@ -466,9 +509,9 @@ def criar_subtarefa(request, pk: int):
             (f for f in funcionarios_para_equipe(funcionario) if str(f.pk) == str(resp_id)),
             None,
         )
-    criar_atividade(
+    sub = criar_atividade(
         funcionario,
-        titulo=titulo,
+        titulo=titulo[:200],
         responsavel=responsavel or funcionario,
         atividade_pai=pai,
         status=StatusAtividade.NAO_INICIADO,
@@ -476,6 +519,8 @@ def criar_subtarefa(request, pk: int):
         cliente_rsc=pai.cliente_rsc,
         planejado_para=pai.planejado_para,
     )
+    if _quer_json(request):
+        return JsonResponse({"ok": True, "pai": _tarefa_json(pai, funcionario), "pk": sub.pk})
     messages.success(request, "Subtarefa criada.")
     return _redirect_lista(request)
 
@@ -494,19 +539,19 @@ def mudar_status(request, pk: int):
         return _negar(request, "Status inválido.", status=400)
     alterar_status(item, status, autor=funcionario)
     item.refresh_from_db()
+    relogio = relogio_para(item, funcionario)
     if _quer_json(request):
         return JsonResponse(
             {
                 "ok": True,
                 "status": item.status,
                 "label": item.get_status_display(),
-                "cronometro_ativo": item.cronometro_ativo,
-                "segundos": item.tempo_atual_segundos(),
-                "acumulado": int(item.tempo_acumulado_segundos or 0),
-                "inicio": item.cronometro_inicio.isoformat()
-                if item.cronometro_inicio
-                else "",
-                "texto": formatar_tempo(item.tempo_atual_segundos()),
+                "cronometro_ativo": relogio["ativo"],
+                "segundos": relogio["segundos"],
+                "acumulado": relogio["acumulado"],
+                "inicio": relogio["inicio"],
+                "texto": relogio["texto"],
+                "tarefa": _tarefa_json(item, funcionario),
             }
         )
     return _redirect_lista(request)
@@ -528,7 +573,7 @@ def cronometro(request, pk: int):
         return _negar(
             request, "Só quem faz parte da equipe da tarefa pode usar o cronômetro."
         )
-    if item.status == StatusAtividade.REALIZADO and not item.cronometro_inicio:
+    if item.status in STATUS_CONCLUIDOS and not item.cronometro_ativo_para(funcionario):
         return _negar(
             request,
             "Não é possível iniciar o timer de uma tarefa realizada.",
@@ -543,13 +588,8 @@ def cronometro(request, pk: int):
                 "ok": True,
                 "pk": item.pk,
                 "titulo": item.titulo,
-                "ativo": item.cronometro_ativo,
-                "segundos": item.tempo_atual_segundos(),
-                "acumulado": int(item.tempo_acumulado_segundos or 0),
-                "texto": formatar_tempo(item.tempo_atual_segundos()),
-                "inicio": item.cronometro_inicio.isoformat()
-                if item.cronometro_inicio
-                else None,
+                **relogio_para(item, funcionario),
+                "tarefa": _tarefa_json(item, funcionario),
             }
         )
     next_url = (request.POST.get("next") or "").strip()
@@ -635,11 +675,28 @@ def detalhe(request, pk: int):
                 "pode_marcar": pode_alterar_status(funcionario, sub),
             }
         )
+    por_pessoa: dict[int, dict] = {}
+    for sessao in item.sessoes_tempo.select_related("funcionario"):
+        linha = por_pessoa.setdefault(
+            sessao.funcionario_id,
+            {
+                "id": sessao.funcionario_id,
+                "nome": sessao.funcionario.nome_completo,
+                "segundos": 0,
+                "rodando": False,
+            },
+        )
+        linha["segundos"] += sessao.segundos_atuais()
+        if sessao.fim is None:
+            linha["rodando"] = True
     return JsonResponse(
         {
             "ok": True,
             "pode_editar": pode_gerenciar_atividade(funcionario, item),
             "eventos": eventos,
             "subtarefas": subtarefas,
+            "tempo_por_pessoa": sorted(
+                por_pessoa.values(), key=lambda p: -p["segundos"]
+            ),
         }
     )

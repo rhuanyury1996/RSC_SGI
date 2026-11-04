@@ -6,16 +6,36 @@ from funcionarios.models import Funcionario
 
 class StatusAtividade(models.TextChoices):
     NAO_INICIADO = "nao_iniciado", "Não iniciado"
+    ORGANIZANDO = "organizando", "Organizando"
     EXECUTANDO = "executando", "Executando"
     EM_REVISAO = "em_revisao", "Em revisão"
+    LIBERADO = "liberado", "Liberado"
     REALIZADO = "realizado", "Realizado"
+    COMPLETE = "complete", "Complete"
+
+
+# Fluxo na ordem em que aparece nas visualizações.
+STATUS_FLUXO = (
+    StatusAtividade.NAO_INICIADO,
+    StatusAtividade.ORGANIZANDO,
+    StatusAtividade.EXECUTANDO,
+    StatusAtividade.EM_REVISAO,
+    StatusAtividade.LIBERADO,
+    StatusAtividade.REALIZADO,
+    StatusAtividade.COMPLETE,
+)
+
+# "Concluído" continua visível; "fechado" fica oculto por padrão.
+STATUS_CONCLUIDOS = (StatusAtividade.REALIZADO, StatusAtividade.COMPLETE)
+STATUS_FECHADOS = (StatusAtividade.COMPLETE,)
 
 
 class PrioridadeAtividade(models.TextChoices):
-    BAIXA = "baixa", "Baixa"
-    MEDIA = "media", "Média"
-    ALTA = "alta", "Alta"
     URGENTE = "urgente", "Urgente"
+    ALTA = "alta", "Alta"
+    MEDIA = "media", "Normal"
+    BAIXA = "baixa", "Baixa"
+    NENHUMA = "nenhuma", "Sem prioridade"
 
 
 class QuadranteEisenhower(models.TextChoices):
@@ -34,20 +54,6 @@ HABITOS_PADRAO = (
     ("pausa_descansar", "Pausa para descansar"),
 )
 
-
-STATUS_ORDEM = (
-    StatusAtividade.REALIZADO,
-    StatusAtividade.EM_REVISAO,
-    StatusAtividade.EXECUTANDO,
-    StatusAtividade.NAO_INICIADO,
-)
-
-STATUS_COR = {
-    StatusAtividade.REALIZADO: "ok",
-    StatusAtividade.EM_REVISAO: "warn",
-    StatusAtividade.EXECUTANDO: "accent",
-    StatusAtividade.NAO_INICIADO: "orange",
-}
 
 
 class AtividadeQuerySet(models.QuerySet):
@@ -208,7 +214,7 @@ class AtividadeDiaria(models.Model):
     def data_atraso(self, hoje=None):
         """Dia de origem quando a tarefa passou da data e ainda não foi realizada."""
         hoje = hoje or timezone.localdate()
-        if self.status == StatusAtividade.REALIZADO:
+        if self.status in STATUS_CONCLUIDOS:
             return None
         datas = []
         if self.planejado_para and self.planejado_para < hoje:
@@ -218,23 +224,75 @@ class AtividadeDiaria(models.Model):
         return min(datas) if datas else None
 
     @property
+    def eh_concluida(self) -> bool:
+        return self.status in STATUS_CONCLUIDOS
+
+    @property
+    def data_entrega(self):
+        """Entrega: vencimento quando houver, senão o dia planejado."""
+        return self.data_vencimento or self.planejado_para
+
+    @property
     def eh_trabalho_interno(self) -> bool:
         return self.cliente_rsc_id is None
 
+    # Cronômetro por pessoa: cada membro abre a sua SessaoTempoAtividade e a
+    # tarefa soma todas. cronometro_inicio marca o início da sessão aberta mais
+    # antiga (ou None quando ninguém está cronometrando).
+
     @property
     def cronometro_ativo(self) -> bool:
+        """Alguém da equipe está cronometrando esta tarefa."""
         return self.cronometro_inicio is not None
 
+    def sessoes_lista(self) -> list:
+        pref = getattr(self, "sessoes_pref", None)
+        if pref is not None:
+            return pref
+        if not self.pk:
+            return []
+        return list(self.sessoes_tempo.all())
+
+    def sessoes_abertas(self) -> list:
+        return [s for s in self.sessoes_lista() if s.fim is None]
+
+    def _cronometro_legado(self) -> bool:
+        """Cronômetro iniciado antes das sessões por pessoa existirem."""
+        return self.cronometro_inicio is not None and not self.sessoes_abertas()
+
+    def sessao_aberta_de(self, funcionario):
+        if funcionario is None:
+            return None
+        return next(
+            (s for s in self.sessoes_abertas() if s.funcionario_id == funcionario.pk),
+            None,
+        )
+
+    def cronometro_ativo_para(self, funcionario) -> bool:
+        if self.sessao_aberta_de(funcionario) is not None:
+            return True
+        return self._cronometro_legado() and self.faz_parte_da_equipe(funcionario)
+
+    def segundos_em_andamento(self) -> int:
+        agora = timezone.now()
+        if self._cronometro_legado():
+            return max(0, int((agora - self.cronometro_inicio).total_seconds()))
+        return sum(
+            max(0, int((agora - s.inicio).total_seconds())) for s in self.sessoes_abertas()
+        )
+
     def tempo_atual_segundos(self) -> int:
-        total = int(self.tempo_acumulado_segundos or 0)
-        if self.cronometro_inicio:
-            total += max(
-                0, int((timezone.now() - self.cronometro_inicio).total_seconds())
-            )
-        return total
+        return int(self.tempo_acumulado_segundos or 0) + self.segundos_em_andamento()
+
+    def tempo_por_pessoa(self) -> dict:
+        """{funcionario_id: segundos}, incluindo sessões em andamento."""
+        out: dict[int, int] = {}
+        for s in self.sessoes_lista():
+            out[s.funcionario_id] = out.get(s.funcionario_id, 0) + s.segundos_atuais()
+        return out
 
     def sincronizar_conclusao(self) -> None:
-        if self.status == StatusAtividade.REALIZADO:
+        if self.status in STATUS_CONCLUIDOS:
             if not self.concluida:
                 self.concluida = True
                 self.concluida_em = self.concluida_em or timezone.now()
@@ -288,6 +346,7 @@ def quadrante_por_prioridade(prioridade: str) -> str:
         PrioridadeAtividade.ALTA: QuadranteEisenhower.AGENDAR,
         PrioridadeAtividade.MEDIA: QuadranteEisenhower.AGENDAR,
         PrioridadeAtividade.BAIXA: QuadranteEisenhower.ELIMINAR,
+        PrioridadeAtividade.NENHUMA: QuadranteEisenhower.AGENDAR,
     }
     return mapa.get(prioridade, QuadranteEisenhower.AGENDAR)
 

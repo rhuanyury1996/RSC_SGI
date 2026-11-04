@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/sgi.css' %}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="{% if user.is_authenticated %}app-shell{% endif %}">
 {% if user.is_authenticated %}
@@ -441,6 +442,20 @@
       }
     }
 
+    // Outras telas (ex.: Atividades) atualizam este cronômetro sem recarregar.
+    window.SGITopbarTimer = {
+      pk: function () { return timer.getAttribute("data-pk"); },
+      mostrar: function (pk, titulo, url, data) {
+        timer.setAttribute("data-pk", String(pk));
+        timer.setAttribute("data-url", url);
+        var t = timer.querySelector(".topbar-timer-title");
+        if (t) t.textContent = titulo;
+        if (form) form.setAttribute("action", url);
+        paint(data);
+      },
+      paint: paint,
+    };
+
     setInterval(tick, 1000);
     tick();
 
@@ -465,6 +480,7 @@
               return;
             }
             paint(data);
+            document.dispatchEvent(new CustomEvent("sgi:timer", { detail: data }));
           })
           .catch(function () { form.submit(); });
       });

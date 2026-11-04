@@ -13,8 +13,10 @@
   <header class="pp-top">
     <div class="pp-top-bar">
       <div class="cu-views" role="tablist" aria-label="Organização">
-        <a class="cu-view" href="?org=quadro&data={{ dia|date:'Y-m-d' }}">Quadro</a>
-        <a class="cu-view" href="?org=lista&data={{ dia|date:'Y-m-d' }}">Lista</a>
+        <a class="cu-view" href="?org=lista">Lista</a>
+        <a class="cu-view" href="?org=quadro">Quadro</a>
+        <a class="cu-view" href="?org=gantt">Gantt</a>
+        <a class="cu-view" href="?org=mapa">Mind Map</a>
         <a class="cu-view active" href="?org=planner&data={{ dia|date:'Y-m-d' }}{% if resp_id %}&resp={{ resp_id }}{% endif %}">Planner</a>
       </div>
       <div class="cu-nav">

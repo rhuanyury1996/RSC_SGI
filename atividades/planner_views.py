@@ -14,6 +14,7 @@ from funcionarios.utils import obter_funcionario
 
 from .models import (
     COPOS_AGUA_META,
+    STATUS_CONCLUIDOS,
     HABITOS_PADRAO,
     ML_POR_COPO,
     AtividadeDiaria,
@@ -261,7 +262,7 @@ def checklist_toggle(request, pk: int):
         return _redirect_planner(request, _parse_data(request.POST.get("data")))
     novo = (
         StatusAtividade.NAO_INICIADO
-        if item.status == StatusAtividade.REALIZADO
+        if item.status in STATUS_CONCLUIDOS
         else StatusAtividade.REALIZADO
     )
     alterar_status(item, novo, autor=eu)
@@ -272,7 +273,7 @@ def checklist_toggle(request, pk: int):
                 "ok": True,
                 "status": item.status,
                 "label": item.get_status_display(),
-                "concluida": item.status == StatusAtividade.REALIZADO,
+                "concluida": item.status in STATUS_CONCLUIDOS,
             }
         )
     dia = item.planejado_para or timezone.localdate()

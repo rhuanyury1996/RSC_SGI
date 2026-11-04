@@ -11,9 +11,10 @@ from .models import (
     AtividadeDiaria,
     PrioridadeAtividade,
     QuadranteEisenhower,
+    SessaoTempoAtividade,
     StatusAtividade,
 )
-from .services import criar_atividade, iniciar_cronometro
+from .services import alterar_status, criar_atividade, iniciar_cronometro, parar_cronometro
 
 
 class _Base(TestCase):
@@ -54,14 +55,21 @@ class CarryOverTests(_Base):
             planejado_para=self.ontem,
         )
         self.client.force_login(self.user)
-        resp = self.client.get(
-            reverse("atividades"),
-            {"data": self.hoje.isoformat()},
-        )
+        resp = self.client.get(reverse("atividades"), {"formato": "json"})
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Montar proposta AdecoAgro")
-        self.assertContains(resp, f"Atrasada desde {self.ontem.strftime('%d/%m')}")
-        self.assertNotContains(resp, feita.titulo)
+        por_titulo = {t["titulo"]: t for t in resp.json()["tarefas"]}
+        self.assertEqual(
+            por_titulo["Montar proposta AdecoAgro"]["atraso"], self.ontem.isoformat()
+        )
+        # Realizada continua visível nas visualizações, mas não conta como atraso.
+        self.assertEqual(por_titulo[feita.titulo]["atraso"], "")
+
+    def test_paginas_das_visualizacoes_carregam(self):
+        self.client.force_login(self.user)
+        for org in ("lista", "quadro", "gantt", "mapa", "status"):
+            resp = self.client.get(reverse("atividades"), {"org": org})
+            self.assertEqual(resp.status_code, 200, org)
+            self.assertContains(resp, 'id="ca-dados"')
 
     def test_planner_tambem_carrega_atrasada(self):
         criar_atividade(
@@ -226,6 +234,114 @@ class ValidacaoHorarioTests(_Base):
 
 
 class TimerTests(_Base):
+    def _tarefa_em_dupla(self):
+        tarefa = criar_atividade(
+            self.ana,
+            titulo="Em dupla",
+            responsavel=self.ana,
+            participantes=[self.bruno],
+            planejado_para=self.hoje,
+        )
+        return tarefa
+
+    def test_cada_pessoa_tem_seu_cronometro_na_mesma_tarefa(self):
+        tarefa = self._tarefa_em_dupla()
+        self.client.force_login(self.user)
+        r1 = self.client.post(
+            reverse("atividade_cronometro", args=[tarefa.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).json()
+        self.assertTrue(r1["ativo"])
+        self.client.force_login(self.outro_user)
+        r2 = self.client.post(
+            reverse("atividade_cronometro", args=[tarefa.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).json()
+        # O clique do Bruno inicia o dele, não para o da Ana.
+        self.assertTrue(r2["ativo"])
+        self.assertEqual(
+            SessaoTempoAtividade.objects.filter(atividade=tarefa, fim__isnull=True).count(), 2
+        )
+        self.assertEqual({p["id"] for p in r2["tarefa"]["rodando"]}, {self.ana.pk, self.bruno.pk})
+
+        self.client.force_login(self.user)
+        r3 = self.client.post(
+            reverse("atividade_cronometro", args=[tarefa.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).json()
+        self.assertFalse(r3["ativo"])
+        abertas = SessaoTempoAtividade.objects.filter(atividade=tarefa, fim__isnull=True)
+        self.assertEqual([s.funcionario_id for s in abertas], [self.bruno.pk])
+        tarefa.refresh_from_db()
+        self.assertTrue(tarefa.cronometro_ativo)
+
+    def test_total_soma_as_pessoas(self):
+        tarefa = self._tarefa_em_dupla()
+        agora = timezone.now()
+        iniciar_cronometro(tarefa, self.ana)
+        iniciar_cronometro(tarefa, self.bruno)
+        SessaoTempoAtividade.objects.filter(funcionario=self.ana).update(
+            inicio=agora - timedelta(minutes=30)
+        )
+        SessaoTempoAtividade.objects.filter(funcionario=self.bruno).update(
+            inicio=agora - timedelta(minutes=10)
+        )
+        tarefa.refresh_from_db()
+        parar_cronometro(tarefa, ator=self.ana)
+        tarefa.refresh_from_db()
+        parar_cronometro(tarefa, ator=self.bruno)
+        tarefa.refresh_from_db()
+        self.assertAlmostEqual(tarefa.tempo_acumulado_segundos, 40 * 60, delta=5)
+        por_pessoa = tarefa.tempo_por_pessoa()
+        self.assertAlmostEqual(por_pessoa[self.ana.pk], 30 * 60, delta=5)
+        self.assertAlmostEqual(por_pessoa[self.bruno.pk], 10 * 60, delta=5)
+        self.assertIsNone(tarefa.cronometro_inicio)
+
+    def test_concluir_para_o_cronometro_de_todos(self):
+        tarefa = self._tarefa_em_dupla()
+        iniciar_cronometro(tarefa, self.ana)
+        iniciar_cronometro(tarefa, self.bruno)
+        tarefa.refresh_from_db()
+        alterar_status(tarefa, StatusAtividade.REALIZADO, autor=self.ana)
+        tarefa.refresh_from_db()
+        self.assertIsNone(tarefa.cronometro_inicio)
+        self.assertFalse(
+            SessaoTempoAtividade.objects.filter(atividade=tarefa, fim__isnull=True).exists()
+        )
+
+    def test_detalhe_soma_tempo_por_pessoa(self):
+        tarefa = criar_atividade(
+            self.ana, titulo="Com tempo", responsavel=self.ana, planejado_para=self.hoje
+        )
+        agora = timezone.now()
+        SessaoTempoAtividade.objects.create(
+            atividade=tarefa,
+            funcionario=self.ana,
+            inicio=agora - timedelta(hours=2),
+            fim=agora - timedelta(hours=1),
+            segundos=3600,
+        )
+        SessaoTempoAtividade.objects.create(
+            atividade=tarefa,
+            funcionario=self.ana,
+            inicio=agora - timedelta(minutes=30),
+            fim=agora - timedelta(minutes=20),
+            segundos=600,
+        )
+        SessaoTempoAtividade.objects.create(
+            atividade=tarefa,
+            funcionario=self.bruno,
+            inicio=agora - timedelta(seconds=90),
+        )
+        self.client.force_login(self.user)
+        dados = self.client.get(reverse("atividade_detalhe", args=[tarefa.pk])).json()
+        linhas = {p["nome"]: p for p in dados["tempo_por_pessoa"]}
+        self.assertEqual(linhas["Ana Silva"]["segundos"], 4200)
+        self.assertFalse(linhas["Ana Silva"]["rodando"])
+        self.assertTrue(linhas["Bruno Costa"]["rodando"])
+        self.assertGreaterEqual(linhas["Bruno Costa"]["segundos"], 90)
+        self.assertEqual(dados["tempo_por_pessoa"][0]["nome"], "Ana Silva")
+
     def test_nao_inicia_em_tarefa_realizada(self):
         tarefa = criar_atividade(
             self.ana,
@@ -263,3 +379,133 @@ class TimerTests(_Base):
         segunda.refresh_from_db()
         self.assertIsNone(primeira.cronometro_inicio)
         self.assertIsNotNone(segunda.cronometro_inicio)
+
+
+class VisualizacoesTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.tarefa = criar_atividade(
+            self.ana,
+            titulo="Contrato Berkan: analisar",
+            responsavel=self.ana,
+            planejado_para=self.ontem,
+        )
+
+    def test_complete_conta_como_concluida(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividade_status", args=[self.tarefa.pk]),
+            {"status": StatusAtividade.COMPLETE},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        self.assertTrue(self.tarefa.concluida)
+        self.assertIsNone(self.tarefa.data_atraso())
+        self.assertEqual(resp.json()["tarefa"]["status"], StatusAtividade.COMPLETE)
+
+    def test_campos_muda_prioridade_e_entrega(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividade_campos", args=[self.tarefa.pk]),
+            {"prioridade": "", "data_vencimento": self.hoje.isoformat()},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.prioridade, PrioridadeAtividade.NENHUMA)
+        self.assertEqual(self.tarefa.data_vencimento, self.hoje)
+        self.assertEqual(resp.json()["tarefa"]["entrega"], self.hoje.isoformat())
+
+    def test_campos_rejeita_data_invalida(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividade_campos", args=[self.tarefa.pk]),
+            {"data_vencimento": "31/10/2026"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_campos_sem_permissao_retorna_403(self):
+        self.client.force_login(self.outro_user)
+        resp = self.client.post(
+            reverse("atividade_campos", args=[self.tarefa.pk]),
+            {"titulo": "Invadido"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.titulo, "Contrato Berkan: analisar")
+
+    def test_executor_nao_troca_responsavel(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividade_campos", args=[self.tarefa.pk]),
+            {"responsavel": self.bruno.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_reordenar_move_de_coluna(self):
+        outra = criar_atividade(
+            self.ana, titulo="Outra", responsavel=self.ana, planejado_para=self.hoje
+        )
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividades_reordenar"),
+            {
+                "ids": [outra.pk, self.tarefa.pk],
+                "movida": self.tarefa.pk,
+                "status": StatusAtividade.EM_REVISAO,
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        outra.refresh_from_db()
+        self.assertEqual(self.tarefa.status, StatusAtividade.EM_REVISAO)
+        self.assertEqual((outra.ordem, self.tarefa.ordem), (0, 1))
+
+    def test_reordenar_ignora_tarefa_alheia(self):
+        self.client.force_login(self.outro_user)
+        self.client.post(
+            reverse("atividades_reordenar"),
+            {"ids": [self.tarefa.pk]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        resp = self.client.post(
+            reverse("atividades_reordenar"),
+            {"ids": [self.tarefa.pk], "movida": self.tarefa.pk, "status": "realizado"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.status, StatusAtividade.NAO_INICIADO)
+
+    def test_subtarefa_por_json(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividade_subtarefa", args=[self.tarefa.pk]),
+            {"titulo": "Ler cláusulas"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        subs = resp.json()["pai"]["subtarefas"]
+        self.assertEqual([s["titulo"] for s in subs], ["Ler cláusulas"])
+
+    def test_adicao_rapida_devolve_tarefa(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("atividades"),
+            {
+                "acao": "criar_rapida",
+                "titulo": "Nova no quadro",
+                "status": StatusAtividade.ORGANIZANDO,
+                "data_vencimento": self.ontem.isoformat(),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        tarefa = resp.json()["tarefa"]
+        self.assertEqual(tarefa["status"], StatusAtividade.ORGANIZANDO)
+        self.assertEqual(tarefa["entrega"], self.ontem.isoformat())
