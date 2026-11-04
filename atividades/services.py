@@ -73,7 +73,7 @@ def queryset_visivel(
     )
     subtarefas = AtividadeDiaria.objects.filter(deletado_em__isnull=True).select_related(
         "responsavel"
-    ).prefetch_related("participantes", sessoes)
+    ).prefetch_related("participantes", sessoes).order_by("criado_em", "id")
     qs = (
         AtividadeDiaria.objects.ativas()
         .select_related("responsavel", "criado_por", "cliente_rsc", "atividade_pai")
@@ -989,3 +989,182 @@ def relogio_para(item: AtividadeDiaria, funcionario: Funcionario | None) -> dict
         "inicio": inicio.isoformat() if inicio else "",
         "texto": formatar_tempo(total),
     }
+
+
+# ---------------------------------------------------------------------------
+# Tempo lançado à mão (esqueceu o cronômetro) e correção de registros
+# ---------------------------------------------------------------------------
+
+_DURACAO_RE = None
+
+
+def interpretar_duracao(texto: str) -> int | None:
+    """Aceita "1h30", "1h", "45min", "45m", "1:30", "90" (minutos). Devolve segundos."""
+    import re
+
+    global _DURACAO_RE
+    if _DURACAO_RE is None:
+        _DURACAO_RE = re.compile(
+            r"^\s*(?:(?P<h>\d{1,3})\s*h(?:oras?)?)?\s*(?:(?P<m>\d{1,4})\s*(?:m|min|minutos?)?)?\s*$",
+            re.IGNORECASE,
+        )
+    texto = (texto or "").strip().lower().replace(",", ".")
+    if not texto:
+        return None
+    if ":" in texto:
+        partes = texto.split(":")
+        if len(partes) != 2 or not all(p.strip().isdigit() for p in partes):
+            return None
+        horas, minutos = int(partes[0]), int(partes[1])
+        if minutos >= 60:
+            return None
+        total = horas * 3600 + minutos * 60
+    else:
+        try:
+            # "1.5h" ou "1.5" horas
+            if texto.endswith("h") and texto[:-1].replace(".", "", 1).isdigit():
+                total = int(round(float(texto[:-1]) * 3600))
+                return total if 0 < total <= 24 * 3600 else None
+        except ValueError:
+            return None
+        m = _DURACAO_RE.match(texto)
+        if not m or not (m.group("h") or m.group("m")):
+            return None
+        total = int(m.group("h") or 0) * 3600 + int(m.group("m") or 0) * 60
+    return total if 0 < total <= 24 * 3600 else None
+
+
+def _inicio_lancamento(dia: date, segundos: int):
+    """Hoje: termina agora. Outro dia: começa às 09:00 daquele dia."""
+    from datetime import datetime, time as time_cls
+
+    tz = timezone.get_current_timezone()
+    if dia == timezone.localdate():
+        return timezone.now() - timedelta(seconds=segundos)
+    return timezone.make_aware(datetime.combine(dia, time_cls(9, 0)), tz)
+
+
+def _ajustar_acumulado(atividade: AtividadeDiaria, delta: int) -> None:
+    atividade.tempo_acumulado_segundos = max(
+        0, int(atividade.tempo_acumulado_segundos or 0) + int(delta)
+    )
+    atividade.save(update_fields=["tempo_acumulado_segundos", "atualizado_em"])
+
+
+def lancar_tempo(
+    atividade: AtividadeDiaria,
+    funcionario: Funcionario,
+    dia: date,
+    segundos: int,
+    autor: Funcionario,
+) -> SessaoTempoAtividade:
+    inicio = _inicio_lancamento(dia, segundos)
+    sessao = SessaoTempoAtividade.objects.create(
+        atividade=atividade,
+        funcionario=funcionario,
+        inicio=inicio,
+        fim=inicio + timedelta(seconds=segundos),
+        segundos=segundos,
+        manual=True,
+    )
+    _ajustar_acumulado(atividade, segundos)
+    quem = "" if funcionario.pk == autor.pk else f" para {funcionario.nome_completo}"
+    registrar_evento(
+        atividade,
+        autor,
+        TipoEventoAtividade.EDICAO,
+        texto=f"Lançou {formatar_duracao(segundos)} de tempo{quem} em {dia.strftime('%d/%m')}.",
+    )
+    return sessao
+
+
+def editar_sessao(
+    sessao: SessaoTempoAtividade,
+    dia: date,
+    segundos: int,
+    autor: Funcionario,
+) -> SessaoTempoAtividade:
+    antes = int(sessao.segundos or 0)
+    if dia != timezone.localtime(sessao.inicio).date():
+        sessao.inicio = _inicio_lancamento(dia, segundos)
+    sessao.segundos = segundos
+    sessao.fim = sessao.inicio + timedelta(seconds=segundos)
+    sessao.save(update_fields=["inicio", "fim", "segundos"])
+    _ajustar_acumulado(sessao.atividade, segundos - antes)
+    registrar_evento(
+        sessao.atividade,
+        autor,
+        TipoEventoAtividade.EDICAO,
+        texto=(
+            f"Corrigiu o tempo de {sessao.funcionario.nome_completo}: "
+            f"{formatar_duracao(antes)} → {formatar_duracao(segundos)}."
+        ),
+    )
+    return sessao
+
+
+def excluir_sessao(sessao: SessaoTempoAtividade, autor: Funcionario) -> None:
+    atividade = sessao.atividade
+    segundos = int(sessao.segundos or 0)
+    nome = sessao.funcionario.nome_completo
+    sessao.delete()
+    _ajustar_acumulado(atividade, -segundos)
+    registrar_evento(
+        atividade,
+        autor,
+        TipoEventoAtividade.EDICAO,
+        texto=f"Removeu {formatar_duracao(segundos)} de tempo de {nome}.",
+    )
+
+
+def formatar_duracao(segundos: int) -> str:
+    segundos = max(0, int(segundos or 0))
+    h, resto = divmod(segundos, 3600)
+    m = resto // 60
+    if h and m:
+        return f"{h}h{m:02d}"
+    if h:
+        return f"{h}h"
+    return f"{m}min"
+
+
+
+def aparencia_atividades() -> dict:
+    """Status e prioridades na ordem, nome e cor definidos no admin.
+
+    Itens ainda não cadastrados usam o padrão do sistema.
+    """
+    from .models import (
+        PRIORIDADE_CORES_PADRAO,
+        STATUS_CORES_PADRAO,
+        AparenciaPrioridade,
+        AparenciaStatus,
+    )
+
+    salvos_s = {a.status: a for a in AparenciaStatus.objects.all()}
+    status = []
+    for i, (valor, label) in enumerate(StatusAtividade.choices):
+        a = salvos_s.get(valor)
+        status.append(
+            {
+                "valor": valor,
+                "label": a.nome if a else label,
+                "cor": a.cor if a else STATUS_CORES_PADRAO[valor],
+                "ordem": a.ordem if a else i,
+            }
+        )
+    salvos_p = {a.prioridade: a for a in AparenciaPrioridade.objects.all()}
+    prioridades = []
+    for i, (valor, label) in enumerate(PrioridadeAtividade.choices):
+        a = salvos_p.get(valor)
+        prioridades.append(
+            {
+                "valor": valor,
+                "label": a.nome if a else label,
+                "cor": a.cor if a else PRIORIDADE_CORES_PADRAO[valor],
+                "ordem": a.ordem if a else i,
+            }
+        )
+    status.sort(key=lambda x: x["ordem"])
+    prioridades.sort(key=lambda x: x["ordem"])
+    return {"status": status, "prioridades": prioridades}

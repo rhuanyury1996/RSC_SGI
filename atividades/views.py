@@ -16,6 +16,7 @@ from .forms import AtividadeForm, AtividadeRapidaForm, queryset_clientes_rsc
 from .models import (
     STATUS_CONCLUIDOS,
     AtividadeDiaria,
+    SessaoTempoAtividade,
     PrioridadeAtividade,
     QuadranteEisenhower,
     StatusAtividade,
@@ -23,6 +24,8 @@ from .models import (
     aviso_quadrante,
 )
 from .permissions import (
+    pode_editar_sessao,
+    pode_lancar_tempo,
     pode_alterar_status,
     pode_comentar_atividade,
     pode_dirigir_atividades,
@@ -32,10 +35,15 @@ from .permissions import (
 from .services import (
     alterar_status,
     alternar_cronometro,
+    aparencia_atividades,
     atualizar_atividade,
     aviso_sobreposicao,
     criar_atividade,
     definir_participantes,
+    editar_sessao,
+    excluir_sessao,
+    interpretar_duracao,
+    lancar_tempo,
     excluir_atividade,
     queryset_visivel,
     registrar_evento,
@@ -231,10 +239,7 @@ def lista(request):
         "tarefas": tarefas,
         "pessoas": pessoas,
         "empresas": [{"id": c.pk, "nome": c.nome} for c in queryset_clientes_rsc()],
-        "status": [{"valor": v, "label": l} for v, l in StatusAtividade.choices],
-        "prioridades": [
-            {"valor": v, "label": l} for v, l in PrioridadeAtividade.choices
-        ],
+        **aparencia_atividades(),
         "urls": {
             "criar": reverse("atividades"),
             "reordenar": reverse("atividades_reordenar"),
@@ -282,6 +287,17 @@ def atualizar_campos(request, pk: int):
         except ValueError as exc:
             raise ValueError("Data inválida.") from exc
 
+    def _hora(nome):
+        valor = (post.get(nome) or "").strip()
+        if not valor:
+            return None
+        for formato in ("%H:%M", "%H:%M:%S"):
+            try:
+                return datetime.strptime(valor, formato).time()
+            except ValueError:
+                continue
+        raise ValueError("Horário inválido.")
+
     try:
         if "titulo" in post:
             titulo = (post.get("titulo") or "").strip()
@@ -304,6 +320,14 @@ def atualizar_campos(request, pk: int):
         if "planejado_para" in post:
             item.planejado_para = _data("planejado_para")
             alterados.append("planejado_para")
+        if "hora_inicio" in post or "hora_fim" in post:
+            item.hora_inicio = _hora("hora_inicio") if "hora_inicio" in post else item.hora_inicio
+            item.hora_fim = _hora("hora_fim") if "hora_fim" in post else item.hora_fim
+            if item.hora_fim and not item.hora_inicio:
+                raise ValueError("Informe o horário de início.")
+            if item.hora_inicio and item.hora_fim and item.hora_fim <= item.hora_inicio:
+                raise ValueError("O fim deve ser depois do início.")
+            alterados.append("horario")
     except ValueError as exc:
         return _negar(request, str(exc), 400)
     if "empresa" in post:
@@ -336,6 +360,7 @@ def atualizar_campos(request, pk: int):
         "prioridade": "a prioridade",
         "data_vencimento": "a data de entrega",
         "planejado_para": "o dia planejado",
+        "horario": "o horário",
         "cliente_rsc": "a empresa",
         "responsavel": "o responsável",
     }
@@ -351,7 +376,18 @@ def atualizar_campos(request, pk: int):
         ids = [int(v) for v in post.getlist("participantes") if v.isdigit()]
         validos = funcionarios_para_equipe(funcionario).filter(pk__in=ids)
         definir_participantes(item, validos)
-    return JsonResponse({"ok": True, "tarefa": _tarefa_json(item, funcionario)})
+    aviso = ""
+    if "horario" in alterados or "planejado_para" in alterados:
+        aviso = aviso_sobreposicao(
+            item.responsavel,
+            item.planejado_para,
+            item.hora_inicio,
+            item.hora_fim,
+            ignorar_pk=item.pk,
+        )
+    return JsonResponse(
+        {"ok": True, "aviso": aviso, "tarefa": _tarefa_json(item, funcionario)}
+    )
 
 
 @login_required
@@ -676,7 +712,20 @@ def detalhe(request, pk: int):
             }
         )
     por_pessoa: dict[int, dict] = {}
-    for sessao in item.sessoes_tempo.select_related("funcionario"):
+    registros = []
+    for sessao in item.sessoes_tempo.select_related("funcionario").order_by("-inicio"):
+        registros.append(
+            {
+                "id": sessao.pk,
+                "funcionario": sessao.funcionario_id,
+                "nome": sessao.funcionario.nome_completo,
+                "data": timezone.localtime(sessao.inicio).date().isoformat(),
+                "segundos": sessao.segundos_atuais(),
+                "rodando": sessao.fim is None,
+                "manual": sessao.manual,
+                "pode_editar": pode_editar_sessao(funcionario, sessao),
+            }
+        )
         linha = por_pessoa.setdefault(
             sessao.funcionario_id,
             {
@@ -698,5 +747,88 @@ def detalhe(request, pk: int):
             "tempo_por_pessoa": sorted(
                 por_pessoa.values(), key=lambda p: -p["segundos"]
             ),
+            "registros": registros,
+            "pode_lancar_para_outros": pode_dirigir_atividades(funcionario),
         }
     )
+
+
+def _ler_tempo(request):
+    """(dia, segundos) do POST, ou (None, mensagem de erro)."""
+    segundos = interpretar_duracao(request.POST.get("duracao") or "")
+    if segundos is None:
+        return None, "Informe a duração, por exemplo 1h30, 45min ou 1:15 (máx. 24h)."
+    valor = (request.POST.get("data") or "").strip()
+    try:
+        dia = datetime.strptime(valor, "%Y-%m-%d").date() if valor else timezone.localdate()
+    except ValueError:
+        return None, "Data inválida."
+    if dia > timezone.localdate():
+        return None, "Não dá para lançar tempo em data futura."
+    return (dia, segundos), ""
+
+
+@login_required
+@require_POST
+def tempo_lancar(request, pk: int):
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return _negar(request, "Sem perfil de funcionário.")
+    item = get_object_or_404(
+        AtividadeDiaria.objects.ativas().prefetch_related("participantes"), pk=pk
+    )
+    para = funcionario
+    para_id = (request.POST.get("funcionario") or "").strip()
+    if para_id and para_id != str(funcionario.pk):
+        para = funcionarios_para_equipe(funcionario).filter(
+            pk=para_id if para_id.isdigit() else 0
+        ).first()
+    if not pode_lancar_tempo(funcionario, item, para):
+        return _negar(request, "Sem permissão para lançar tempo nesta tarefa.")
+    lido, erro = _ler_tempo(request)
+    if lido is None:
+        return _negar(request, erro, 400)
+    dia, segundos = lido
+    lancar_tempo(item, para, dia, segundos, funcionario)
+    item.refresh_from_db()
+    return JsonResponse({"ok": True, "tarefa": _tarefa_json(item, funcionario)})
+
+
+@login_required
+@require_POST
+def tempo_editar(request, sid: int):
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return _negar(request, "Sem perfil de funcionário.")
+    sessao = get_object_or_404(
+        SessaoTempoAtividade.objects.select_related("atividade", "funcionario"),
+        pk=sid,
+        atividade__deletado_em__isnull=True,
+    )
+    if not pode_editar_sessao(funcionario, sessao):
+        return _negar(request, "Só quem registrou (ou um gestor) corrige este tempo.")
+    lido, erro = _ler_tempo(request)
+    if lido is None:
+        return _negar(request, erro, 400)
+    dia, segundos = lido
+    editar_sessao(sessao, dia, segundos, funcionario)
+    return JsonResponse({"ok": True, "tarefa": _tarefa_json(sessao.atividade, funcionario)})
+
+
+@login_required
+@require_POST
+def tempo_excluir(request, sid: int):
+    funcionario = obter_funcionario(request)
+    if funcionario is None:
+        return _negar(request, "Sem perfil de funcionário.")
+    sessao = get_object_or_404(
+        SessaoTempoAtividade.objects.select_related("atividade", "funcionario"),
+        pk=sid,
+        atividade__deletado_em__isnull=True,
+    )
+    if not pode_editar_sessao(funcionario, sessao):
+        return _negar(request, "Só quem registrou (ou um gestor) remove este tempo.")
+    atividade = sessao.atividade
+    excluir_sessao(sessao, funcionario)
+    atividade.refresh_from_db()
+    return JsonResponse({"ok": True, "tarefa": _tarefa_json(atividade, funcionario)})

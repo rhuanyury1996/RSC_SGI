@@ -509,3 +509,169 @@ class VisualizacoesTests(_Base):
         tarefa = resp.json()["tarefa"]
         self.assertEqual(tarefa["status"], StatusAtividade.ORGANIZANDO)
         self.assertEqual(tarefa["entrega"], self.ontem.isoformat())
+
+
+class TempoManualTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.tarefa = criar_atividade(
+            self.ana,
+            titulo="Relatório",
+            responsavel=self.ana,
+            participantes=[self.bruno],
+            planejado_para=self.hoje,
+        )
+        self.client.force_login(self.user)
+
+    def _post(self, nome, args, dados):
+        return self.client.post(
+            reverse(nome, args=args), dados, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+
+    def test_lanca_tempo_esquecido(self):
+        resp = self._post(
+            "atividade_tempo_lancar",
+            [self.tarefa.pk],
+            {"duracao": "1h30", "data": self.ontem.isoformat()},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.tempo_acumulado_segundos, 5400)
+        sessao = SessaoTempoAtividade.objects.get(atividade=self.tarefa)
+        self.assertTrue(sessao.manual)
+        self.assertEqual(timezone.localtime(sessao.inicio).date(), self.ontem)
+        self.assertEqual(resp.json()["tarefa"]["por_pessoa"][str(self.ana.pk)], 5400)
+
+    def test_rejeita_duracao_invalida_e_data_futura(self):
+        r1 = self._post("atividade_tempo_lancar", [self.tarefa.pk], {"duracao": "abc"})
+        r2 = self._post(
+            "atividade_tempo_lancar",
+            [self.tarefa.pk],
+            {"duracao": "30min", "data": (self.hoje + timedelta(days=1)).isoformat()},
+        )
+        self.assertEqual((r1.status_code, r2.status_code), (400, 400))
+        self.assertFalse(SessaoTempoAtividade.objects.exists())
+
+    def test_executor_nao_lanca_para_outra_pessoa(self):
+        resp = self._post(
+            "atividade_tempo_lancar",
+            [self.tarefa.pk],
+            {"duracao": "1h", "funcionario": self.bruno.pk},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_corrige_e_exclui_o_proprio_tempo(self):
+        self._post("atividade_tempo_lancar", [self.tarefa.pk], {"duracao": "2h"})
+        sessao = SessaoTempoAtividade.objects.get()
+        resp = self._post(
+            "atividade_tempo_editar",
+            [sessao.pk],
+            {"duracao": "45min", "data": self.hoje.isoformat()},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.tempo_acumulado_segundos, 2700)
+        resp = self._post("atividade_tempo_excluir", [sessao.pk], {})
+        self.assertEqual(resp.status_code, 200)
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.tempo_acumulado_segundos, 0)
+        self.assertFalse(SessaoTempoAtividade.objects.exists())
+
+    def test_nao_corrige_tempo_de_outra_pessoa(self):
+        agora = timezone.now()
+        sessao = SessaoTempoAtividade.objects.create(
+            atividade=self.tarefa,
+            funcionario=self.bruno,
+            inicio=agora - timedelta(hours=1),
+            fim=agora,
+            segundos=3600,
+        )
+        resp = self._post("atividade_tempo_editar", [sessao.pk], {"duracao": "5h"})
+        self.assertEqual(resp.status_code, 403)
+        resp = self._post("atividade_tempo_excluir", [sessao.pk], {})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_detalhe_lista_registros(self):
+        self._post("atividade_tempo_lancar", [self.tarefa.pk], {"duracao": "20min"})
+        dados = self.client.get(reverse("atividade_detalhe", args=[self.tarefa.pk])).json()
+        self.assertEqual(len(dados["registros"]), 1)
+        self.assertTrue(dados["registros"][0]["manual"])
+        self.assertTrue(dados["registros"][0]["pode_editar"])
+
+
+class HorarioTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.tarefa = criar_atividade(
+            self.ana, titulo="Reunião", responsavel=self.ana, planejado_para=self.hoje
+        )
+        self.client.force_login(self.user)
+
+    def _post(self, dados):
+        return self.client.post(
+            reverse("atividade_campos", args=[self.tarefa.pk]),
+            dados,
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+    def test_ajusta_e_remove_horario(self):
+        resp = self._post({"hora_inicio": "16:00", "hora_fim": "16:30"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["tarefa"]["hora_inicio"], "16:00")
+        self.tarefa.refresh_from_db()
+        self.assertEqual(self.tarefa.hora_fim, time(16, 30))
+        self._post({"hora_inicio": "", "hora_fim": ""})
+        self.tarefa.refresh_from_db()
+        self.assertIsNone(self.tarefa.hora_inicio)
+
+    def test_rejeita_fim_antes_do_inicio(self):
+        resp = self._post({"hora_inicio": "16:00", "hora_fim": "15:00"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_avisa_sobreposicao(self):
+        criar_atividade(
+            self.ana,
+            titulo="Outra",
+            responsavel=self.ana,
+            planejado_para=self.hoje,
+            hora_inicio=time(16, 0),
+            hora_fim=time(17, 0),
+        )
+        resp = self._post({"hora_inicio": "16:30", "hora_fim": "17:30"})
+        self.assertIn("Outra", resp.json()["aviso"])
+
+
+class AparenciaTests(_Base):
+    def test_cores_e_nomes_do_admin_chegam_na_tela(self):
+        from .models import AparenciaPrioridade, AparenciaStatus
+
+        AparenciaStatus.objects.filter(status="executando").update(
+            nome="Em andamento", cor="#7B68EE"
+        )
+        AparenciaPrioridade.objects.filter(prioridade="urgente").update(cor="#AA00AA")
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("atividades"))
+        dados = resp.context["dados"]
+        execucao = next(s for s in dados["status"] if s["valor"] == "executando")
+        self.assertEqual((execucao["label"], execucao["cor"]), ("Em andamento", "#7B68EE"))
+        urgente = next(p for p in dados["prioridades"] if p["valor"] == "urgente")
+        self.assertEqual(urgente["cor"], "#AA00AA")
+
+    def test_sem_cadastro_usa_padrao(self):
+        from .models import AparenciaStatus
+
+        AparenciaStatus.objects.all().delete()
+        from .services import aparencia_atividades
+
+        status = aparencia_atividades()["status"]
+        self.assertEqual(len(status), 7)
+        self.assertEqual(status[0]["valor"], "nao_iniciado")
+
+    def test_admin_lista_aparencia(self):
+        admin_user = get_user_model().objects.create_superuser("chefe", password="x-123-y")
+        self.client.force_login(admin_user)
+        resp = self.client.get(reverse("admin:atividades_aparenciastatus_changelist"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'type="color"')
+        resp = self.client.get(reverse("admin:atividades_aparenciaprioridade_changelist"))
+        self.assertEqual(resp.status_code, 200)

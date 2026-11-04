@@ -1,6 +1,10 @@
+from django import forms
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import (
+    AparenciaPrioridade,
+    AparenciaStatus,
     AtividadeDiaria,
     DiaPlanner,
     EventoAtividade,
@@ -81,3 +85,66 @@ class DiaPlannerAdmin(admin.ModelAdmin):
     search_fields = ("funcionario__nome", "funcionario__sobrenome")
     autocomplete_fields = ("funcionario",)
     inlines = (MetaFocoInline, HabitoDiaInline)
+
+
+
+class _CorForm(forms.ModelForm):
+    class Meta:
+        fields = "__all__"
+        widgets = {"cor": forms.TextInput(attrs={"type": "color", "style": "width:4rem;height:2rem;padding:0"})}
+
+
+class _AparenciaAdmin(admin.ModelAdmin):
+    """Só edita nome, cor e ordem: os status/prioridades em si são fixos no sistema."""
+
+    list_display = ("amostra", "nome", "cor", "ordem")
+    list_display_links = ("amostra",)
+    list_editable = ("nome", "cor", "ordem")
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return (self.chave,) if obj else ()
+
+
+@admin.register(AparenciaStatus)
+class AparenciaStatusAdmin(_AparenciaAdmin):
+    chave = "status"
+
+    class form(_CorForm):
+        class Meta(_CorForm.Meta):
+            model = AparenciaStatus
+
+    def get_changelist_form(self, request, **kwargs):
+        kwargs.setdefault("form", self.form)
+        return super().get_changelist_form(request, **kwargs)
+
+    @admin.display(description="Como aparece")
+    def amostra(self, obj):
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 10px;border-radius:999px;'
+            'font-size:11px;font-weight:700;text-transform:uppercase;'
+            'text-shadow:0 0 2px rgba(0,0,0,.35)">{}</span>',
+            obj.cor,
+            obj.nome,
+        )
+
+
+@admin.register(AparenciaPrioridade)
+class AparenciaPrioridadeAdmin(_AparenciaAdmin):
+    chave = "prioridade"
+
+    class form(_CorForm):
+        class Meta(_CorForm.Meta):
+            model = AparenciaPrioridade
+
+    def get_changelist_form(self, request, **kwargs):
+        kwargs.setdefault("form", self.form)
+        return super().get_changelist_form(request, **kwargs)
+
+    @admin.display(description="Como aparece")
+    def amostra(self, obj):
+        return format_html(
+            '<span style="color:{};font-size:18px">&#9873;</span> {}', obj.cor, obj.nome
+        )

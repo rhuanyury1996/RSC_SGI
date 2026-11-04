@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -319,6 +320,11 @@ class SessaoTempoAtividade(models.Model):
     inicio = models.DateTimeField("Início")
     fim = models.DateTimeField("Fim", null=True, blank=True)
     segundos = models.PositiveIntegerField("Segundos", default=0)
+    manual = models.BooleanField(
+        "Lançado manualmente",
+        default=False,
+        help_text="Tempo informado à mão (ex.: esqueceu de ligar o cronômetro).",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -487,3 +493,72 @@ class HabitoDia(models.Model):
 
     def __str__(self) -> str:
         return self.chave
+
+
+# ---------------------------------------------------------------------------
+# Aparência configurável pelo admin (nomes, cores e ordem)
+# ---------------------------------------------------------------------------
+
+COR_VALIDATOR = RegexValidator(r"^#[0-9A-Fa-f]{6}$", "Use uma cor no formato #RRGGBB.")
+
+STATUS_CORES_PADRAO = {
+    StatusAtividade.NAO_INICIADO: "#FFC53D",
+    StatusAtividade.ORGANIZANDO: "#0091FF",
+    StatusAtividade.EXECUTANDO: "#0091FF",
+    StatusAtividade.EM_REVISAO: "#FFC53D",
+    StatusAtividade.LIBERADO: "#1090E0",
+    StatusAtividade.REALIZADO: "#30A46C",
+    StatusAtividade.COMPLETE: "#008844",
+}
+
+PRIORIDADE_CORES_PADRAO = {
+    PrioridadeAtividade.URGENTE: "#F50000",
+    PrioridadeAtividade.ALTA: "#FFCC00",
+    PrioridadeAtividade.MEDIA: "#6FDDFF",
+    PrioridadeAtividade.BAIXA: "#D8D8D8",
+    PrioridadeAtividade.NENHUMA: "#B9BEC7",
+}
+
+
+class AparenciaStatus(models.Model):
+    """Nome e cor de cada status nas telas de Atividades (editável no admin)."""
+
+    status = models.CharField(
+        "Status", max_length=20, choices=StatusAtividade.choices, unique=True
+    )
+    nome = models.CharField("Nome exibido", max_length=40)
+    cor = models.CharField(
+        "Cor", max_length=7, default="#87909E", validators=[COR_VALIDATOR]
+    )
+    ordem = models.PositiveSmallIntegerField(
+        "Ordem", default=0, help_text="Posição no fluxo (colunas e grupos)."
+    )
+
+    class Meta:
+        verbose_name = "Status: nome e cor"
+        verbose_name_plural = "Status: nomes e cores"
+        ordering = ["ordem", "id"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+class AparenciaPrioridade(models.Model):
+    """Nome e cor da bandeira de cada prioridade (editável no admin)."""
+
+    prioridade = models.CharField(
+        "Prioridade", max_length=10, choices=PrioridadeAtividade.choices, unique=True
+    )
+    nome = models.CharField("Nome exibido", max_length=40)
+    cor = models.CharField(
+        "Cor da bandeira", max_length=7, default="#B9BEC7", validators=[COR_VALIDATOR]
+    )
+    ordem = models.PositiveSmallIntegerField("Ordem", default=0)
+
+    class Meta:
+        verbose_name = "Prioridade: nome e cor da bandeira"
+        verbose_name_plural = "Prioridades: nomes e cores das bandeiras"
+        ordering = ["ordem", "id"]
+
+    def __str__(self) -> str:
+        return self.nome

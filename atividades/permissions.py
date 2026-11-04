@@ -54,3 +54,19 @@ def funcionarios_atribuiveis(ator: Funcionario):
 def funcionarios_para_equipe(ator: Funcionario):
     """Colegas que podem entrar na equipe da atividade."""
     return Funcionario.objects.filter(ativo=True).order_by("nome", "sobrenome")
+
+
+def pode_lancar_tempo(ator: Funcionario | None, atividade, para: Funcionario | None) -> bool:
+    """Cada um lança o próprio tempo; gestores lançam para qualquer pessoa."""
+    if ator is None or para is None:
+        return False
+    if para.pk != ator.pk:
+        return pode_dirigir_atividades(ator)
+    return pode_gerenciar_atividade(ator, atividade) or atividade.faz_parte_da_equipe(ator)
+
+
+def pode_editar_sessao(ator: Funcionario | None, sessao) -> bool:
+    """O dono do registro corrige o seu; gestores corrigem qualquer um."""
+    if ator is None or sessao.fim is None:
+        return False
+    return sessao.funcionario_id == ator.pk or pode_dirigir_atividades(ator)

@@ -20,7 +20,17 @@
     complete: { cor: "#008844", texto: "#fff", tipo: "fechado" },
   };
   var FLUXO = D.status.map(function (s) { return s.valor; });
-  D.status.forEach(function (s) { STATUS[s.valor].label = s.label; });
+  // Cores e nomes vêm do admin; o texto da pílula se ajusta ao contraste.
+  function textoSobre(cor) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor || "");
+    if (!m) return "#fff";
+    var lum = (0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16)) / 255;
+    return lum > 0.62 ? "#3b3200" : "#fff";
+  }
+  D.status.forEach(function (s) {
+    STATUS[s.valor].label = s.label;
+    if (s.cor) { STATUS[s.valor].cor = s.cor; STATUS[s.valor].texto = textoSobre(s.cor); }
+  });
   var PRIO = {
     urgente: { cor: "#F50000" },
     alta: { cor: "#FFCC00" },
@@ -29,7 +39,10 @@
     nenhuma: { cor: "" },
   };
   var PRIO_ORDEM = D.prioridades.map(function (p) { return p.valor; });
-  D.prioridades.forEach(function (p) { PRIO[p.valor].label = p.label; });
+  D.prioridades.forEach(function (p) {
+    PRIO[p.valor].label = p.label;
+    if (p.cor && p.valor !== "nenhuma") PRIO[p.valor].cor = p.cor;
+  });
   var PALETA = ["#7B68EE", "#FF7800", "#1090E0", "#2EA52C", "#D6409F", "#00A3BF", "#E5484D", "#AB6400"];
   var PESSOAS = {};
   D.pessoas.forEach(function (p, i) {
@@ -137,6 +150,9 @@
     menos: '<path d="M5 12h14"/>',
     ajustar: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    relogioMais: '<circle cx="11" cy="13" r="8"/><path d="M11 9v4l2.5 1.5M19 2v5M16.5 4.5h5"/>',
+    dots: '<circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/>',
+    desfazer: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
   };
   function icone(nome, classe) {
     var span = document.createElement("span");
@@ -210,6 +226,9 @@
     sub: function (id) { return "/atividades/" + id + "/subtarefa/"; },
     excluir: function (id) { return "/atividades/" + id + "/excluir/"; },
     restaurar: function (id) { return "/atividades/" + id + "/restaurar/"; },
+    tempoLancar: function (id) { return "/atividades/" + id + "/tempo/"; },
+    tempoEditar: function (sid) { return "/atividades/tempo/" + sid + "/"; },
+    tempoExcluir: function (sid) { return "/atividades/tempo/" + sid + "/excluir/"; },
   };
 
   // ----------------------------------------------------------- estado/tarefas
@@ -269,7 +288,7 @@
   function vencida(t) { return !concluida(t) && !!t.entrega && t.entrega < HOJE; }
 
   function passaFiltro(t) {
-    if (!S.fechadas && t.status === "complete") return false;
+    if (!S.fechadas && concluida(t)) return false;
     var subs = t.subtarefas || [];
     if (S.busca) {
       var b = normalizar(S.busca);
@@ -299,7 +318,7 @@
       return ordem.map(function (k) { return mapa[k]; }).filter(function (g) { return g.itens.length; });
     }
     if (modo === "prioridade") {
-      PRIO_ORDEM.forEach(function (p) { bucket(p, { label: PRIO[p].label, cor: PRIO[p].cor || "#B9BEC7", texto: p === "alta" || p === "media" || p === "baixa" ? "#3B3B3B" : "#fff", prioridade: p }); });
+      PRIO_ORDEM.forEach(function (p) { bucket(p, { label: PRIO[p].label, cor: PRIO[p].cor || "#B9BEC7", texto: textoSobre(PRIO[p].cor || "#B9BEC7"), prioridade: p }); });
       lista.forEach(function (t) { mapa[t.prioridade].itens.push(t); });
       return ordem.map(function (k) { return mapa[k]; }).filter(function (g) { return g.itens.length; });
     }
@@ -408,7 +427,7 @@
       "aria-label": acao,
       onclick: function (ev) { ev.stopPropagation(); alternarTimer(t.id); },
     }, h("span", { class: "ca-timer-ico" }, icone(meu ? "pause" : "play")),
-    h("span", { class: "ca-timer-txt" }, vivo ? fmtTempo(seg) : fmtCurto(seg)),
+    h("span", { class: "ca-timer-txt" }, vivo ? fmtTempo(seg) : seg ? fmtCurto(seg) : "—"),
     outros.length ? h("span", { class: "ca-timer-quem" }, outros.slice(0, 2).map(function (r) { return avatar(r.id, true); })) : null);
     if (concluida(t) && !meu) btn.disabled = true;
     return btn;
@@ -466,7 +485,15 @@
     render();
     post(URL_T.status(id), { status: status }).then(function (data) {
       aplicarResposta(data);
-      ofertaTimer(achar(id));
+      var nova = achar(id);
+      if (nova && concluida(nova) && !concluida({ status: antes }) && !nova.pai && !S.fechadas) {
+        toast("Tarefa concluída e oculta da lista", {
+          label: "Desfazer",
+          onClick: function () { mudarStatus(id, antes); },
+        });
+        return;
+      }
+      ofertaTimer(nova);
     }).catch(function (err) {
       t.status = antes;
       render();
@@ -488,7 +515,8 @@
     if (!t.pode_editar) { toast("Sem permissão para editar esta tarefa."); return Promise.resolve(); }
     return post(URL_T.campos(id), campos).then(function (data) {
       aplicarResposta(data);
-      if (msg) toast(msg);
+      if (data.aviso) toast("Salvo. Atenção: " + data.aviso);
+      else if (msg) toast(msg);
     }).catch(function (err) { toast(err.message); render(); });
   }
   function alternarTimer(id) {
@@ -617,6 +645,38 @@
     return h("button", { type: "button", role: "menuitem", class: "ca-menu-item" + (extra ? " " + extra : ""), onclick: function () { fecharMenu(); onclick(); } },
       conteudo, ativo ? icone("check", "ca-menu-check") : null);
   }
+  function menuAcoes(ancora, t, opcoes) {
+    opcoes = opcoes || {};
+    var itens = [itemMenu([icone("abrir"), "Abrir"], false, function () { abrirDrawer(t.id); })];
+    if (t.pode_editar && opcoes.renomear) itens.push(itemMenu([icone("lapis"), "Renomear"], false, opcoes.renomear));
+    if (t.pode_editar && !t.pai) itens.push(itemMenu([icone("sub"), "Adicionar subtarefa"], false, function () { iniciarSubtarefa(t.id); }));
+    if (t.pode_editar) itens.push(itemMenu([icone("calendario"), "Dia e horário no planner"], false, function () { setTimeout(function () { menuPlanner(ancora, t); }, 0); }));
+    itens.push(itemMenu([icone("relogioMais"), "Lançar tempo"], false, function () { abrirLancamento(t.id); }));
+    if (t.pode_status) {
+      itens.push(concluida(t)
+        ? itemMenu([icone("desfazer"), "Reabrir"], false, function () { mudarStatus(t.id, "nao_iniciado"); })
+        : itemMenu([icone("check"), "Marcar como realizado"], false, function () { mudarStatus(t.id, "realizado"); }));
+    }
+    if (t.pode_editar) {
+      itens.push(h("hr"));
+      itens.push(itemMenu([icone("lixo"), "Excluir"], false, function () { excluir(t.id); }, "is-danger"));
+    }
+    abrirMenu(ancora, itens, 210);
+  }
+  function abrirLancamento(id) {
+    S.formTempo = Number(id);
+    S.focarTempo = true;
+    abrirDrawer(id, "tempo");
+  }
+  function iniciarSubtarefa(id) {
+    S.visao = S.visao === "lista" ? "lista" : S.visao;
+    S.abertas[id] = true;
+    S.addSub = Number(id);
+    if (S.visao !== "lista") { abrirDrawer(id, "sub"); return; }
+    render();
+    var input = view.querySelector('.ca-subadd-input[data-pai="' + id + '"]');
+    if (input) input.focus();
+  }
   function menuStatus(ancora, t) {
     if (!t.pode_status) { toast("Sem permissão para mudar o status desta tarefa."); return; }
     abrirMenu(ancora, [
@@ -640,7 +700,8 @@
   function menuData(ancora, t, campo) {
     campo = campo || "data_vencimento";
     if (!t.pode_editar) { toast("Sem permissão para editar esta tarefa."); return; }
-    var atual = campo === "planejado_para" ? t.planejado : (t.vencimento || t.planejado);
+    if (campo === "planejado_para") { menuPlanner(ancora, t); return; }
+    var atual = t.vencimento || t.planejado;
     var input = h("input", { type: "date", class: "ca-input", value: atual || "", "aria-label": "Data" });
     function salvar(v) { fecharMenu(); salvarCampos(t.id, (function () { var o = {}; o[campo] = v; return o; })()); }
     input.addEventListener("change", function () { if (input.value) salvar(input.value); });
@@ -651,8 +712,55 @@
       atalhos.map(function (a) {
         return itemMenu(a[0], false, function () { salvar(isoDe(somarDias(parseData(HOJE), a[1]))); });
       }),
-      t.vencimento && campo === "data_vencimento" ? [h("hr"), itemMenu([icone("x"), "Remover data de entrega"], false, function () { salvar(""); })] : null,
+      h("hr"),
+      itemMenu([icone("relogio"), "Dia e horário no planner…"], false, function () { setTimeout(function () { menuPlanner(ancora, t); }, 0); }),
+      t.vencimento && campo === "data_vencimento" ? itemMenu([icone("x"), "Remover data de entrega"], false, function () { salvar(""); }) : null,
     ], 220);
+  }
+  function menuPlanner(ancora, t) {
+    // Dia já passou (ou vazio) numa tarefa aberta: sugere hoje para entrar no planner.
+    var sugerirHoje = !concluida(t) && (!t.planejado || t.planejado < HOJE);
+    var dia = h("input", { type: "date", class: "ca-input", value: sugerirHoje ? HOJE : t.planejado, "aria-label": "Dia no planner" });
+    var dica = sugerirHoje && t.planejado ? h("p", { class: "ca-menu-dica" }, "Estava em " + fmtData(t.planejado) + ". Sugerimos hoje para aparecer no planner do dia.") : null;
+    var ini = h("input", { type: "time", class: "ca-input", value: t.hora_inicio || "", "aria-label": "Início", step: "300" });
+    var fim = h("input", { type: "time", class: "ca-input", value: t.hora_fim || "", "aria-label": "Fim", step: "300" });
+    var erro = h("p", { class: "ca-menu-erro", role: "alert" });
+    function salvar(campos) {
+      fecharMenu();
+      salvarCampos(t.id, campos, "Planner atualizado");
+    }
+    // Ao escolher o início, sugere 1h de duração se o fim estiver vazio.
+    ini.addEventListener("change", function () {
+      if (ini.value && !fim.value) {
+        var p = ini.value.split(":");
+        var hh = Math.min(23, Number(p[0]) + 1);
+        fim.value = (hh < 10 ? "0" : "") + hh + ":" + p[1];
+      }
+    });
+    var form = h("form", { class: "ca-menu-form" },
+      h("label", { class: "ca-menu-lbl" }, "Dia", dia),
+      dica,
+      h("div", { class: "ca-menu-horas" },
+        h("label", { class: "ca-menu-lbl" }, "Início", ini),
+        h("label", { class: "ca-menu-lbl" }, "Fim", fim)),
+      erro,
+      h("div", { class: "ca-menu-acoes" },
+        h("button", { type: "submit", class: "ca-primary is-sm" }, "Salvar"),
+        t.hora_inicio ? h("button", { type: "button", class: "ca-ghost is-sm", onclick: function () { salvar({ hora_inicio: "", hora_fim: "" }); } }, "Tirar horário") : null));
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      if (fim.value && !ini.value) { erro.textContent = "Informe o início."; return; }
+      if (ini.value && fim.value && fim.value <= ini.value) { erro.textContent = "O fim deve ser depois do início."; return; }
+      salvar({ planejado_para: dia.value, hora_inicio: ini.value, hora_fim: fim.value });
+    });
+    abrirMenu(ancora, [
+      h("p", { class: "ca-menu-title" }, "Dia e horário no planner"),
+      form,
+      h("hr"),
+      [["Hoje", 0], ["Amanhã", 1], ["Em 1 semana", 7]].map(function (a) {
+        return itemMenu(a[0], false, function () { salvar({ planejado_para: isoDe(somarDias(parseData(HOJE), a[1])) }); });
+      }),
+    ], 250);
   }
   function menuPessoas(ancora, t) {
     if (!t.pode_editar) { toast("Sem permissão para editar esta tarefa."); return; }
@@ -777,7 +885,7 @@
     });
     btnAgrupar.textContent = "Agrupar: " + ROTULO_AGRUPAR[S.agrupar];
     btnSubs.textContent = "Subtarefas: " + (S.subs ? "expandidas" : "recolhidas");
-    btnFechadas.textContent = "Fechadas: " + (S.fechadas ? "visíveis" : "ocultas");
+    btnFechadas.textContent = "Concluídas: " + (S.fechadas ? "visíveis" : "ocultas");
     btnFechadas.classList.toggle("is-on", S.fechadas);
     btnEu.classList.toggle("is-on", S.eu);
     btnEu.setAttribute("aria-pressed", S.eu ? "true" : "false");
@@ -789,16 +897,16 @@
     S.entrouGantt = view.dataset.visao !== "gantt";
     view.innerHTML = "";
     var lista = visiveis();
-    desenharResumo(lista);
+    desenharResumo(S.tarefas.filter(passaFiltroSemFechadas));
     if (S.visao === "quadro") renderQuadro(lista);
     else if (S.visao === "gantt") renderGantt(lista);
     else if (S.visao === "mapa") renderMapa(lista);
     else renderLista(lista);
     if (scroll && scroll.visao === S.visao) restaurarScroll(scroll);
 
-    var fechadas = S.tarefas.filter(function (t) { return t.status === "complete"; }).length;
+    var fechadas = S.tarefas.filter(function (t) { return concluida(t) && passaFiltroSemFechadas(t); }).length;
     foot.textContent = lista.length + (lista.length === 1 ? " tarefa" : " tarefas") +
-      (S.fechadas ? "" : " · fechadas ocultas" + (fechadas ? " (" + fechadas + ")" : "")) +
+      (S.fechadas || !fechadas ? "" : " · " + fechadas + (fechadas === 1 ? " concluída oculta" : " concluídas ocultas")) +
       (S.busca || S.eu || S.pessoas.length ? " · com filtro" : "");
   }
   function desenharResumo(lista) {
@@ -911,7 +1019,9 @@
         g.itens.forEach(function (t) {
           corpo.appendChild(linha(t, false, g));
           var subs = t.subtarefas || [];
-          if (subs.length && (S.subs || S.abertas[t.id])) subs.forEach(function (s) { corpo.appendChild(linha(s, true, g)); });
+          var aberta = S.subs || S.abertas[t.id];
+          if (subs.length && aberta) subs.forEach(function (s) { corpo.appendChild(linha(s, true, g)); });
+          if (t.pode_editar && (aberta && subs.length || S.addSub === t.id)) corpo.appendChild(linhaNovaSub(t));
         });
         if (S.agrupar === "status") arrastavelLista(corpo, g.status);
         sec.appendChild(corpo);
@@ -957,23 +1067,67 @@
       }, icone("sub"), subs.filter(concluida).length + "/" + subs.length));
     }
     var acoes = h("span", { class: "ca-quick" });
-    if (t.pode_editar) {
-      acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Renomear", "aria-label": "Renomear", onclick: function (ev) { ev.stopPropagation(); renomear(titulo, t); } }, icone("lapis")));
-      if (!ehSub) acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Adicionar subtarefa", "aria-label": "Adicionar subtarefa", onclick: function (ev) { ev.stopPropagation(); abrirDrawer(t.id, "sub"); } }, icone("sub")));
+    if (t.pode_status && !concluida(t)) {
+      acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn is-ok", "data-tip": "Marcar como realizado", "aria-label": "Marcar como realizado", onclick: function (ev) { ev.stopPropagation(); mudarStatus(t.id, "realizado"); } }, icone("check")));
     }
-    acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Abrir", "aria-label": "Abrir tarefa", onclick: function (ev) { ev.stopPropagation(); abrirDrawer(t.id); } }, icone("abrir")));
+    if (t.pode_editar && !ehSub) {
+      acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Adicionar subtarefa", "aria-label": "Adicionar subtarefa", onclick: function (ev) { ev.stopPropagation(); iniciarSubtarefa(t.id); } }, icone("sub")));
+    }
+    if (t.pode_editar) {
+      var agendar = h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Dia e horário no planner", "aria-label": "Dia e horário no planner", onclick: function (ev) { ev.stopPropagation(); menuPlanner(agendar, t); } }, icone("calendario"));
+      acoes.appendChild(agendar);
+    }
+    acoes.appendChild(h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Lançar tempo", "aria-label": "Lançar tempo", onclick: function (ev) { ev.stopPropagation(); abrirLancamento(t.id); } }, icone("relogioMais")));
+    var mais = h("button", { type: "button", class: "ca-icon-btn", "data-tip": "Mais ações", "aria-label": "Mais ações", "aria-haspopup": "menu", onclick: function (ev) { ev.stopPropagation(); menuAcoes(mais, t, { renomear: function () { renomear(titulo, t); } }); } }, icone("dots"));
+    acoes.appendChild(mais);
     nome.appendChild(acoes);
     row.appendChild(nome);
 
     var resp = h("button", { type: "button", class: "c-resp ca-cell", "aria-label": "Responsáveis", onclick: function () { menuPessoas(resp, t); } }, avatares(t));
     row.appendChild(resp);
     var data = h("button", { type: "button", class: "c-data ca-cell", "aria-label": "Data de entrega", onclick: function () { menuData(data, t); } }, dataEl(t, { icone: !t.entrega, vazio: "" }));
+    if (t.hora_inicio) {
+      var hora = h("button", { type: "button", class: "ca-hora", "data-tip": "No planner: " + fmtData(t.planejado) + " · " + t.hora_inicio + (t.hora_fim ? "–" + t.hora_fim : ""), "aria-label": "Horário no planner", onclick: function (ev) { ev.stopPropagation(); menuPlanner(hora, t); } }, icone("relogio"), t.hora_inicio);
+      nome.insertBefore(hora, acoes);
+    }
     row.appendChild(data);
     var prio = h("button", { type: "button", class: "c-prio ca-cell", "aria-label": "Prioridade: " + PRIO[t.prioridade].label, onclick: function () { menuPrioridade(prio, t); } },
       bandeira(t.prioridade), t.prioridade !== "nenhuma" ? h("span", { class: "ca-prio-txt" }, PRIO[t.prioridade].label) : null);
     row.appendChild(prio);
     row.appendChild(h("div", { class: "c-tempo" }, timerBtn(t)));
     return row;
+  }
+  function linhaNovaSub(t) {
+    var wrap = h("div", { class: "ca-subadd", "data-pai-row": t.id });
+    if (S.addSub !== t.id) {
+      wrap.appendChild(h("button", { type: "button", class: "ca-subadd-btn", onclick: function () { iniciarSubtarefa(t.id); } }, icone("mais"), "Adicionar subtarefa"));
+      return wrap;
+    }
+    var input = h("input", { type: "text", class: "ca-subadd-input", "data-pai": t.id, placeholder: "Nome da subtarefa e Enter (Esc para sair)", maxlength: "200", "aria-label": "Nome da nova subtarefa" });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { ev.stopPropagation(); S.addSub = null; render(); return; }
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      var v = input.value.trim();
+      if (!v) return;
+      input.disabled = true;
+      post(URL_T.sub(t.id), { titulo: v, responsavel: t.responsavel }).then(function (data) {
+        if (data.pai) substituir(data.pai);
+        S.abertas[t.id] = true;
+        render();
+        var novo = view.querySelector('.ca-subadd-input[data-pai="' + t.id + '"]');
+        if (novo) novo.focus();
+        toast("Subtarefa criada");
+      }).catch(function (err) { input.disabled = false; toast(err.message); });
+    });
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        if (S.addSub === t.id && !input.value.trim() && !input.disabled && document.activeElement !== input) { S.addSub = null; render(); }
+      }, 150);
+    });
+    wrap.appendChild(h("span", { class: "ca-subadd-ico" }, icone("sub")));
+    wrap.appendChild(input);
+    return wrap;
   }
   function renomear(alvo, t) {
     var input = h("input", { type: "text", class: "ca-rename", value: t.titulo, maxlength: "200", "aria-label": "Nome da tarefa" });
@@ -1063,7 +1217,8 @@
     FLUXO.forEach(function (s) {
       var itens = lista.filter(function (t) { return t.status === s; });
       var meta = STATUS[s];
-      var recolhida = s === "complete" ? !S.fechadas : !!S.recolhidos["quadro:" + s];
+      var ehConcluida = s === "realizado" || s === "complete";
+      var recolhida = ehConcluida ? !S.fechadas : !!S.recolhidos["quadro:" + s];
       if (recolhida) {
         var estreita = h("button", {
           type: "button",
@@ -1071,11 +1226,11 @@
           style: { "--c": meta.cor },
           "aria-label": "Expandir coluna " + meta.label,
           onclick: function () {
-            if (s === "complete") { S.fechadas = true; salvarUrl(); } else S.recolhidos["quadro:" + s] = false;
+            if (ehConcluida) { S.fechadas = true; salvarUrl(); } else S.recolhidos["quadro:" + s] = false;
             render();
           },
-        }, h("span", { class: "ca-col-vert" }, meta.label + " · " + (s === "complete" ? S.tarefas.filter(function (t) { return t.status === "complete" && passaFiltroSemFechadas(t); }).length : itens.length)));
-        if (s !== "complete") ligarDrop(estreita, s, ".ca-card");
+        }, h("span", { class: "ca-col-vert" }, meta.label + " · " + (ehConcluida ? S.tarefas.filter(function (t) { return t.status === s && passaFiltroSemFechadas(t); }).length : itens.length)));
+        ligarDrop(estreita, s, ".ca-card");
         board.appendChild(estreita);
         return;
       }
@@ -1087,7 +1242,7 @@
           h("button", {
             type: "button", class: "ca-icon-btn", "data-tip": "Recolher", "aria-label": "Recolher coluna " + meta.label,
             onclick: function () {
-              if (s === "complete") { S.fechadas = false; salvarUrl(); } else S.recolhidos["quadro:" + s] = true;
+              if (ehConcluida) { S.fechadas = false; salvarUrl(); } else S.recolhidos["quadro:" + s] = true;
               render();
             },
           }, icone("menos")),
@@ -1124,7 +1279,8 @@
     el.addEventListener("keydown", function (ev) { if (ev.key === "Enter" && ev.target === el) abrirDrawer(t.id); });
     if (t.pode_status) ligarDrag(el, t.id);
     var emp = EMPRESAS[t.empresa];
-    el.appendChild(h("p", { class: "ca-card-crumb" }, emp ? emp.nome : "Sem empresa"));
+    var maisCard = h("button", { type: "button", class: "ca-icon-btn ca-card-more", "aria-label": "Mais ações", "aria-haspopup": "menu", onclick: function (ev) { ev.stopPropagation(); menuAcoes(maisCard, t); } }, icone("dots"));
+    el.appendChild(h("div", { class: "ca-card-top" }, h("p", { class: "ca-card-crumb" }, emp ? emp.nome : "Sem empresa"), maisCard));
     var tituloEl = h("p", { class: "ca-card-title" });
     if (concluida(t)) tituloEl.appendChild(icone("check", "ca-done-check"));
     tituloEl.appendChild(document.createTextNode(t.titulo));
@@ -1643,7 +1799,9 @@
     if (vencida(t)) entBtn.appendChild(h("span", { class: "ca-late-txt" }, "Venceu há " + diasEntre(parseData(t.entrega), parseData(HOJE)) + " dias"));
     var planBtn = h("button", { type: "button", class: "ca-cell is-wide", "aria-label": "Dia no planner", onclick: function () { menuData(planBtn, t, "planejado_para"); } },
       t.planejado ? h("span", { class: "ca-date" }, icone("calendario"), fmtData(t.planejado)) : h("span", { class: "ca-muted" }, "Sem dia"),
-      t.hora_inicio ? h("span", { class: "ca-muted" }, t.hora_inicio + (t.hora_fim ? "–" + t.hora_fim : "")) : null);
+      t.hora_inicio
+        ? h("span", { class: "ca-hora is-static" }, icone("relogio"), t.hora_inicio + (t.hora_fim ? "–" + t.hora_fim : ""))
+        : h("span", { class: "ca-link-txt" }, "definir horário"));
     var prBtn = h("button", { type: "button", class: "ca-cell is-wide", "aria-label": "Prioridade", onclick: function () { menuPrioridade(prBtn, t); } }, bandeira(t.prioridade), PRIO[t.prioridade].label);
     var empSel = h("select", { class: "ca-input", "aria-label": "Empresa", disabled: !t.pode_editar, onchange: function (ev) { salvarCampos(t.id, { empresa: ev.target.value }); } },
       h("option", { value: "" }, "Sem empresa"),
@@ -1653,7 +1811,7 @@
       campo("Status", stBtn),
       campo("Responsáveis", pessoasBtn),
       campo("Data de entrega", entBtn),
-      campo("Dia no planner", planBtn),
+      campo("Planner", planBtn),
       campo("Prioridade", prBtn),
       campo("Empresa", empSel),
       campo("Cronômetro", h("div", { class: "ca-dr-timer" }, timerBtn(t),
@@ -1698,9 +1856,12 @@
       corpo.appendChild(subSec);
     }
 
-    corpo.appendChild(h("section", { class: "ca-dr-sec" }, h("h3", null, "Tempo por pessoa"),
-      h("p", { class: "ca-dr-hint" }, "Cada pessoa liga o próprio cronômetro. O total da tarefa é a soma de todos."),
-      h("ul", { class: "ca-tempo-pessoas" }, h("li", { class: "ca-muted" }, "Carregando…"))));
+    corpo.appendChild(h("section", { class: "ca-dr-sec", id: "caTempoSec", "data-campo-sec": "tempo" },
+      h("div", { class: "ca-dr-sec-head" },
+        h("h3", null, "Tempo gasto", h("span", { class: "ca-dr-total", "data-total": String(t.id) }, fmtCurto(tempoTotal(t)))),
+        h("button", { type: "button", class: "ca-ghost is-sm", "data-campo": "lancar", onclick: function () { S.formTempo = t.id; S.editReg = null; desenharTempo(); var d = drawer.querySelector('[data-campo="tempo"]'); if (d) d.focus(); } }, icone("relogioMais"), "Lançar tempo")),
+      h("p", { class: "ca-dr-hint" }, "Cada pessoa liga o próprio cronômetro; o total soma todos. Esqueceu de ligar? Lance o tempo à mão."),
+      h("div", { class: "ca-tempo-box" }, h("p", { class: "ca-muted" }, "Carregando…"))));
     var ativ = h("section", { class: "ca-dr-sec ca-dr-activity", id: "caAtividade" }, h("h3", null, "Comentários e atividade"), h("ol", { class: "ca-feed" }, h("li", { class: "ca-muted" }, "Carregando…")));
     corpo.appendChild(ativ);
     drawer.appendChild(corpo);
@@ -1721,6 +1882,10 @@
 
     autoAltura(titulo);
     if (cacheDetalhe[t.id]) desenharAtividade();
+    if (S.drawerFoco === "tempo") {
+      var sec = drawer.querySelector("#caTempoSec");
+      if (sec) sec.scrollIntoView({ block: "start" });
+    }
     var foco = S.drawerFoco || focoAtual;
     S.drawerFoco = "";
     var alvo = foco ? drawer.querySelector('[data-campo="' + foco + '"]') : null;
@@ -1740,20 +1905,108 @@
         h("p", { class: "ca-feed-txt" }, ev.texto || ev.tipo_label)));
     });
     if (!feed.children.length) feed.appendChild(h("li", { class: "ca-muted" }, "Sem registros ainda."));
-    var tp = drawer.querySelector(".ca-tempo-pessoas");
-    if (tp) {
-      tp.innerHTML = "";
-      var pessoas = data.tempo_por_pessoa || [];
-      var max = pessoas.reduce(function (m, p) { return Math.max(m, p.segundos); }, 0) || 1;
-      pessoas.forEach(function (p) {
-        tp.appendChild(h("li", null,
-          avatar(p.id, true) || h("span", { class: "ca-av is-sm is-off" }),
-          h("span", { class: "ca-tp-nome" }, p.nome),
-          h("span", { class: "ca-tp-barra" }, h("i", { style: { width: Math.max(4, Math.round((p.segundos / max) * 100)) + "%" } })),
-          h("span", { class: "ca-tp-val" + (p.rodando ? " is-running" : "") }, fmtCurto(p.segundos), p.rodando ? " · rodando" : "")));
-      });
-      if (!pessoas.length) tp.appendChild(h("li", { class: "ca-muted" }, "Ninguém registrou tempo ainda. Use o cronômetro acima."));
+    desenharTempo();
+  }
+  function fmtDia(iso) {
+    if (iso === HOJE) return "Hoje";
+    if (iso === isoDe(somarDias(parseData(HOJE), -1))) return "Ontem";
+    return fmtData(iso);
+  }
+  function desenharTempo() {
+    var data = cacheDetalhe[S.drawer];
+    var box = drawer.querySelector(".ca-tempo-box");
+    var t = achar(S.drawer);
+    if (!box || !data || !t) return;
+    var foco = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.campo : null;
+    box.innerHTML = "";
+
+    if (S.formTempo === t.id) {
+      box.appendChild(formTempo(t, data, null));
+      if (S.focarTempo) {
+        S.focarTempo = false;
+        foco = "tempo";
+        drawer.querySelector("#caTempoSec").scrollIntoView({ block: "start" });
+      }
     }
+
+    var pessoas = data.tempo_por_pessoa || [];
+    var max = pessoas.reduce(function (m, p) { return Math.max(m, p.segundos); }, 0) || 1;
+    var ul = h("ul", { class: "ca-tempo-pessoas" });
+    pessoas.forEach(function (p) {
+      ul.appendChild(h("li", null,
+        avatar(p.id, true) || h("span", { class: "ca-av is-sm is-off" }),
+        h("span", { class: "ca-tp-nome" }, p.nome),
+        h("span", { class: "ca-tp-barra" }, h("i", { style: { width: Math.max(4, Math.round((p.segundos / max) * 100)) + "%" } })),
+        h("span", { class: "ca-tp-val" + (p.rodando ? " is-running" : "") }, fmtCurto(p.segundos), p.rodando ? " · rodando" : "")));
+    });
+    if (pessoas.length) box.appendChild(ul);
+    else if (S.formTempo !== t.id) box.appendChild(h("p", { class: "ca-tempo-vazio" }, "Ninguém registrou tempo ainda. Ligue o cronômetro ou use “Lançar tempo”."));
+
+    var regs = data.registros || [];
+    if (regs.length) {
+      var lista = h("ul", { class: "ca-regs" });
+      regs.forEach(function (r) {
+        if (S.editReg === r.id) { lista.appendChild(h("li", { class: "is-editing" }, formTempo(t, data, r))); return; }
+        lista.appendChild(h("li", null,
+          h("span", { class: "ca-reg-dia" }, fmtDia(r.data)),
+          avatar(r.funcionario, true),
+          h("span", { class: "ca-reg-nome" }, r.nome.split(" ")[0]),
+          r.manual ? h("span", { class: "ca-tag" }, "manual") : null,
+          r.rodando ? h("span", { class: "ca-tag is-live" }, "rodando") : null,
+          h("strong", { class: "ca-reg-val" }, fmtCurto(r.segundos)),
+          h("span", { class: "ca-reg-acoes" },
+            r.pode_editar ? h("button", { type: "button", class: "ca-icon-btn", "aria-label": "Corrigir este tempo", "data-tip": "Corrigir", onclick: function () { S.editReg = r.id; S.formTempo = null; desenharTempo(); var i = box.querySelector('[data-campo="tempo"]'); if (i) { i.focus(); i.select(); } } }, icone("lapis")) : null,
+            r.pode_editar ? h("button", { type: "button", class: "ca-icon-btn", "aria-label": "Remover este tempo", "data-tip": "Remover", onclick: function (ev) {
+              var b = ev.currentTarget;
+              abrirMenu(b, [h("p", { class: "ca-menu-note" }, "Remover " + fmtCurto(r.segundos) + " de " + r.nome.split(" ")[0] + "?"),
+                itemMenu([icone("lixo"), "Remover tempo"], false, function () { salvarTempo(URL_T.tempoExcluir(r.id), {}, "Tempo removido"); }, "is-danger")], 220);
+            } }, icone("lixo")) : null)));
+      });
+      box.appendChild(h("details", { class: "ca-regs-wrap", open: S.editReg ? true : null },
+        h("summary", null, "Registros (" + regs.length + ")"), lista));
+    }
+    if (foco) { var alvo = box.querySelector('[data-campo="' + foco + '"]'); if (alvo) alvo.focus(); }
+  }
+  function formTempo(t, data, reg) {
+    var duracao = h("input", { type: "text", class: "ca-input", "data-campo": "tempo", placeholder: "ex.: 1h30, 45min, 1:15", "aria-label": "Duração", value: reg ? fmtCurto(reg.segundos).replace("min", "min") : "" });
+    var dia = h("input", { type: "date", class: "ca-input", "aria-label": "Dia", max: HOJE, value: reg ? reg.data : HOJE });
+    var quem = null;
+    if (!reg && data.pode_lancar_para_outros) {
+      quem = h("select", { class: "ca-input", "aria-label": "Pessoa" }, D.pessoas.filter(function (p) { return p.ativo; }).map(function (p) {
+        return h("option", { value: p.id, selected: p.id === D.eu }, p.nome);
+      }));
+    }
+    var salvar = h("button", { type: "submit", class: "ca-primary is-sm" }, reg ? "Salvar" : "Lançar");
+    var form = h("form", { class: "ca-tempo-form" },
+      h("div", { class: "ca-tempo-campos" },
+        h("label", null, h("span", null, "Duração"), duracao),
+        h("label", null, h("span", null, "Dia"), dia),
+        quem ? h("label", null, h("span", null, "Pessoa"), quem) : null),
+      h("div", { class: "ca-tempo-botoes" }, salvar,
+        h("button", { type: "button", class: "ca-ghost is-sm", onclick: function () { S.formTempo = null; S.editReg = null; desenharTempo(); } }, "Cancelar")));
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var campos = { duracao: duracao.value, data: dia.value };
+      if (quem) campos.funcionario = quem.value;
+      salvar.disabled = true;
+      salvarTempo(reg ? URL_T.tempoEditar(reg.id) : URL_T.tempoLancar(t.id), campos, reg ? "Tempo corrigido" : "Tempo lançado")
+        .then(function (ok) { if (!ok) salvar.disabled = false; });
+    });
+    duracao.addEventListener("keydown", function (ev) { if (ev.key === "Escape") { ev.stopPropagation(); S.formTempo = null; S.editReg = null; desenharTempo(); } });
+    return form;
+  }
+  function salvarTempo(url, campos, msg) {
+    var id = S.drawer;
+    return post(url, campos).then(function (data) {
+      if (data.tarefa) substituir(data.tarefa);
+      S.formTempo = null;
+      S.editReg = null;
+      render();
+      if (S.drawer === id) desenharDrawer();
+      carregarDetalhe(id);
+      toast(msg);
+      return true;
+    }).catch(function (err) { toast(err.message); return false; });
   }
 
   // Cronômetro do topo do SGI foi usado: sincroniza a tela.

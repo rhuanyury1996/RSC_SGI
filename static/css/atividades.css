@@ -595,3 +595,86 @@ body.ca-drawer-open { overflow: hidden; }
 .ca-timer-quem .ca-av { width: 18px; height: 18px; font-size: 8px; border-width: 1.5px; }
 .ca-timer-quem .ca-av + .ca-av { margin-left: -6px; }
 .ca-dr-hint { margin: -2px 0 10px; font-size: 12px; color: var(--ca-muted); }
+
+/* ------------------------------------------------ ações e subtarefas */
+.ca-quick { gap: 0; background: #fff; border: 1px solid var(--ca-line); border-radius: 8px; padding: 1px; box-shadow: var(--ca-shadow); }
+.ca-row:hover .ca-quick { background: #fff; }
+.ca-quick .ca-icon-btn { width: 26px; height: 24px; }
+.ca-icon-btn.is-ok:hover { background: #e9f8ef; color: #18794e; }
+.ca-menu-item .ca-ico { color: var(--ca-muted); }
+.ca-menu-item.is-danger .ca-ico { color: var(--ca-late); }
+.ca-menu-item.is-danger:hover { background: #fdecec; }
+
+.ca-subadd { display: flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px 0 74px; border-bottom: 1px solid #f0f1f3; background: #fcfcfd; }
+.ca-subadd-btn {
+  display: inline-flex !important; align-items: center; gap: 6px; height: 28px; padding: 0 8px !important;
+  color: #a3aab5; font-size: 13px; cursor: pointer;
+}
+.ca-subadd-btn:hover { color: var(--ca-brand-ink); background: #f3f1ff !important; }
+.ca-subadd-ico { display: inline-flex; color: var(--ca-muted); }
+input.ca-subadd-input {
+  flex: 1; min-width: 0; min-height: 0; font: inherit; font-size: 13.5px; padding: 5px 8px;
+  border: 1px solid var(--ca-brand); border-radius: 6px; outline: 0; box-shadow: none;
+}
+.ca-row.is-sub { background: #fcfcfd; }
+.ca-row.is-sub .c-nome { padding-left: 40px; }
+
+/* Cronômetro zerado: só um traço, o botão aparece ao passar o mouse */
+.ca-row .ca-timer.is-zero .ca-timer-ico { opacity: 0; }
+.ca-row:hover .ca-timer.is-zero .ca-timer-ico, .ca-row .ca-timer.is-zero:focus-visible .ca-timer-ico { opacity: 1; }
+
+/* Card do quadro */
+.ca-card-top { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.ca-card-top .ca-card-crumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ca-card-more { width: 22px; height: 22px; margin: -4px -6px -4px 0; opacity: 0; }
+.ca-card:hover .ca-card-more, .ca-card:focus-within .ca-card-more { opacity: 1; }
+
+/* ------------------------------------------------ painel: tempo gasto */
+.ca-dr-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.ca-dr-sec-head h3 { margin: 0; }
+.ca-dr-total { font-size: 13px; font-weight: 800; color: var(--ca-title); background: #f0f1f4; border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums; }
+.ca-tempo-box { display: grid; gap: 12px; }
+.ca-tempo-vazio { margin: 0; font-size: 12.5px; color: var(--ca-muted); background: var(--ca-side); border: 1px dashed #d8dce1; border-radius: 8px; padding: 10px 12px; }
+.ca-tempo-form { display: grid; gap: 10px; background: #faf9ff; border: 1px solid #e3defc; border-radius: 10px; padding: 12px; }
+.ca-tempo-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ca-tempo-campos label { display: grid; gap: 4px; font-size: 12px; color: var(--ca-desc); font-weight: 600; }
+.ca-tempo-campos label:nth-child(3) { grid-column: 1 / -1; }
+.ca-tempo-botoes { display: flex; gap: 6px; }
+.ca-regs-wrap summary { cursor: pointer; font-size: 12.5px; color: var(--ca-desc); font-weight: 600; padding: 2px 0; }
+.ca-regs-wrap summary:hover { color: var(--ca-ink); }
+.ca-regs { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.ca-regs li { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 6px; border-radius: 6px; font-size: 13px; }
+.ca-regs li:hover { background: var(--ca-hover); }
+.ca-regs li.is-editing { display: block; padding: 0; background: none; }
+.ca-reg-dia { width: 52px; color: var(--ca-muted); font-size: 12px; flex: none; }
+.ca-reg-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ca-reg-val { font-variant-numeric: tabular-nums; }
+.ca-reg-acoes { display: inline-flex; opacity: 0; }
+.ca-regs li:hover .ca-reg-acoes, .ca-regs li:focus-within .ca-reg-acoes { opacity: 1; }
+.ca-tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--ca-brand-ink); background: var(--ca-brand-soft); border-radius: 4px; padding: 1px 5px; }
+.ca-tag.is-live { color: #18794e; background: #e3f4ea; }
+@media (max-width: 720px) {
+  .ca-subadd { padding-left: 40px; }
+  .ca-reg-acoes, .ca-card-more { opacity: 1; }
+}
+
+/* Menu de dia e horário */
+.ca-menu-form { display: grid; gap: 8px; padding: 2px 8px 6px; }
+.ca-menu-lbl { display: grid; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--ca-desc); }
+.ca-menu-horas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ca-menu-acoes { display: flex; gap: 6px; }
+.ca-menu-erro { margin: 0; font-size: 12px; color: var(--ca-late); min-height: 0; }
+.ca-menu-erro:empty { display: none; }
+
+/* Horário no planner */
+.ca-hora {
+  display: inline-flex !important; align-items: center; gap: 3px; height: 20px; padding: 0 6px !important; flex: none;
+  border: 1px solid #e3defc !important; background: #f6f4ff !important; border-radius: 6px !important;
+  font-size: 11.5px; font-weight: 600; color: var(--ca-brand-ink); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.ca-hora .ca-ico { width: 12px; height: 12px; }
+.ca-hora:hover { background: var(--ca-brand-soft) !important; }
+.ca-hora.is-static { cursor: inherit; }
+.ca-link-txt { font-size: 12.5px; color: var(--ca-brand-ink); }
+.ca-cell:hover .ca-link-txt { text-decoration: underline; }
+.ca-menu-dica { margin: -2px 0 0; font-size: 11.5px; color: var(--ca-muted); line-height: 1.35; }
