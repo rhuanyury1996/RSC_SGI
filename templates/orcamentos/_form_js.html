@@ -1,0 +1,34 @@
+<script id="contatos-por-empresa" type="application/json">{{ contatos_por_empresa|safe }}</script>
+<script>
+  (function () {
+    var mapa = JSON.parse(document.getElementById('contatos-por-empresa').textContent || '{}');
+    var empresa = document.getElementById('{{ form.empresa.auto_id }}');
+    var contato = document.getElementById('{{ form.contato.auto_id }}');
+    var tipo = document.getElementById('{{ form.tipo_cliente.auto_id }}');
+    var vencimento = document.getElementById('campo-vencimento');
+
+    function carregarContatos() {
+      if (!empresa || !contato) return;
+      var escolhido = contato.value;
+      var itens = mapa[empresa.value] || [];
+      contato.innerHTML = '<option value="">Contato principal da empresa</option>';
+      itens.forEach(function (c) {
+        var op = document.createElement('option');
+        op.value = c.id;
+        op.textContent = c.nome + (c.principal ? ' (principal)' : '');
+        contato.appendChild(op);
+      });
+      if (escolhido) contato.value = escolhido;
+    }
+
+    function alternarVencimento() {
+      if (!tipo || !vencimento) return;
+      vencimento.style.display = tipo.value === 'renovacao' ? '' : 'none';
+    }
+
+    if (empresa) empresa.addEventListener('change', carregarContatos);
+    if (tipo) tipo.addEventListener('change', alternarVencimento);
+    carregarContatos();
+    alternarVencimento();
+  })();
+</script>

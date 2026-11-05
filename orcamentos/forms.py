@@ -76,8 +76,9 @@ class OrcamentoForm(forms.Form):
         help_text="Em branco: próximo número livre do dia.",
     )
 
-    def __init__(self, *args, pode_sobrescrever_sequencial: bool = False, **kwargs):
+    def __init__(self, *args, pode_sobrescrever_sequencial: bool = False, edicao: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
+        self.edicao = edicao
         hoje = timezone.localdate()
         self.fields["data"].initial = hoje
         self.fields["empresa"].queryset = Empresa.objects.filter(ativa=True).order_by("nome")
@@ -93,7 +94,12 @@ class OrcamentoForm(forms.Form):
         meses = periodos_disponiveis(ano)
         self.fields["periodos"].choices = [(str(m), f"{m} meses") for m in meses]
         self.fields["periodos"].initial = [str(m) for m in meses]
-        if not pode_sobrescrever_sequencial:
+        if edicao:
+            # Número e data identificam a proposta: não mudam numa revisão.
+            self.fields["data"].disabled = True
+            self.fields["data"].help_text = "Não muda na revisão. Para outra data, emita uma nova proposta."
+            self.fields.pop("sequencial", None)
+        elif not pode_sobrescrever_sequencial:
             del self.fields["sequencial"]
 
     def clean_contato(self):
@@ -118,6 +124,25 @@ class OrcamentoForm(forms.Form):
         if dados.get("tipo_cliente") == TipoCliente.NOVO:
             dados["vencimento_licenca"] = None
         return dados
+
+    @staticmethod
+    def inicial_de(orc) -> dict:
+        """Valores do formulário a partir de uma proposta já emitida."""
+        treinos = {t["produto"]: t["alunos"] for t in (orc.treinamentos or [])}
+        return {
+            "empresa": orc.empresa_id,
+            "contato": orc.contato_id,
+            "escopo": orc.escopo,
+            "incluir_adicional": orc.incluir_adicional,
+            "periodos": [str(m) for m in orc.periodos],
+            "tipo_cliente": orc.tipo_cliente_solicitado,
+            "vencimento_licenca": orc.vencimento_licenca,
+            "treino_effects": PRODUTO_EFFECTS in treinos,
+            "alunos_effects": treinos.get(PRODUTO_EFFECTS, 1),
+            "treino_er": PRODUTO_ER in treinos,
+            "alunos_er": treinos.get(PRODUTO_ER, 1),
+            "data": orc.data,
+        }
 
     def dados_do_pedido(self) -> dict:
         """cleaned_data no formato que `services.calcular` / `services.emitir` esperam."""

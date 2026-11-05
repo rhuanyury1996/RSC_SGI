@@ -75,34 +75,29 @@
         <table class="recup-table">
           <thead>
             <tr>
-              <th>Número</th><th>Data</th><th>Empresa</th><th>Escopo</th>
+              <th>Número</th><th>Data</th><th>Empresa</th>
               <th>Serviços</th><th>Status</th><th>Emitida por</th><th></th>
             </tr>
           </thead>
           <tbody>
             {% for item in itens %}
-            <tr>
-              <td><strong>{{ item.numero }}</strong><div class="muted">{{ item.nome_arquivo }}</div></td>
+            <tr class="com-row-link" data-href="{% url 'orcamento_detalhe' item.pk %}" tabindex="0" role="link" aria-label="Abrir proposta {{ item.numero }}">
+              <td>
+                <a href="{% url 'orcamento_detalhe' item.pk %}"><strong>{{ item.numero }}</strong></a>
+                {% if item.revisao %}<span class="badge">rev. {{ item.revisao }}</span>{% endif %}
+                <div class="muted">{{ item.cliente.nome_curto }} · {{ item.get_escopo_display }}</div>
+              </td>
               <td>{{ item.data|date:"d/m/Y" }}</td>
               <td>{% if item.empresa %}{{ item.empresa.nome }}{% else %}{{ item.cliente.razao_social }}{% endif %}</td>
-              <td>{{ item.get_escopo_display }}</td>
               <td>{{ item.total_servicos|moeda:"€" }}</td>
               <td><span class="badge info">{{ item.get_status_display }}</span></td>
               <td>{% if item.emitido_por %}{{ item.emitido_por.nome_completo }}{% else %}—{% endif %}</td>
               <td class="com-row-actions">
-                <a class="link-action" href="{% url 'orcamento_download' item.pk %}">Baixar</a>
-                <form method="post" action="{% url 'orcamento_status' item.pk %}" class="inline-form">
-                  {% csrf_token %}
-                  <select name="status" onchange="this.form.submit()" aria-label="Mudar status">
-                    {% for valor, rotulo in status_opcoes %}
-                    <option value="{{ valor }}"{% if item.status == valor %} selected{% endif %}>{{ rotulo }}</option>
-                    {% endfor %}
-                  </select>
-                </form>
+                <a class="link-action" href="{% url 'orcamento_download' item.pk %}" data-row-ignore>Baixar .docx</a>
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="8" class="muted">Nenhuma proposta emitida ainda.</td></tr>
+            <tr><td colspan="7" class="muted">Nenhuma proposta emitida ainda.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -110,4 +105,16 @@
     </div>
   </details>
 </div>
+
+<script>
+  document.querySelectorAll('.com-row-link[data-href]').forEach(function (row) {
+    row.addEventListener('click', function (event) {
+      if (event.target.closest('a, button, [data-row-ignore]')) return;
+      window.location.href = row.dataset.href;
+    });
+    row.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); window.location.href = row.dataset.href; }
+    });
+  });
+</script>
 {% endblock %}

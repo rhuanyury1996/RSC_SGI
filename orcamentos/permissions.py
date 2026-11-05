@@ -20,3 +20,12 @@ def pode_gerir_parametros(funcionario: Funcionario | None) -> bool:
 
 # Sobrescrever o sequencial do dia é a mesma alçada de editar os parâmetros.
 pode_sobrescrever_sequencial = pode_gerir_parametros
+
+
+def pode_editar_orcamento(funcionario: Funcionario | None, orcamento) -> bool:
+    """Quem emitiu edita a sua; gestores editam qualquer uma."""
+    if funcionario is None:
+        return False
+    if orcamento.emitido_por_id == funcionario.pk:
+        return True
+    return pode_gerir_parametros(funcionario)

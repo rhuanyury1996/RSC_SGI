@@ -75,6 +75,7 @@ class Orcamento(models.Model):
     versao_tabela = models.CharField(max_length=120)
     nome_arquivo = models.CharField(max_length=200)
     arquivo = models.BinaryField("Arquivo .docx")
+    revisao = models.PositiveSmallIntegerField("Revisão", default=0)
     emitido_por = models.ForeignKey(
         Funcionario, on_delete=models.SET_NULL, null=True, related_name="orcamentos_emitidos"
     )
@@ -82,7 +83,9 @@ class Orcamento(models.Model):
         max_length=10, choices=StatusOrcamento.choices, default=StatusOrcamento.EMITIDA, db_index=True
     )
     historico_status = models.JSONField(default=list, blank=True)
+    historico_edicoes = models.JSONField("Histórico de edições", default=list, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Orçamento GEXCON"
@@ -90,4 +93,9 @@ class Orcamento(models.Model):
         ordering = ["-data", "-sequencial"]
 
     def __str__(self) -> str:
-        return self.numero
+        return self.identificacao
+
+    @property
+    def identificacao(self) -> str:
+        """261104-1, ou "261104-1 rev. 2" depois de editada."""
+        return f"{self.numero} rev. {self.revisao}" if self.revisao else self.numero

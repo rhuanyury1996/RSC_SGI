@@ -331,6 +331,19 @@ class TelasTests(BaseOrcamentoTestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertIn(orc.nome_arquivo, resposta["Content-Disposition"])
 
+    def test_detalhe_abre(self):
+        orc = services.emitir(self.pedido(), self.funcionario)
+        resposta = self.client.get(f"/orcamentos/{orc.pk}/")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, "261104-1")
+        self.assertContains(resposta, "€ 22.575,00")
+
+    def test_tela_de_edicao_abre_preenchida(self):
+        orc = services.emitir(self.pedido(periodos=[6]), self.funcionario)
+        resposta = self.client.get(f"/orcamentos/{orc.pk}/editar/")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context["form"]["periodos"].value(), ["6"])
+
     def test_parametros_somente_leitura_para_nao_gestor(self):
         usuario = User.objects.create_user("estagio", password="x")
         Funcionario.objects.create(
@@ -344,3 +357,84 @@ class TelasTests(BaseOrcamentoTestCase):
         resposta = self.client.get("/orcamentos/parametros/")
         self.assertEqual(resposta.status_code, 200)
         self.assertFalse(resposta.context["pode_editar"])
+
+
+class EdicaoTests(BaseOrcamentoTestCase):
+    """Editar gera nova revisão, refaz os arquivos e registra o que mudou."""
+
+    def setUp(self):
+        self.orc = services.emitir(self.pedido(), self.funcionario)
+
+    def test_revisao_incrementa_e_numero_nao_muda(self):
+        services.editar(self.orc, self.pedido(periodos=[6]), self.funcionario)
+        self.orc.refresh_from_db()
+        self.assertEqual(self.orc.numero, "261104-1")
+        self.assertEqual(self.orc.data, DATA)
+        self.assertEqual(self.orc.revisao, 1)
+        self.assertEqual(self.orc.identificacao, "261104-1 rev. 1")
+
+    def test_valores_sao_recalculados(self):
+        services.editar(self.orc, self.pedido(periodos=[6]), self.funcionario)
+        self.orc.refresh_from_db()
+        self.assertEqual(self.orc.periodos, [6])
+        self.assertEqual(formatar_euro(self.orc.total_servicos), "€ 18.963,00")
+
+    def test_historico_registra_o_que_mudou(self):
+        services.editar(
+            self.orc,
+            self.pedido(
+                periodos=[6],
+                treinamentos=[{"produto": PRODUTO_EFFECTS, "tipo": "Online", "alunos": 2}],
+            ),
+            self.funcionario,
+        )
+        self.orc.refresh_from_db()
+        entrada = self.orc.historico_edicoes[-1]
+        self.assertEqual(entrada["revisao"], 1)
+        self.assertEqual(entrada["por"], self.funcionario.nome_completo)
+        mudou = {a["campo"]: (a["de"], a["para"]) for a in entrada["alteracoes"]}
+        self.assertEqual(mudou["Períodos apresentados"][1], "6 meses")
+        self.assertEqual(mudou["Treinamentos"], ("—", "EFFECTS (2 aluno(s))"))
+        self.assertEqual(mudou["Total de SERVIÇOS"], ("€ 22.575,00", "€ 22.563,00"))
+
+    def test_duas_edicoes_empilham_no_historico(self):
+        services.editar(self.orc, self.pedido(periodos=[6]), self.funcionario)
+        services.editar(self.orc, self.pedido(periodos=[12]), self.funcionario)
+        self.orc.refresh_from_db()
+        self.assertEqual(self.orc.revisao, 2)
+        self.assertEqual([e["revisao"] for e in self.orc.historico_edicoes], [1, 2])
+
+    def test_arquivo_e_refeito(self):
+        antes = bytes(self.orc.arquivo)
+        services.editar(self.orc, self.pedido(escopo=Escopo.SO_EFFECTS.value), self.funcionario)
+        self.orc.refresh_from_db()
+        self.assertNotEqual(bytes(self.orc.arquivo), antes)
+        self.assertEqual(self.orc.nome_arquivo, "Orc_261104-1_RME_E.docx")
+
+    def test_edicao_invalida_nao_altera_a_proposta(self):
+        with self.assertRaises(services.OrcamentoErro):
+            services.editar(
+                self.orc,
+                self.pedido(
+                    treinamentos=[{"produto": PRODUTO_EFFECTS, "tipo": "Presencial", "alunos": 1}]
+                ),
+                self.funcionario,
+            )
+        self.orc.refresh_from_db()
+        self.assertEqual(self.orc.revisao, 0)
+        self.assertEqual(self.orc.historico_edicoes, [])
+
+    def test_so_quem_emitiu_ou_gestor_edita(self):
+        from .permissions import pode_editar_orcamento
+
+        outro_usuario = User.objects.create_user("outro", password="x")
+        outro = Funcionario.objects.create(
+            usuario=outro_usuario,
+            nome="Bea",
+            sobrenome="Lima",
+            data_nascimento=date(1995, 2, 2),
+            cargo=Cargo.EXECUTIVO,
+        )
+        self.assertTrue(pode_editar_orcamento(self.funcionario, self.orc))
+        self.assertFalse(pode_editar_orcamento(outro, self.orc))
+        self.assertFalse(pode_editar_orcamento(None, self.orc))

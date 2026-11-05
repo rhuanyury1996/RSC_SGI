@@ -1,0 +1,84 @@
+  {% if previa %}
+          <button class="btn" type="submit" name="acao" value="emitir">Gerar proposta (.docx)</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </details>
+
+  {% if previa %}
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Pré-visualização</h2>
+        <span class="muted">{{ previa.numero }} · {{ previa.arquivo }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      {% if previa.avisos %}
+      <ul class="messages">
+        {% for aviso in previa.avisos %}<li class="warning">{{ aviso }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              {% for m in previa.periodos %}<th>{{ m }} meses</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in previa.linhas %}
+            <tr>
+              <td><strong>{{ linha.descricao }}</strong></td>
+              {% for preco in linha.precos %}<td>{{ preco }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if previa.treinamentos %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Treinamento</th><th>Tipo</th><th>Carga</th><th>Alunos</th><th>Unitário</th><th>Subtotal</th></tr>
+          </thead>
+          <tbody>
+            {% for t in previa.treinamentos %}
+            <tr>
+              <td><strong>{{ t.produto }}</strong></td>
+              <td>{{ t.tipo }}</td>
+              <td>{{ t.horas }} horas</td>
+              <td>{{ t.alunos }}</td>
+              <td>{{ t.unitario }}</td>
+              <td>{{ t.subtotal }}</td>
+            </tr>
+            {% endfor %}
+            <tr><td colspan="5"><strong>TOTAL</strong></td><td><strong>{{ previa.total_treinamentos }}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <table class="recup-table">
+        <tbody>
+          <tr><td>SOFTWARE</td><td class="muted">A depender dos módulos e período escolhidos</td></tr>
+          <tr>
+            <td><strong>SERVIÇOS</strong></td>
+            <td><strong>{{ previa.total_servicos }}</strong>
+              <span class="muted">(módulo em {{ previa.periodo_servicos }} meses + treinamentos)</span></td>
+          </tr>
+          <tr><td>Contato</td><td>{{ previa.contato }}</td></tr>
+          <tr><td>Validade</td><td>{{ previa.validade }}</td></tr>
+          <tr><td>Tipo de cliente aplicado</td><td>{{ previa.tipo_efetivo }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+</div>
+

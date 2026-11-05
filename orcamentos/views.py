@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,8 +16,13 @@ from funcionarios.utils import obter_funcionario
 
 from . import services
 from .forms import OrcamentoForm, TabelaParametrosForm
+from .gexcon.precos import formatar_euro
 from .models import Escopo, Orcamento, StatusOrcamento, TabelaParametros
-from .permissions import pode_gerir_parametros, pode_sobrescrever_sequencial
+from .permissions import (
+    pode_editar_orcamento,
+    pode_gerir_parametros,
+    pode_sobrescrever_sequencial,
+)
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -123,6 +129,80 @@ def download(request, pk: int):
 
 
 @login_required
+def detalhe(request, pk: int):
+    """Resumo da proposta, downloads, status e os dois históricos."""
+    orc = get_object_or_404(
+        Orcamento.objects.select_related("empresa", "contato", "emitido_por"), pk=pk
+    )
+    funcionario = obter_funcionario(request)
+    return render(
+        request,
+        "orcamentos/detalhe.html",
+        {
+            "orc": orc,
+            "linhas": _linhas_para_exibir(orc),
+            "status_opcoes": StatusOrcamento.choices,
+            "pode_editar": pode_editar_orcamento(funcionario, orc),
+            "funcionario": funcionario,
+        },
+    )
+
+
+def _linhas_para_exibir(orc: Orcamento) -> list[dict]:
+    """Linhas de software do snapshot, já formatadas na ordem dos períodos."""
+    return [
+        {
+            "descricao": l["descricao"],
+            "precos": [formatar_euro(Decimal(l["precos"][str(m)])) for m in orc.periodos],
+        }
+        for l in (orc.linhas_software or [])
+    ]
+
+
+@login_required
+def editar(request, pk: int):
+    """Nova revisão da proposta: recalcula, regrava os arquivos e registra o que mudou."""
+    orc = get_object_or_404(Orcamento, pk=pk)
+    funcionario = obter_funcionario(request)
+    if not pode_editar_orcamento(funcionario, orc):
+        messages.error(request, "Você só edita as propostas que emitiu.")
+        return redirect("orcamento_detalhe", pk=orc.pk)
+
+    previa = None
+    if request.method == "POST":
+        form = OrcamentoForm(request.POST, edicao=True)
+        if form.is_valid():
+            dados = form.dados_do_pedido()
+            try:
+                if request.POST.get("acao") == "salvar":
+                    services.editar(orc, dados, funcionario)
+                    messages.success(
+                        request, f"Proposta {orc.numero} atualizada (revisão {orc.revisao})."
+                    )
+                    return redirect("orcamento_detalhe", pk=orc.pk)
+                calculado, _params, _tabela = services.calcular(
+                    {**dados, "data": orc.data, "sequencial": orc.sequencial, "ignorar_pk": orc.pk}
+                )
+                previa = services.resumo_valores(calculado)
+            except services.OrcamentoErro as exc:
+                messages.error(request, str(exc))
+    else:
+        form = OrcamentoForm(initial=OrcamentoForm.inicial_de(orc), edicao=True)
+
+    return render(
+        request,
+        "orcamentos/editar.html",
+        {
+            "orc": orc,
+            "form": form,
+            "previa": previa,
+            "contatos_por_empresa": json.dumps(_contatos_por_empresa()),
+            "funcionario": funcionario,
+        },
+    )
+
+
+@login_required
 def mudar_status(request, pk: int):
     orc = get_object_or_404(Orcamento, pk=pk)
     status = request.POST.get("status", "")
@@ -131,7 +211,7 @@ def mudar_status(request, pk: int):
     else:
         services.mudar_status(orc, status, obter_funcionario(request))
         messages.success(request, f"Proposta {orc.numero}: {orc.get_status_display().lower()}.")
-    return redirect("orcamentos")
+    return redirect(request.POST.get("next") or "orcamentos")
 
 
 @login_required

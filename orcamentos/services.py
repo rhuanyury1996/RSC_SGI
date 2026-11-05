@@ -141,8 +141,11 @@ def calcular(dados: dict):
         orc = montar_orcamento(pedido, params, cliente, proximo_sequencial)
     except (ValueError, LookupError) as exc:
         raise OrcamentoErro(str(exc).strip("'\"")) from exc
-    if pedido.sequencial and Orcamento.objects.filter(numero=orc.numero).exists():
-        raise OrcamentoErro(f"Já existe a proposta {orc.numero}. Escolha outro sequencial.")
+    if pedido.sequencial:
+        # Numa revisão, a própria proposta já usa esse número.
+        iguais = Orcamento.objects.filter(numero=orc.numero).exclude(pk=dados.get("ignorar_pk"))
+        if iguais.exists():
+            raise OrcamentoErro(f"Já existe a proposta {orc.numero}. Escolha outro sequencial.")
     return orc, params, tabela
 
 
@@ -256,6 +259,125 @@ def mudar_status(orc: Orcamento, status: str, autor) -> None:
         {"status": status, "em": timezone.now().isoformat(), "por": getattr(autor, "nome_completo", "")}
     ]
     orc.save(update_fields=["status", "historico_status"])
+
+
+# ------------------------------------------------------------------ edição
+
+
+ROTULOS = {
+    "escopo": "Escopo",
+    "contato": "Contato",
+    "periodos": "Períodos apresentados",
+    "incluir_adicional": "Usuário adicional",
+    "tipo_cliente_solicitado": "Tipo de cliente",
+    "vencimento_licenca": "Vencimento da licença",
+    "treinamentos": "Treinamentos",
+    "total_servicos": "Total de SERVIÇOS",
+}
+
+
+def _legivel(campo: str, valor) -> str:
+    if valor in (None, "", [], {}):
+        return "—"
+    if campo == "incluir_adicional":
+        return "sim" if valor else "não"
+    if campo == "periodos":
+        return ", ".join(f"{m} meses" for m in valor)
+    if campo == "treinamentos":
+        return ", ".join(f"{t['produto']} ({t['alunos']} aluno(s))" for t in valor) or "—"
+    if campo == "total_servicos":
+        return formatar_euro(Decimal(str(valor)))
+    if isinstance(valor, date):
+        return f"{valor:%d/%m/%Y}"
+    return str(valor)
+
+
+def _estado(orc: Orcamento) -> dict:
+    """Campos que o histórico de edição acompanha."""
+    return {
+        "escopo": orc.escopo,
+        "contato": (orc.contato_dados or {}).get("nome", ""),
+        "periodos": list(orc.periodos),
+        "incluir_adicional": bool(orc.incluir_adicional),
+        "tipo_cliente_solicitado": orc.tipo_cliente_solicitado,
+        "vencimento_licenca": orc.vencimento_licenca,
+        "treinamentos": [
+            {"produto": t["produto"], "alunos": t["alunos"]} for t in (orc.treinamentos or [])
+        ],
+        "total_servicos": str(orc.total_servicos),
+    }
+
+
+def diferencas(antes: dict, depois: dict) -> list[dict]:
+    return [
+        {"campo": ROTULOS.get(c, c), "de": _legivel(c, antes[c]), "para": _legivel(c, depois[c])}
+        for c in ROTULOS
+        if antes.get(c) != depois.get(c)
+    ]
+
+
+def editar(orc: Orcamento, dados: dict, autor) -> Orcamento:
+    """Recalcula a proposta mantendo número e data, e registra o que mudou."""
+    dados = {**dados, "data": orc.data, "sequencial": orc.sequencial, "ignorar_pk": orc.pk}
+    antes = _estado(orc)
+    calculado, params, tabela = calcular(dados)
+    conteudo = gerar_bytes(calculado, params)
+
+    orc.empresa = dados["empresa"]
+    orc.contato = dados.get("contato") or dados["empresa"].contatos.filter(
+        pk=calculado.contato.id
+    ).first()
+    orc.cliente = {
+        "razao_social": calculado.cliente.razao_social,
+        "nome_curto": calculado.cliente.nome_curto,
+        "cnpj": calculado.cliente.cnpj,
+        "endereco_linhas": calculado.cliente.endereco_linhas,
+    }
+    orc.contato_dados = {
+        "nome": calculado.contato.nome,
+        "fone": calculado.contato.fone,
+        "email": calculado.contato.email,
+    }
+    orc.escopo = calculado.escopo.value
+    orc.periodos = calculado.periodos_meses
+    orc.incluir_adicional = bool(dados.get("incluir_adicional"))
+    orc.tipo_cliente_solicitado = dados.get("tipo_cliente") or "novo"
+    orc.tipo_cliente_efetivo = calculado.tipo_cliente.value
+    orc.vencimento_licenca = dados.get("vencimento_licenca")
+    orc.linhas_software = [
+        {"descricao": l.descricao, "precos": {str(m): str(v) for m, v in l.precos_por_periodo.items()}}
+        for l in calculado.linhas_software
+    ]
+    orc.treinamentos = [
+        {
+            "produto": l.produto,
+            "tipo": l.tipo,
+            "horas": l.horas,
+            "alunos": l.alunos,
+            "preco_unitario": str(l.preco_unitario),
+        }
+        for l in calculado.linhas_treinamento
+    ]
+    orc.total_treinamentos = calculado.total_treinamentos
+    orc.total_servicos = calculado.total_servicos
+    orc.avisos = list(calculado.avisos)
+    orc.tabela = tabela
+    orc.versao_tabela = params.versao_tabela
+    orc.nome_arquivo = calculado.nome_arquivo
+    orc.arquivo = conteudo
+    orc.revisao = (orc.revisao or 0) + 1
+
+    alteracoes = diferencas(antes, _estado(orc))
+    orc.historico_edicoes = list(orc.historico_edicoes or []) + [
+        {
+            "revisao": orc.revisao,
+            "em": timezone.now().isoformat(),
+            "por": getattr(autor, "nome_completo", ""),
+            "alteracoes": alteracoes,
+        }
+    ]
+    orc.save()
+    return orc
 
 
 TREINAMENTO_PRODUTOS = ((PRODUTO_EFFECTS, "EFFECTS (12 h)"), (PRODUTO_ER, "EFFECTS + RISKCURVES (18 h)"))

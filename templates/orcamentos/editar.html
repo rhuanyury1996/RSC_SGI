@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Editar {{ orc.numero }} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos <span>/</span> {{ orc.numero }} <span>/</span> Editar{% endblock %}
+{% block page_title %}Editar proposta {{ orc.numero }}{% endblock %}
+{% block page_actions %}
+  <a class="btn ghost" href="{% url 'orcamento_detalhe' orc.pk %}">Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <ul class="messages"><li class="info">
+    Salvar cria a <strong>revisão {{ orc.revisao|add:1 }}</strong>: os arquivos são refeitos e a
+    mudança fica registrada no histórico. Número e data continuam os mesmos.
+  </li></ul>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Dados da proposta</h2>
+        <span class="muted">revisão atual: {{ orc.revisao }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form" id="form-orcamento">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+{% include "orcamentos/_campos.html" %}
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit" name="acao" value="previa">Pré-visualizar valores</button>
+          {% if previa %}
+          <button class="btn" type="submit" name="acao" value="salvar">Salvar revisão {{ orc.revisao|add:1 }}</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </details>
+
+{% include "orcamentos/_previa.html" %}
+</div>
+{% include "orcamentos/_form_js.html" %}
+{% endblock %}
