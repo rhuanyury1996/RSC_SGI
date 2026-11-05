@@ -51,6 +51,9 @@
     setIfEmpty(tel2, dados.telefone_portaria_2);
     setIfEmpty(email, dados.email_geral);
     setIfEmpty(cidade, dados.cidade);
+    ["razao_social", "nome_curto", "logradouro", "complemento", "cep", "pais"].forEach(function (campo) {
+      setIfEmpty(form.querySelector('[name="' + campo + '"]'), dados[campo]);
+    });
     if (estado && dados.estado && !String(estado.value || "").trim()) {
       estado.value = dados.estado;
       estado.dispatchEvent(new Event("change", { bubbles: true }));

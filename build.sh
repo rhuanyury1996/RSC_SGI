@@ -12,3 +12,6 @@ fi
 
 # Cadastra feriados nacionais (crédito automático de jornada)
 python manage.py cadastrar_feriados
+
+# Tabela de parâmetros do orçamento GEXCON (não sobrescreve se já existir)
+python manage.py seed_parametros_orcamento

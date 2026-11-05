@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "crm",
     "atividades",
     "pagamentos",
+    "orcamentos",
 ]
 
 MIDDLEWARE = [

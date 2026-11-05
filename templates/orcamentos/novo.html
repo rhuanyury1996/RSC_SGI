@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Novo orçamento · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos <span>/</span> Novo{% endblock %}
+{% block page_title %}Novo orçamento GEXCON{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'orcamentos' %}">Histórico</a>
+  <a class="btn ghost" href="{% url 'orcamento_parametros' %}">Parâmetros</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if pendencias %}
+  <ul class="messages"><li class="warning">
+    Faltam dados no cadastro da empresa: {{ pendencias|join:", " }}.
+    Complete em <a href="{% url 'crm_empresas' %}">Empresas</a> antes de enviar a proposta.
+  </li></ul>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Dados da proposta</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form" id="form-orcamento">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Cliente</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.contato.id_for_label }}">{{ form.contato.label }}</label>
+              {{ form.contato }}{{ form.contato.errors }}
+              <p class="field-hint muted">Em branco: usa o contato principal da empresa.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Escopo e períodos</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label>{{ form.escopo.label }}</label>
+              <div class="check-grid">{{ form.escopo }}</div>
+              {{ form.escopo.errors }}
+            </div>
+            <div class="field">
+              <label>{{ form.periodos.label }}</label>
+              <div class="check-grid">{{ form.periodos }}</div>
+              {{ form.periodos.errors }}
+            </div>
+            <div class="field span-2">
+              <label class="check-inline">{{ form.incluir_adicional }} {{ form.incluir_adicional.label }}</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Tipo de cliente</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.tipo_cliente.id_for_label }}">{{ form.tipo_cliente.label }}</label>
+              {{ form.tipo_cliente }}{{ form.tipo_cliente.errors }}
+            </div>
+            <div class="field" id="campo-vencimento">
+              <label for="{{ form.vencimento_licenca.id_for_label }}">{{ form.vencimento_licenca.label }}</label>
+              {{ form.vencimento_licenca }}{{ form.vencimento_licenca.errors }}
+              <p class="field-hint muted">{{ form.vencimento_licenca.help_text }}</p>
+            </div>
+          </div>
+        </div>
+
+        <details class="form-section form-section-collapse"{% if form.treino_effects.value or form.treino_er.value %} open{% endif %}>
+          <summary class="form-section-summary">
+            <span class="form-section-title">Treinamentos</span>
+            <span class="apont-lista-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="form-section-body">
+            <div class="empresa-grid">
+              <div class="field">
+                <label class="check-inline">{{ form.treino_effects }} {{ form.treino_effects.label }}</label>
+                {{ form.alunos_effects }}{{ form.alunos_effects.errors }}
+                <p class="field-hint muted">Alunos · online</p>
+              </div>
+              <div class="field">
+                <label class="check-inline">{{ form.treino_er }} {{ form.treino_er.label }}</label>
+                {{ form.alunos_er }}{{ form.alunos_er.errors }}
+                <p class="field-hint muted">Alunos · online</p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Emissão</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
+              {{ form.data }}{{ form.data.errors }}
+            </div>
+            {% if form.sequencial %}
+            <div class="field">
+              <label for="{{ form.sequencial.id_for_label }}">{{ form.sequencial.label }}</label>
+              {{ form.sequencial }}{{ form.sequencial.errors }}
+              <p class="field-hint muted">{{ form.sequencial.help_text }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit" name="acao" value="previa">Pré-visualizar valores</button>
+          {% if previa %}
+          <button class="btn" type="submit" name="acao" value="emitir">Gerar proposta (.docx)</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </details>
+
+  {% if previa %}
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Pré-visualização</h2>
+        <span class="muted">{{ previa.numero }} · {{ previa.arquivo }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      {% if previa.avisos %}
+      <ul class="messages">
+        {% for aviso in previa.avisos %}<li class="warning">{{ aviso }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              {% for m in previa.periodos %}<th>{{ m }} meses</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in previa.linhas %}
+            <tr>
+              <td><strong>{{ linha.descricao }}</strong></td>
+              {% for preco in linha.precos %}<td>{{ preco }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if previa.treinamentos %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Treinamento</th><th>Tipo</th><th>Carga</th><th>Alunos</th><th>Unitário</th><th>Subtotal</th></tr>
+          </thead>
+          <tbody>
+            {% for t in previa.treinamentos %}
+            <tr>
+              <td><strong>{{ t.produto }}</strong></td>
+              <td>{{ t.tipo }}</td>
+              <td>{{ t.horas }} horas</td>
+              <td>{{ t.alunos }}</td>
+              <td>{{ t.unitario }}</td>
+              <td>{{ t.subtotal }}</td>
+            </tr>
+            {% endfor %}
+            <tr><td colspan="5"><strong>TOTAL</strong></td><td><strong>{{ previa.total_treinamentos }}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <table class="recup-table">
+        <tbody>
+          <tr><td>SOFTWARE</td><td class="muted">A depender dos módulos e período escolhidos</td></tr>
+          <tr>
+            <td><strong>SERVIÇOS</strong></td>
+            <td><strong>{{ previa.total_servicos }}</strong>
+              <span class="muted">(módulo em {{ previa.periodo_servicos }} meses + treinamentos)</span></td>
+          </tr>
+          <tr><td>Contato</td><td>{{ previa.contato }}</td></tr>
+          <tr><td>Validade</td><td>{{ previa.validade }}</td></tr>
+          <tr><td>Tipo de cliente aplicado</td><td>{{ previa.tipo_efetivo }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<script id="contatos-por-empresa" type="application/json">{{ contatos_por_empresa|safe }}</script>
+<script>
+  (function () {
+    var mapa = JSON.parse(document.getElementById('contatos-por-empresa').textContent || '{}');
+    var empresa = document.getElementById('{{ form.empresa.auto_id }}');
+    var contato = document.getElementById('{{ form.contato.auto_id }}');
+    var tipo = document.getElementById('{{ form.tipo_cliente.auto_id }}');
+    var vencimento = document.getElementById('campo-vencimento');
+
+    function carregarContatos() {
+      if (!empresa || !contato) return;
+      var escolhido = contato.value;
+      var itens = mapa[empresa.value] || [];
+      contato.innerHTML = '<option value="">Contato principal da empresa</option>';
+      itens.forEach(function (c) {
+        var op = document.createElement('option');
+        op.value = c.id;
+        op.textContent = c.nome + (c.principal ? ' (principal)' : '');
+        contato.appendChild(op);
+      });
+      if (escolhido) contato.value = escolhido;
+    }
+
+    function alternarVencimento() {
+      if (!tipo || !vencimento) return;
+      vencimento.style.display = tipo.value === 'renovacao' ? '' : 'none';
+    }
+
+    if (empresa) empresa.addEventListener('change', carregarContatos);
+    if (tipo) tipo.addEventListener('change', alternarVencimento);
+    carregarContatos();
+    alternarVencimento();
+  })();
+</script>
+{% endblock %}

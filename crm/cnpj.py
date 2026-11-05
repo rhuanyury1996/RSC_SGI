@@ -99,9 +99,31 @@ def consultar_cnpj(cnpj: str) -> dict[str, Any]:
     cidade = _titulo(str(payload.get("municipio") or ""))
     uf = (payload.get("uf") or "").strip().upper()[:2]
 
+    tipo_log = _titulo(str(payload.get("descricao_tipo_de_logradouro") or ""))
+    logradouro = _titulo(str(payload.get("logradouro") or ""))
+    if tipo_log and logradouro and not logradouro.lower().startswith(tipo_log.lower()):
+        logradouro = f"{tipo_log} {logradouro}"
+    numero = str(payload.get("numero") or "").strip()
+    if logradouro and numero:
+        logradouro = f"{logradouro}, {numero}"
+    complemento = ", ".join(
+        p for p in (
+            _titulo(str(payload.get("complemento") or "")),
+            _titulo(str(payload.get("bairro") or "")),
+        ) if p
+    )
+    cep = re.sub(r"\D", "", str(payload.get("cep") or ""))
+    if len(cep) == 8:
+        cep = f"{cep[:5]}-{cep[5:]}"
+
     return {
         "cnpj": formatar_cnpj(digitos),
         "nome": nome,
+        "nome_curto": fantasia[:60] if fantasia else "",
+        "logradouro": logradouro,
+        "complemento": complemento,
+        "cep": cep,
+        "pais": "Brasil",
         "razao_social": razao,
         "nome_fantasia": fantasia,
         "telefone_portaria": tel1,

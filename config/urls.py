@@ -17,6 +17,7 @@ urlpatterns = [
     path("comercial/", include("crm.urls")),
     path("atividades/", include("atividades.urls")),
     path("pagamentos/", include("pagamentos.urls")),
+    path("orcamentos/", include("orcamentos.urls")),
 ]
 
 # Media: em DEBUG usa o helper; em produção serve via view (disco do Render é efêmero)

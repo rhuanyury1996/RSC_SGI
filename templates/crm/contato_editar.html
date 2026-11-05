@@ -76,6 +76,10 @@
               <label for="{{ form.empresa.id_for_label }}">Selecionar empresa</label>
               {{ form.empresa }}{{ form.empresa.errors }}
             </div>
+            <div class="field span-2">
+              <label class="check-inline">{{ form.principal }} {{ form.principal.label }}</label>
+              <p class="field-hint muted">{{ form.principal.help_text }} Só um contato por empresa fica marcado.</p>
+            </div>
           </div>
         </div>
 

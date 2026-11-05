@@ -38,6 +38,12 @@ class EmpresaForm(forms.ModelForm):
         fields = (
             "nome",
             "cnpj",
+            "razao_social",
+            "nome_curto",
+            "logradouro",
+            "complemento",
+            "cep",
+            "pais",
             "site",
             "nicho",
             "classificacao_unidade",
@@ -156,6 +162,7 @@ class ContatoForm(forms.ModelForm):
             "telefone_whatsapp",
             "responsavel",
             "empresa",
+            "principal",
             "clientes_rsc",
         )
         widgets = {
