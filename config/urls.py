@@ -7,6 +7,8 @@ from django.views.static import serve
 admin.site.site_header = "SGI RSC"
 admin.site.site_title = "SGI RSC"
 admin.site.index_title = "Gestão Interna"
+# Segurança: só superusuário ativo entra no /admin
+admin.site.has_permission = lambda request: request.user.is_active and request.user.is_superuser
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -17,6 +19,7 @@ urlpatterns = [
     path("comercial/", include("crm.urls")),
     path("atividades/", include("atividades.urls")),
     path("pagamentos/", include("pagamentos.urls")),
+    path("orcamentos/", include("orcamentos.urls")),
 ]
 
 # Media: em DEBUG usa o helper; em produção serve via view (disco do Render é efêmero)

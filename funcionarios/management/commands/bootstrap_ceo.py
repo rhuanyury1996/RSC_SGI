@@ -40,6 +40,17 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
 
+        # Segurança: o CEO é o único admin do sistema
+        outros = User.objects.exclude(pk=user.pk).filter(is_superuser=True) | User.objects.exclude(
+            pk=user.pk
+        ).filter(is_staff=True)
+        rebaixados = list(outros.distinct().values_list("username", flat=True))
+        if rebaixados:
+            User.objects.filter(username__in=rebaixados).update(is_superuser=False, is_staff=False)
+            self.stdout.write(
+                self.style.WARNING(f"Admin removido de: {', '.join(rebaixados)}")
+            )
+
         if created:
             self.stdout.write(self.style.SUCCESS(f"CEO criado: {username}"))
         else:

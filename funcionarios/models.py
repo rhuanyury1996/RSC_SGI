@@ -27,6 +27,21 @@ class Setor(models.TextChoices):
     DESENVOLVIMENTO = "desenvolvimento", "Desenvolvimento"
 
 
+class NivelAcesso(models.TextChoices):
+    EDITAR = "editar", "Ver e editar"
+    VER = "ver", "Só ver"
+    NENHUM = "nenhum", "Sem acesso"
+
+
+def _campo_acesso(rotulo: str):
+    return models.CharField(
+        rotulo,
+        max_length=10,
+        choices=NivelAcesso.choices,
+        default=NivelAcesso.EDITAR,
+    )
+
+
 class SignoSolar(models.TextChoices):
     ARIES = "aries", "Áries"
     TOURO = "touro", "Touro"
@@ -141,6 +156,14 @@ class Funcionario(models.Model):
         related_name="funcionario",
     )
     ativo = models.BooleanField("Ativo", default=True)
+    # Acesso por módulo (ver funcionarios/acessos.py)
+    acesso_comercial = _campo_acesso("Comercial (CRM)")
+    acesso_orcamentos = _campo_acesso("Orçamentos")
+    acesso_atividades = _campo_acesso("Atividades")
+    acesso_apontamentos = _campo_acesso("Apontamentos")
+    acesso_calendario = _campo_acesso("Calendário")
+    acesso_informativos = _campo_acesso("Informativos")
+    acesso_pagamentos = _campo_acesso("Pagamentos")
     criado_em = models.DateTimeField("Criado em", auto_now_add=True)
     atualizado_em = models.DateTimeField("Atualizado em", auto_now=True)
 
@@ -259,3 +282,12 @@ class Funcionario(models.Model):
         saida = self.hora_saida.strftime("%H:%M")
         liquida = self.jornada_diaria_horas()
         return f"{dias_txt} · {entrada}–{saida} ({liquida}h líquidas/dia)"
+
+
+class AcessoModulo(Funcionario):
+    """Visão do admin: matriz funcionário × módulo."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Acesso aos módulos"
+        verbose_name_plural = "Acessos aos módulos"

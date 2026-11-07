@@ -1,0 +1,32 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Admin SGI RSC{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/admin_sgi.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+  <a href="{% url 'admin:index' %}" class="sgi-admin-brand">
+    <img src="{% static 'img/logo-rsc-white.png' %}" alt="RSC">
+    <span>Admin</span>
+  </a>
+</div>
+{% endblock %}
+
+{% block userlinks %}
+<a href="{% url 'home' %}">← Voltar ao SGI</a> /
+{% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}">Senha</a> /{% endif %}
+<form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+  {% csrf_token %}
+  <button type="submit">Sair</button>
+</form>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

@@ -1,0 +1,173 @@
+/* Admin SGI RSC — mesmo design system do sgi.css */
+:root,
+html[data-theme="light"],
+html[data-theme="dark"],
+html[data-theme="auto"] {
+  --sgi-bg: #f6f7f9;
+  --sgi-soft: #eef0f4;
+  --sgi-card: #ffffff;
+  --sgi-text: #16181d;
+  --sgi-muted: #64748b;
+  --sgi-line: #e6e8ee;
+  --sgi-line-strong: #d7dae3;
+  --sgi-accent: #2563eb;
+  --sgi-accent-soft: #e8efff;
+  --sgi-radius: 14px;
+  --sgi-radius-sm: 10px;
+
+  /* Variáveis nativas do Django admin */
+  --font-family-primary: "Manrope", "Segoe UI", sans-serif;
+  --primary: #1d4ed8;
+  --secondary: #1e3a8a;
+  --accent: #7dd3fc;
+  --primary-fg: #fff;
+  --body-fg: var(--sgi-text);
+  --body-bg: var(--sgi-bg);
+  --body-quiet-color: var(--sgi-muted);
+  --body-medium-color: #475569;
+  --body-loud-color: #000;
+  --header-color: #fff;
+  --header-branding-color: #fff;
+  --header-bg: linear-gradient(90deg, #0891b2 0%, #1d4ed8 55%, #1e3a8a 100%);
+  --header-link-color: #fff;
+  --breadcrumbs-fg: var(--sgi-muted);
+  --breadcrumbs-link-fg: var(--sgi-accent);
+  --breadcrumbs-bg: transparent;
+  --link-fg: var(--sgi-accent);
+  --link-hover-color: #1e40af;
+  --link-selected-fg: #1e3a8a;
+  --hairline-color: var(--sgi-line);
+  --border-color: var(--sgi-line-strong);
+  --error-fg: #b91c1c;
+  --message-success-bg: #e8f7ee;
+  --message-warning-bg: #fff1e8;
+  --message-error-bg: #fdecec;
+  --darkened-bg: var(--sgi-soft);
+  --selected-bg: var(--sgi-accent-soft);
+  --selected-row: #f3f7ff;
+  --button-fg: #fff;
+  --button-bg: #111827;
+  --button-hover-bg: #000;
+  --default-button-bg: var(--sgi-accent);
+  --default-button-hover-bg: #1d4ed8;
+  --close-button-bg: #64748b;
+  --close-button-hover-bg: #475569;
+  --delete-button-bg: #b91c1c;
+  --delete-button-hover-bg: #991b1b;
+  --object-tools-fg: #fff;
+  --object-tools-bg: #111827;
+  --object-tools-hover-bg: #000;
+  color-scheme: light;
+}
+
+body { font-family: var(--font-family-primary); font-size: 14.5px; background: var(--sgi-bg); -webkit-font-smoothing: antialiased; }
+.theme-toggle { display: none !important; }
+
+/* Topbar */
+#header {
+  background: var(--header-bg);
+  height: 64px; padding: 0 1.25rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,.06);
+}
+#site-name { font-size: 1rem; }
+.sgi-admin-brand { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none; }
+.sgi-admin-brand img { height: 23px; width: auto; }
+.sgi-admin-brand span {
+  font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase;
+  padding: .2rem .55rem; border-radius: 999px; background: rgba(255,255,255,.16);
+}
+#user-tools { font-size: .84rem; text-transform: none; letter-spacing: 0; }
+#user-tools a, #logout-form button { border-bottom: 0; color: rgba(255,255,255,.85); }
+#user-tools a:hover, #logout-form button:hover { color: #7dd3fc; text-decoration: none; }
+
+/* Breadcrumbs */
+div.breadcrumbs { padding: .85rem 1.35rem; font-size: .82rem; border-bottom: 1px solid var(--sgi-line); background: #fbfbfc; }
+div.breadcrumbs a { color: var(--sgi-accent); }
+
+/* Conteúdo */
+#content { padding: 1.15rem 1.35rem; }
+#content h1 { font-weight: 800; font-size: 1.45rem; color: var(--sgi-text); margin-bottom: 1rem; }
+h2, h3 { font-weight: 700; }
+
+/* Cards (módulos) */
+.module, #changelist, .inline-group, fieldset.module {
+  background: var(--sgi-card);
+  border: 1px solid var(--sgi-line);
+  border-radius: var(--sgi-radius);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16,24,40,.04);
+}
+.module h2, .module caption, .inline-group h2 {
+  background: #fbfbfc; color: var(--sgi-text);
+  font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  padding: .75rem 1rem; border-bottom: 1px solid var(--sgi-line);
+}
+.module caption a.section { color: var(--sgi-text); }
+#content-main .module { margin-bottom: 1rem; }
+.dashboard #content { max-width: 1280px; }
+.dashboard .module table th, .dashboard .module table td { padding: .6rem 1rem; }
+.dashboard .module table th a { font-weight: 600; }
+
+/* Tabelas */
+table { border-color: var(--sgi-line); }
+thead th, tfoot td {
+  background: var(--sgi-soft); color: var(--sgi-muted);
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border-bottom: 1px solid var(--sgi-line);
+}
+thead th a { color: var(--sgi-muted); }
+td, th { border-bottom-color: var(--sgi-line); font-size: .88rem; vertical-align: middle; }
+#result_list tbody tr:hover { background: #f8fafc; }
+tr.selected { background: var(--selected-row) !important; }
+
+/* Botões */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  border-radius: var(--sgi-radius-sm); font-weight: 700; padding: .6rem 1rem; font-family: inherit;
+}
+.object-tools a, .object-tools a:link, .object-tools a:visited {
+  border-radius: 999px; font-weight: 700; text-transform: none; letter-spacing: 0; padding: .45rem .9rem;
+}
+.object-tools a.addlink { background-color: var(--sgi-accent); }
+.submit-row {
+  background: #fbfbfc; border: 1px solid var(--sgi-line); border-radius: var(--sgi-radius);
+  padding: .85rem 1rem;
+}
+.submit-row a.deletelink { border-radius: var(--sgi-radius-sm); padding: .6rem 1rem; }
+
+/* Inputs */
+input[type=text], input[type=password], input[type=email], input[type=url], input[type=number],
+input[type=tel], input[type=date], input[type=time], input[type=search], textarea, select, .vTextField {
+  border: 1px solid var(--sgi-line-strong); border-radius: var(--sgi-radius-sm);
+  padding: .5rem .65rem; font-family: inherit; font-size: .9rem; background: #fff;
+}
+input:focus, textarea:focus, select:focus {
+  outline: 0; border-color: var(--sgi-accent); box-shadow: 0 0 0 3px var(--sgi-accent-soft);
+}
+.form-row { padding: .85rem 1rem; border-bottom-color: var(--sgi-line); }
+label { color: var(--sgi-text); font-weight: 600; }
+.help, p.help, div.help { color: var(--sgi-muted); }
+
+/* Busca + filtros */
+#toolbar { background: transparent; border: 0; padding: 0 0 .75rem; }
+#toolbar #searchbar { min-width: 280px; }
+#changelist-filter {
+  background: var(--sgi-card); border: 1px solid var(--sgi-line); border-radius: var(--sgi-radius);
+}
+#changelist-filter h2 { background: #fbfbfc; color: var(--sgi-text); border-radius: var(--sgi-radius) var(--sgi-radius) 0 0; }
+#changelist-filter h3 { color: var(--sgi-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+#changelist-filter li.selected a { color: var(--sgi-accent); font-weight: 700; }
+.paginator { padding: .75rem 1rem; color: var(--sgi-muted); }
+
+/* Sidebar do admin */
+#nav-sidebar { background: #fbfbfc; border-right: 1px solid var(--sgi-line); }
+#nav-sidebar .module { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+#nav-sidebar .current-model { background: var(--sgi-accent-soft); }
+#nav-filter { border-radius: var(--sgi-radius-sm); border: 1px solid var(--sgi-line); }
+.toggle-nav-sidebar { background: #fbfbfc; border-color: var(--sgi-line); }
+
+/* Mensagens */
+ul.messagelist li { border-radius: var(--sgi-radius-sm); margin: 0 0 .5rem; font-weight: 600; }
+
+/* Login do admin */
+.login #container { border-radius: 18px; border: 1px solid var(--sgi-line); overflow: hidden; box-shadow: 0 10px 30px rgba(16,24,40,.08); }
+.login #header { height: auto; padding: 1rem 1.25rem; }
