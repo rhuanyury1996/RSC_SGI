@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static financeiro_tags %}
+{% block title %}Lançamentos · Financeiro · SGI RSC{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/financeiro.css' %}">{% endblock %}
+{% block breadcrumb %}Financeiro <span>/</span> Lançamentos{% endblock %}
+{% block page_title %}Lançamentos{% endblock %}
+{% block page_actions %}
+<a class="btn secondary" href="{% url 'financeiro:exportar' %}{% if export_query %}?{{ export_query }}{% endif %}">Excel</a>
+<a class="btn" href="{% url 'financeiro:novo' %}">+ Novo</a>
+{% endblock %}
+{% block content %}
+<div class="fin-page">
+  {% include "financeiro/_topo.html" with aba="lancamentos" %}
+
+  <div class="fin-kpis">
+    <div class="fin-kpi"><div class="fin-kpi-label">Receitas</div><div class="fin-kpi-value fin-pos">+{{ totals.income_cents|money }}</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Vendas projetadas</div><div class="fin-kpi-value fin-warn">+{{ totals.projected_cents|money }}</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Receita + projetada</div><div class="fin-kpi-value">+{{ totals.pipeline_cents|money }}</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Saídas · saldo</div><div class="fin-kpi-value fin-neg">{{ totals.expense_cents|money }}</div><div class="fin-kpi-sub">saldo {% if totals.balance_cents > 0 %}+{% endif %}{{ totals.balance_cents|money }} · {{ period_label }}{% if period_range %} · {{ period_range }}{% endif %}</div></div>
+  </div>
+
+  <section class="card">
+    <form method="get" class="fin-filters">
+      <div class="fin-line fin-chips">
+        <span class="fin-small">Período</span>
+        {% for p, rot in periodos %}
+        <a class="fin-chip {% if period == p %}on{% endif %}" href="?period={{ p }}{% if flow %}&flow={{ flow }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if kind %}&kind={{ kind }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ rot }}</a>
+        {% endfor %}
+        <label class="fin-small" for="f-de">De</label>
+        <input id="f-de" type="date" name="date_from" value="{{ date_from }}" onchange="document.getElementById('f-period').value='custom'">
+        <label class="fin-small" for="f-ate">Até</label>
+        <input id="f-ate" type="date" name="date_to" value="{{ date_to }}" onchange="document.getElementById('f-period').value='custom'">
+        <input type="hidden" name="period" id="f-period" value="{{ period }}">
+      </div>
+      <div class="fin-line fin-chips">
+        {% with qs="?period="|add:period %}
+        <a class="fin-chip {% if not flow and not status %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Todos <span class="n">{{ counts.all }}</span></a>
+        <a class="fin-chip {% if flow == 'income' %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&flow=income">Recebidos <span class="n">{{ counts.income }}</span></a>
+        <a class="fin-chip {% if flow == 'projected' %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&flow=projected">Projetadas <span class="n">{{ counts.projected }}</span></a>
+        <a class="fin-chip {% if flow == 'expense' %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&flow=expense">Saídas <span class="n">{{ counts.expense }}</span></a>
+        <a class="fin-chip {% if status == 'pending' %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&status=pending">Pendentes <span class="n">{{ counts.pending }}</span></a>
+        <a class="fin-chip {% if status == 'paid' %}on{% endif %}" href="{{ qs }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&status=paid">Pagos <span class="n">{{ counts.paid }}</span></a>
+        {% endwith %}
+      </div>
+      <div class="fin-line">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar lançamentos…">
+        <select name="kind">
+          <option value="">Todos os tipos</option>
+          {% for value, label in entry_kinds %}<option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if flow %}<input type="hidden" name="flow" value="{{ flow }}">{% endif %}
+        {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        <button type="submit">Filtrar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="fin-selbar" id="fin-selbar">
+      <span><strong id="sel-n">0</strong> selecionado(s)</span>
+      <span>Soma: <strong id="sel-soma">R$ 0,00</strong></span>
+      <span>A pagar: <strong id="sel-pagar">R$ 0,00</strong></span>
+      <span>A receber: <strong id="sel-receber">R$ 0,00</strong></span>
+      <button type="button" class="btn ghost" id="sel-limpar">Limpar</button>
+    </div>
+    <div class="fin-table-wrap">
+      <table class="fin-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="sel-todos" aria-label="Selecionar todos"></th>
+            <th>Vencimento</th><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th>
+            <th>Conta · categoria</th><th>Entidade</th><th>Status</th><th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr>
+            <td><input type="checkbox" class="sel" data-amount="{{ tx.amount_cents }}" aria-label="Selecionar {{ tx.description }}"></td>
+            <td>{{ tx.due_date|date:"d/m/Y" }}</td>
+            <td class="desc"><a href="{% url 'financeiro:editar' tx.pk %}">{{ tx.description }}</a>{% if tx.employee %}<div class="fin-small">{{ tx.employee.name }}</div>{% endif %}</td>
+            <td>{{ tx.get_entry_kind_display }}</td>
+            <td class="val {% if tx.entry_kind == 'projected_sale' %}fin-warn{% elif tx.amount_cents >= 0 %}fin-pos{% else %}fin-neg{% endif %}">{% if tx.amount_cents >= 0 %}+{% endif %}{{ tx.amount_cents|money }}</td>
+            <td>{{ tx.account.name }}<div class="fin-small">{{ tx.category }}</div></td>
+            <td>{{ tx.account.entity.name }}</td>
+            <td>
+              {% if tx.entry_kind == 'projected_sale' %}<span class="fin-pill proj">Projetada</span>
+              {% elif tx.is_overdue %}<span class="fin-pill late">Atrasado</span>
+              {% elif tx.status == 'paid' %}<span class="fin-pill paid">Pago</span>
+              {% else %}<span class="fin-pill pending">Pendente</span>{% endif %}
+            </td>
+            <td>
+              {% if tx.entry_kind == 'projected_sale' %}
+              <form method="post" action="{% url 'financeiro:consolidar' tx.pk %}">{% csrf_token %}<button class="btn secondary" type="submit" title="Consolidar como receita">Consolidar</button></form>
+              {% else %}
+              <form method="post" action="{% url 'financeiro:status' tx.pk %}">{% csrf_token %}<button class="btn secondary" type="submit">{% if tx.status == 'paid' %}Reabrir{% else %}Pagar{% endif %}</button></form>
+              {% endif %}
+              <a class="btn ghost" href="{% url 'financeiro:editar' tx.pk %}">Editar</a>
+              <form method="post" action="{% url 'financeiro:excluir' tx.pk %}" onsubmit="return confirm('Excluir este lançamento?')">{% csrf_token %}<button class="btn ghost danger" type="submit">Excluir</button></form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="muted">Nenhum lançamento com esses filtros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="fin-small">Mostrando {{ totals.shown }} de {{ totals.filtered }}.</p>
+  </section>
+</div>
+<script>
+(function () {
+  const caixas = Array.from(document.querySelectorAll('.sel'));
+  const todos = document.getElementById('sel-todos');
+  const barra = document.getElementById('fin-selbar');
+  const fmt = (c) => (c < 0 ? '-' : '') + 'R$ ' + (Math.abs(c) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  function atualizar() {
+    let n = 0, soma = 0, pagar = 0, receber = 0;
+    caixas.forEach((c) => { if (!c.checked) return; const v = parseInt(c.dataset.amount, 10) || 0; n++; soma += v; if (v < 0) pagar += -v; else receber += v; });
+    document.getElementById('sel-n').textContent = n;
+    document.getElementById('sel-soma').textContent = fmt(soma);
+    document.getElementById('sel-pagar').textContent = fmt(pagar);
+    document.getElementById('sel-receber').textContent = fmt(receber);
+    barra.classList.toggle('on', n > 0);
+  }
+  caixas.forEach((c) => c.addEventListener('change', atualizar));
+  if (todos) todos.addEventListener('change', () => { caixas.forEach((c) => (c.checked = todos.checked)); atualizar(); });
+  document.getElementById('sel-limpar').addEventListener('click', () => { caixas.forEach((c) => (c.checked = false)); if (todos) todos.checked = false; atualizar(); });
+})();
+</script>
+{% endblock %}

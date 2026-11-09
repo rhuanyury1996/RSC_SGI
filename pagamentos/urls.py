@@ -1,7 +1,7 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
-from . import views
-
+# Pagamentos virou Financeiro (acesso só do CEO, travado no middleware)
 urlpatterns = [
-    path("", views.lista, name="pagamentos"),
+    path("", RedirectView.as_view(pattern_name="financeiro:painel"), name="pagamentos"),
 ]

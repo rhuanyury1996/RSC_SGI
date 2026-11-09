@@ -1,0 +1,16 @@
+<div class="fin-actions" style="justify-content:space-between;align-items:center">
+  <div class="fin-chips">
+    <a class="fin-chip {% if aba == 'painel' %}on{% endif %}" href="{% url 'financeiro:painel' %}">Painel</a>
+    <a class="fin-chip {% if aba == 'lancamentos' %}on{% endif %}" href="{% url 'financeiro:lancamentos' %}">Lançamentos</a>
+  </div>
+  <form method="post" action="{% url 'financeiro:filtro_entidade' %}" class="fin-chips">
+    {% csrf_token %}
+    <label for="fin-ent" class="fin-small" style="margin:0">Entidade</label>
+    <select id="fin-ent" name="entity_filter" onchange="this.form.submit()" style="width:auto;padding:.4rem .6rem">
+      <option value="all" {% if entity_filter == 'all' %}selected{% endif %}>Consolidado</option>
+      {% for ent in entities %}
+      <option value="{{ ent.pk }}" {% if entity_filter == ent.pk|stringformat:'s' %}selected{% endif %}>{{ ent.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>

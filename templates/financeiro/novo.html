@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Novo lançamento · Financeiro · SGI RSC{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/financeiro.css' %}">{% endblock %}
+{% block breadcrumb %}Financeiro <span>/</span> Novo{% endblock %}
+{% block page_title %}O que você quer lançar?{% endblock %}
+{% block page_actions %}<a class="btn secondary" href="{% url 'financeiro:lancamentos' %}">Voltar</a>{% endblock %}
+{% block content %}
+<div class="fin-hub">
+  {% for a in entry_actions %}
+  <a class="{{ a.tone }}" href="{% url 'financeiro:criar' %}?kind={{ a.kind }}">
+    <strong>{{ a.title }}</strong>
+    <span>{{ a.desc }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

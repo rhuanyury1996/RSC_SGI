@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }} · Financeiro · SGI RSC{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/financeiro.css' %}">{% endblock %}
+{% block breadcrumb %}Financeiro <span>/</span> {{ entry_kind_label }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_actions %}
+<button type="submit" form="fin-form">Salvar</button>
+<a class="btn secondary" href="{% if transaction %}{% url 'financeiro:lancamentos' %}{% else %}{% url 'financeiro:novo' %}{% endif %}">Voltar</a>
+{% endblock %}
+{% block content %}
+<div class="fin-form-grid">
+  <section class="card">
+    <form method="post" id="fin-form">
+      {% csrf_token %}
+      <input type="hidden" name="entry_kind" value="{{ entry_kind }}">
+      {% if form.non_field_errors %}<ul class="messages"><li class="error">{{ form.non_field_errors|striptags }}</li></ul>{% endif %}
+      {% if form.errors and not form.non_field_errors %}<ul class="messages"><li class="warning">Confira os campos destacados.</li></ul>{% endif %}
+      <div class="grid-2">
+        {% for field in form %}
+        <div {% if field.name == 'periodicity' or field.name == 'recurrence_start' or field.name == 'recurrence_end' %}data-recorrencia class="hidden"{% endif %}{% if field.name == 'description' or field.name == 'notes' %} style="grid-column:1/-1"{% endif %}>
+          {% if field.field.widget.input_type == 'checkbox' %}
+          <label for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+          {% else %}
+          <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="fin-neg">*</span>{% endif %}</label>
+          {{ field }}
+          {% endif %}
+          {% if field.help_text %}<p class="field-hint">{{ field.help_text }}</p>{% endif %}
+          {% if field.errors %}<p class="err">{{ field.errors|striptags }}</p>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="actions" style="margin-top:1rem">
+        <button type="submit">Salvar</button>
+      </div>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Como funciona</h2>
+    <ul class="muted" style="padding-left:1.1rem;line-height:1.6">
+      {% if entry_kind == 'projected_sale' %}
+      <li>Venda projetada é uma possível receita: fica no pipeline, mas não entra no resultado até consolidar.</li>
+      <li>Depois, na lista, use <strong>Consolidar</strong>.</li>
+      {% else %}
+      <li>Valores em reais com vírgula (ex.: 1.250,00).</li>
+      <li>Receitas e vendas projetadas entram positivas; os demais tipos saem como despesa.</li>
+      <li>Marque <strong>recorrente</strong> e informe início e término para gerar vários lançamentos de uma vez.</li>
+      <li>No salário, escolha o funcionário.</li>
+      <li>Impostos alimentam a projeção sobre o faturamento consolidado.</li>
+      {% endif %}
+    </ul>
+  </section>
+</div>
+<script>
+(function () {
+  const t = document.getElementById('id_is_recurring');
+  if (!t) return;
+  const campos = document.querySelectorAll('[data-recorrencia]');
+  const ini = document.getElementById('id_recurrence_start');
+  const venc = document.getElementById('id_due_date');
+  function sync() {
+    campos.forEach((el) => el.classList.toggle('hidden', !t.checked));
+    if (t.checked && ini && venc && !ini.value && venc.value) ini.value = venc.value;
+  }
+  t.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

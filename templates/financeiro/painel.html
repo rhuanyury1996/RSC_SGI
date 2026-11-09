@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static financeiro_tags %}
+{% block title %}Financeiro · SGI RSC{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/financeiro.css' %}">{% endblock %}
+{% block breadcrumb %}Financeiro{% endblock %}
+{% block page_title %}Financeiro · {{ month_label }}{% endblock %}
+{% block page_actions %}<a class="btn" href="{% url 'financeiro:novo' %}">+ Novo lançamento</a>{% endblock %}
+{% block content %}
+<div class="fin-page">
+  {% include "financeiro/_topo.html" with aba="painel" %}
+
+  {% if overdue_count %}
+  <div class="fin-alert">
+    <span>{{ overdue_count }} lançamento{{ overdue_count|pluralize }} em atraso</span>
+    <a href="{% url 'financeiro:lancamentos' %}?status=pending">Ver</a>
+  </div>
+  {% endif %}
+
+  <div class="fin-kpis">
+    <div class="fin-kpi"><div class="fin-kpi-label">Saldo consolidado</div><div class="fin-kpi-value">{{ balance|money }}</div><div class="fin-kpi-sub">pago (histórico)</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Receitas no mês</div><div class="fin-kpi-value fin-pos">+{{ month_income|money }}</div><div class="fin-kpi-sub">consolidadas</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Receita + projetada</div><div class="fin-kpi-value fin-warn">+{{ month_pipeline|money }}</div><div class="fin-kpi-sub">projetada {{ month_projected|money }}</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Despesas no mês</div><div class="fin-kpi-value fin-neg">-{{ month_expense|money }}</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Resultado do mês</div><div class="fin-kpi-value {% if month_net >= 0 %}fin-pos{% else %}fin-neg{% endif %}">{% if month_net > 0 %}+{% endif %}{{ month_net|money }}</div><div class="fin-kpi-sub">só receita consolidada</div></div>
+    <div class="fin-kpi"><div class="fin-kpi-label">Folha do mês</div><div class="fin-kpi-value">{{ payroll_total|money }}</div><div class="fin-kpi-sub">a pagar {{ a_pagar|money }} · a receber {{ a_receber|money }}</div></div>
+  </div>
+
+  <div class="fin-grid">
+    <section class="card fin-wide">
+      <div class="fin-card-head">
+        <h2>Fluxo de caixa — 12 meses</h2>
+        <div class="fin-legend"><span><i class="fin-dot in"></i>Receita</span><span><i class="fin-dot out"></i>Despesa</span></div>
+      </div>
+      <div class="fin-chart">
+        {% for m in cashflow %}
+        <div class="fin-chart-col" title="{{ m.label }}: +{{ m.income|money }} / -{{ m.expense|money }}">
+          <div class="fin-bar in" style="height: {{ m.income_h }}px"></div>
+          <div class="fin-bar out" style="height: {{ m.expense_h }}px"></div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="fin-chart-labels">{% for m in cashflow %}<span>{{ m.label }}</span>{% endfor %}</div>
+    </section>
+
+    <section class="card">
+      <div class="fin-card-head"><h2>Impostos</h2></div>
+      <div class="fin-small">Projetado ({{ tax_proj.rate_percent }}%)</div>
+      <div class="fin-big">{{ tax_proj.projected_tax_cents|money }}</div>
+      <div class="fin-small">Lançado: {{ tax_proj.booked_tax_cents|money }}</div>
+      {% if tax_proj.gap_cents > 0 %}<div class="fin-alert" style="margin-top:.6rem">Falta provisionar {{ tax_proj.gap_cents|money }}</div>{% endif %}
+      <div class="fin-small" style="margin-top:.6rem">Comprometido 12 meses: <strong>{{ comprometido|money }}</strong></div>
+    </section>
+  </div>
+
+  <div class="fin-grid">
+    <section class="card">
+      <div class="fin-card-head"><h2>Custo por funcionário</h2><a href="{% url 'financeiro:lancamentos' %}?kind=salary&period=month">Ver salários</a></div>
+      {% if employee_rows %}
+      <ul class="fin-rows">
+        {% for row in employee_rows %}
+        <li>
+          <div class="fin-row-top"><span>{{ row.name }}</span><strong>{{ row.cents|money }}</strong></div>
+          <div class="fin-track"><div style="width: {{ row.pct }}%"></div></div>
+          <div class="fin-small">{{ row.count }} lanç. · {{ row.pct }}% da folha</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">Sem salários no mês.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="fin-card-head"><h2>Receitas por categoria</h2><a href="{% url 'financeiro:lancamentos' %}?flow=income&period=month">Ver</a></div>
+      {% if income_cat_rows %}
+      <ul class="fin-rows">
+        {% for row in income_cat_rows %}
+        <li><div class="fin-row-top"><span>{{ row.name }}</span><strong>{{ row.cents|money }}</strong></div><div class="fin-track in"><div style="width: {{ row.pct }}%"></div></div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">Sem receitas no mês.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="fin-card-head"><h2>Despesas por categoria</h2><a href="{% url 'financeiro:lancamentos' %}?flow=expense&period=month">Ver</a></div>
+      {% if cat_rows %}
+      <ul class="fin-rows">
+        {% for row in cat_rows %}
+        <li><div class="fin-row-top"><span>{{ row.name }}</span><strong>{{ row.cents|money }}</strong></div><div class="fin-track out"><div style="width: {{ row.pct }}%"></div></div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">Sem despesas no mês.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="fin-grid">
+    <section class="card">
+      <div class="fin-card-head"><h2>Por tipo de lançamento</h2></div>
+      {% if kind_rows %}
+      <table>
+        <tbody>
+          {% for row in kind_rows %}
+          <tr><td>{{ row.label }} <span class="fin-small">· {{ row.count }} lanç.</span></td><td class="{% if row.cents >= 0 %}fin-pos{% else %}fin-neg{% endif %}" style="text-align:right;font-weight:750">{% if row.cents > 0 %}+{% endif %}{{ row.cents|money }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">Sem lançamentos no mês.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="fin-card-head"><h2>Por entidade</h2></div>
+      {% if entity_rows %}
+      <table>
+        <thead><tr><th>Entidade</th><th>Receita</th><th>Projetada</th><th>Despesa</th><th>Líquido</th></tr></thead>
+        <tbody>
+          {% for row in entity_rows %}
+          <tr><td>{{ row.name }}</td><td class="fin-pos">{{ row.income|money }}</td><td class="fin-warn">{{ row.projected|money }}</td><td class="fin-neg">{{ row.expense|money }}</td><td><strong>{{ row.net|money }}</strong></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">Sem movimento no mês.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="fin-grid">
+    <section class="card">
+      <div class="fin-card-head"><h2>Próximos vencimentos</h2><a href="{% url 'financeiro:lancamentos' %}?status=pending">Lista</a></div>
+      <ul class="fin-rows">
+        {% for tx in upcoming %}
+        <li>
+          <div class="fin-row-top"><a href="{% url 'financeiro:editar' tx.pk %}">{{ tx.description }}</a><strong class="{% if tx.amount_cents >= 0 %}fin-pos{% else %}fin-neg{% endif %}">{{ tx.amount_cents|money }}</strong></div>
+          <div class="fin-small">{{ tx.due_date|date:"d/m/Y" }} · {{ tx.get_entry_kind_display }} · {{ tx.account.entity.name }}{% if tx.is_overdue %} · <span class="fin-neg">atrasado</span>{% endif %}</div>
+        </li>
+        {% empty %}<li class="muted">Nada a vencer.</li>{% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <div class="fin-card-head"><h2>Patrimônio por entidade</h2></div>
+      <ul class="fin-rows">
+        {% for row in patrimony %}
+        <li>
+          <div class="fin-row-top"><span>{{ row.entity.name }} <span class="fin-small">({{ row.count }})</span></span><strong>{{ row.book|money }}</strong></div>
+          <div class="fin-track"><div style="width: {% if row.acquisition %}{% widthratio row.book row.acquisition 100 %}{% else %}0{% endif %}%"></div></div>
+        </li>
+        {% empty %}<li class="muted">Nenhum equipamento cadastrado.</li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+</div>
+{% endblock %}

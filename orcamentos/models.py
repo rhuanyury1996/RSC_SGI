@@ -87,6 +87,10 @@ class Orcamento(models.Model):
     )
     historico_status = models.JSONField(default=list, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
+    # Campos da revisão de propostas (migração 0002_revisao_e_historico_edicoes)
+    revisao = models.PositiveSmallIntegerField("Revisão", default=0)
+    historico_edicoes = models.JSONField("Histórico de edições", default=list, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Orçamento GEXCON"

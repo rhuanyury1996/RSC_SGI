@@ -20,10 +20,21 @@ MODULOS = (
     ("apontamentos", "Apontamentos", "/apontamentos/"),
     ("calendario", "Calendário", "/calendario/"),
     ("informativos", "Informativos", "/informativos/"),
-    ("pagamentos", "Pagamentos", "/pagamentos/"),
 )
 CAMPOS_ACESSO = tuple(f"acesso_{chave}" for chave, _r, _p in MODULOS)
 METODOS_LEITURA = {"GET", "HEAD", "OPTIONS"}
+# Áreas só do CEO: para qualquer outro usuário elas não existem (404)
+PREFIXOS_SO_CEO = ("/financeiro/", "/pagamentos/")
+
+
+def eh_ceo(user) -> bool:
+    """Só o CEO (CEO_USERNAME, padrão rfloriano), ativo e superusuário."""
+    import os
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    ceo = os.getenv("CEO_USERNAME", "rfloriano").lower()
+    return bool(user.is_active and user.is_superuser and (user.username or "").lower() == ceo)
 
 
 def niveis_do_usuario(user, funcionario=None) -> dict:
@@ -65,6 +76,13 @@ class AcessoModuloMiddleware:
 
     def __call__(self, request):
         user = getattr(request, "user", None)
+        if request.path.startswith(PREFIXOS_SO_CEO) and not eh_ceo(user):
+            from django.contrib.auth.views import redirect_to_login
+            from django.http import Http404
+
+            if user is None or not user.is_authenticated:
+                return redirect_to_login(request.get_full_path())
+            raise Http404()
         modulo = modulo_da_url(request.path)
         if modulo and user is not None and user.is_authenticated and not user.is_superuser:
             nivel = niveis_do_usuario(user).get(modulo, EDITAR)
