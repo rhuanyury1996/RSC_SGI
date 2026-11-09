@@ -1,0 +1,87 @@
+        <div class="form-section">
+          <h3 class="form-section-title">Cliente</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.contato.id_for_label }}">{{ form.contato.label }}</label>
+              {{ form.contato }}{{ form.contato.errors }}
+              <p class="field-hint muted">Em branco: usa o contato principal da empresa.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Escopo e períodos</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label>{{ form.escopo.label }}</label>
+              <div class="check-grid">{{ form.escopo }}</div>
+              {{ form.escopo.errors }}
+            </div>
+            <div class="field">
+              <label>{{ form.periodos.label }}</label>
+              <div class="check-grid">{{ form.periodos }}</div>
+              {{ form.periodos.errors }}
+            </div>
+            <div class="field span-2">
+              <label class="check-inline">{{ form.incluir_adicional }} {{ form.incluir_adicional.label }}</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Tipo de cliente</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.tipo_cliente.id_for_label }}">{{ form.tipo_cliente.label }}</label>
+              {{ form.tipo_cliente }}{{ form.tipo_cliente.errors }}
+            </div>
+            <div class="field" id="campo-vencimento">
+              <label for="{{ form.vencimento_licenca.id_for_label }}">{{ form.vencimento_licenca.label }}</label>
+              {{ form.vencimento_licenca }}{{ form.vencimento_licenca.errors }}
+              <p class="field-hint muted">{{ form.vencimento_licenca.help_text }}</p>
+            </div>
+          </div>
+        </div>
+
+        <details class="form-section form-section-collapse"{% if form.treino_effects.value or form.treino_er.value %} open{% endif %}>
+          <summary class="form-section-summary">
+            <span class="form-section-title">Treinamentos</span>
+            <span class="apont-lista-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="form-section-body">
+            <div class="empresa-grid">
+              <div class="field">
+                <label class="check-inline">{{ form.treino_effects }} {{ form.treino_effects.label }}</label>
+                {{ form.alunos_effects }}{{ form.alunos_effects.errors }}
+                <p class="field-hint muted">Alunos · online</p>
+              </div>
+              <div class="field">
+                <label class="check-inline">{{ form.treino_er }} {{ form.treino_er.label }}</label>
+                {{ form.alunos_er }}{{ form.alunos_er.errors }}
+                <p class="field-hint muted">Alunos · online</p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Emissão</h3>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
+              {{ form.data }}{{ form.data.errors }}
+            </div>
+            {% if form.sequencial %}
+            <div class="field">
+              <label for="{{ form.sequencial.id_for_label }}">{{ form.sequencial.label }}</label>
+              {{ form.sequencial }}{{ form.sequencial.errors }}
+              <p class="field-hint muted">{{ form.sequencial.help_text }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+

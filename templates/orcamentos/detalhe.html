@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load crm_format orcamentos_format %}
+{% block title %}Proposta {{ orc.numero }} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos <span>/</span> {{ orc.numero }}{% endblock %}
+{% block page_title %}Proposta {{ orc.identificacao }}{% endblock %}
+{% block page_actions %}
+  <a class="btn" href="{% url 'orcamento_download' orc.pk %}">Baixar .docx</a>
+  {% if pode_editar %}<a class="btn secondary" href="{% url 'orcamento_editar' orc.pk %}">Editar</a>{% endif %}
+  <a class="btn ghost" href="{% url 'orcamentos' %}">Histórico</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if orc.avisos %}
+  <ul class="messages">
+    {% for aviso in orc.avisos %}<li class="warning">{{ aviso }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Resumo</h2>
+        <span class="badge info">{{ orc.get_status_display }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <table class="recup-table">
+        <tbody>
+          <tr><td>Empresa</td><td><strong>{{ orc.cliente.razao_social }}</strong>{% if orc.empresa %} · <a href="{% url 'crm_empresa_editar' orc.empresa.pk %}">abrir no CRM</a>{% endif %}</td></tr>
+          <tr><td>Contato</td><td>{{ orc.contato_dados.nome }}{% if orc.contato_dados.email %} · {{ orc.contato_dados.email }}{% endif %}</td></tr>
+          <tr><td>Escopo</td><td>{{ orc.get_escopo_display }}</td></tr>
+          <tr><td>Data / validade</td><td>{{ orc.data|date:"d/m/Y" }} · vence {{ orc.validade|date:"d/m/Y" }}</td></tr>
+          <tr><td>Tipo de cliente</td><td>{{ orc.get_tipo_cliente_solicitado_display }}{% if orc.tipo_cliente_efetivo != orc.tipo_cliente_solicitado %} <span class="muted">(preço aplicado: {{ orc.get_tipo_cliente_efetivo_display }})</span>{% endif %}</td></tr>
+          <tr><td>Tabela</td><td>{{ orc.versao_tabela }}</td></tr>
+          <tr><td>Arquivo</td><td>{{ orc.nome_arquivo }}</td></tr>
+          <tr><td>Emitida por</td><td>{% if orc.emitido_por %}{{ orc.emitido_por.nome_completo }}{% else %}—{% endif %} em {{ orc.criado_em|date:"d/m/Y H:i" }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Valores</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Item</th>{% for m in orc.periodos %}<th>{{ m }} meses</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas %}
+            <tr>
+              <td><strong>{{ linha.descricao }}</strong></td>
+              {% for preco in linha.precos %}<td>{{ preco }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if orc.treinamentos %}
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Treinamento</th><th>Tipo</th><th>Carga</th><th>Alunos</th><th>Unitário</th></tr>
+          </thead>
+          <tbody>
+            {% for t in orc.treinamentos %}
+            <tr>
+              <td><strong>{{ t.produto }}</strong></td><td>{{ t.tipo }}</td>
+              <td>{{ t.horas }} horas</td><td>{{ t.alunos }}</td>
+              <td>{{ t.preco_unitario|moeda:"€" }}</td>
+            </tr>
+            {% endfor %}
+            <tr><td colspan="4"><strong>TOTAL</strong></td><td><strong>{{ orc.total_treinamentos|moeda:"€" }}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <table class="recup-table">
+        <tbody>
+          <tr><td>SOFTWARE</td><td class="muted">A depender dos módulos e período escolhidos</td></tr>
+          <tr><td><strong>SERVIÇOS</strong></td><td><strong>{{ orc.total_servicos|moeda:"€" }}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Situação</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" action="{% url 'orcamento_status' orc.pk %}" class="com-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="status">Status</label>
+            <select name="status" id="status">
+              {% for valor, rotulo in status_opcoes %}
+              <option value="{{ valor }}"{% if orc.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit">Atualizar status</button>
+        </div>
+      </form>
+
+      <table class="recup-table">
+        <thead><tr><th>Quando</th><th>Status</th><th>Quem</th></tr></thead>
+        <tbody>
+          {% for h in orc.historico_status %}
+          <tr><td>{{ h.em|momento }}</td><td>{{ h.status }}</td><td>{{ h.por|default:"—" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista"{% if orc.historico_edicoes %} open{% endif %}>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Histórico de edições</h2>
+        <span class="muted">{{ orc.historico_edicoes|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead><tr><th>Revisão</th><th>Quando</th><th>Quem</th><th>O que mudou</th></tr></thead>
+          <tbody>
+            {% for e in orc.historico_edicoes reversed %}
+            <tr>
+              <td><strong>rev. {{ e.revisao }}</strong></td>
+              <td>{{ e.em|momento }}</td>
+              <td>{{ e.por|default:"—" }}</td>
+              <td>
+                {% for a in e.alteracoes %}
+                  <div>{{ a.campo }}: <span class="muted">{{ a.de }}</span> → <strong>{{ a.para }}</strong></div>
+                {% empty %}
+                  <span class="muted">Arquivos refeitos, valores sem mudança.</span>
+                {% endfor %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="muted">Proposta nunca editada.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}
