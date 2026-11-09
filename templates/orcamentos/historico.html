@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load crm_format %}
+{% block title %}Orçamentos · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos{% endblock %}
+{% block page_title %}Orçamentos GEXCON{% endblock %}
+{% block page_actions %}
+  <a class="btn" href="{% url 'orcamento_novo' %}">Novo orçamento</a>
+  <a class="btn ghost" href="{% url 'orcamento_parametros' %}">Parâmetros</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Filtros</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="get" class="com-form">
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="f-empresa">Empresa</label>
+            <select name="empresa" id="f-empresa">
+              <option value="">Todas</option>
+              {% for e in empresas %}
+              <option value="{{ e.pk }}"{% if filtro.empresa == e.pk|stringformat:'s' %} selected{% endif %}>{{ e.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-escopo">Escopo</label>
+            <select name="escopo" id="f-escopo">
+              <option value="">Todos</option>
+              {% for valor, rotulo in escopos %}
+              <option value="{{ valor }}"{% if filtro.escopo == valor %} selected{% endif %}>{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select name="status" id="f-status">
+              <option value="">Todos</option>
+              {% for valor, rotulo in status_opcoes %}
+              <option value="{{ valor }}"{% if filtro.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-de">De</label>
+            <input type="date" name="de" id="f-de" value="{{ filtro.de }}">
+          </div>
+          <div class="field">
+            <label for="f-ate">Até</label>
+            <input type="date" name="ate" id="f-ate" value="{{ filtro.ate }}">
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit">Filtrar</button>
+          <a class="btn ghost" href="{% url 'orcamentos' %}">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Propostas emitidas</h2>
+        <span class="muted">{{ itens|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr>
+              <th>Número</th><th>Data</th><th>Empresa</th><th>Escopo</th>
+              <th>Serviços</th><th>Status</th><th>Emitida por</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in itens %}
+            <tr>
+              <td><strong>{{ item.numero }}</strong><div class="muted">{{ item.nome_arquivo }}</div></td>
+              <td>{{ item.data|date:"d/m/Y" }}</td>
+              <td>{% if item.empresa %}{{ item.empresa.nome }}{% else %}{{ item.cliente.razao_social }}{% endif %}</td>
+              <td>{{ item.get_escopo_display }}</td>
+              <td>{{ item.total_servicos|moeda:"€" }}</td>
+              <td><span class="badge info">{{ item.get_status_display }}</span></td>
+              <td>{% if item.emitido_por %}{{ item.emitido_por.nome_completo }}{% else %}—{% endif %}</td>
+              <td class="com-row-actions">
+                <a class="link-action" href="{% url 'orcamento_download' item.pk %}">Baixar</a>
+                <form method="post" action="{% url 'orcamento_status' item.pk %}" class="inline-form">
+                  {% csrf_token %}
+                  <select name="status" onchange="this.form.submit()" aria-label="Mudar status">
+                    {% for valor, rotulo in status_opcoes %}
+                    <option value="{{ valor }}"{% if item.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="muted">Nenhuma proposta emitida ainda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{
+  "versao_tabela": "XSuite Price Builder 2026 (EUR)",
+  "fator_brasil": 0.05,
+  "reajuste_lista": {
+    "novo": 0.0,
+    "renovacao": 0.0
+  },
+  "prazo_renovacao_meses": 1,
+  "validade_ate": "2026-12-16",
+  "arredondar_software_euro_inteiro": true,
+  "precos_lista": {
+    "EFFECTS": 9000.0,
+    "EFFECTS + RISKCURVES": 21500.0
+  },
+  "fator_usuario_adicional": 0.6,
+  "periodos_meses": [
+    3,
+    6,
+    12
+  ],
+  "fatores_periodo": {
+    "1": 0.14,
+    "2": 0.28,
+    "3": 0.42,
+    "4": 0.56,
+    "5": 0.7,
+    "6": 0.84,
+    "12": 1.0
+  },
+  "treinamentos": {
+    "EFFECTS": {
+      "horas": 12,
+      "precos_lista": {
+        "Online": 1800.0
+      },
+      "aplicar_fator_brasil": false
+    },
+    "EFFECTS + RISKCURVES": {
+      "horas": 18,
+      "precos_lista": {
+        "Online": 1800.0
+      },
+      "aplicar_fator_brasil": false
+    }
+  },
+  "responsaveis": {
+    "E&R": {
+      "nome": "Rhuan Floriano",
+      "fone": "+55 (48) 99101-9565",
+      "fax": "",
+      "email": "rhuan.ext@dprengenharia.com"
+    },
+    "E": {
+      "nome": "Denis Shiguemoto",
+      "fone": "+55 (19) 98121-5813",
+      "fax": "",
+      "email": "denis@dprengenharia.com"
+    }
+  },
+  "assinatura": {
+    "nome": "Denis Antonio Shiguemoto",
+    "empresa": "DPR ENGENHARIA"
+  },
+  "fator_multi_ano": 0.05,
+  "periodos_disponiveis": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    12,
+    24,
+    36,
+    48,
+    60
+  ],
+  "max_periodos_por_proposta": 3,
+  "categorias_licenca": {
+    "comercial": {
+      "nome": "Comercial",
+      "desconto": 0.0
+    },
+    "orgao_publico": {
+      "nome": "Órgão público",
+      "desconto": 0.45
+    },
+    "academica": {
+      "nome": "Acadêmica",
+      "desconto": 0.9
+    }
+  },
+  "itens_opcionais": {
+    "Dongle": 750.0
+  }
+}

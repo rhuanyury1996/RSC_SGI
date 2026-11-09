@@ -87,6 +87,38 @@
           </div>
         </div>
 
+        <div class="form-section">
+          <h3 class="form-section-title">Dados para propostas</h3>
+          <p class="field-hint muted" style="margin:0 0 0.6rem;">Usados no cabeçalho e no nome do arquivo dos orçamentos. Ao informar o CNPJ, preenchemos o que estiver vazio.</p>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.razao_social.id_for_label }}">{{ form.razao_social.label }}</label>
+              {{ form.razao_social }}{{ form.razao_social.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.nome_curto.id_for_label }}">{{ form.nome_curto.label }}</label>
+              {{ form.nome_curto }}{{ form.nome_curto.errors }}
+              <p class="field-hint muted">{{ form.nome_curto.help_text }}</p>
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.logradouro.id_for_label }}">{{ form.logradouro.label }}</label>
+              {{ form.logradouro }}{{ form.logradouro.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.complemento.id_for_label }}">{{ form.complemento.label }}</label>
+              {{ form.complemento }}{{ form.complemento.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.cep.id_for_label }}">{{ form.cep.label }}</label>
+              {{ form.cep }}{{ form.cep.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.pais.id_for_label }}">{{ form.pais.label }}</label>
+              {{ form.pais }}{{ form.pais.errors }}
+            </div>
+          </div>
+        </div>
+
         <details class="form-section form-section-collapse"{% if form.clientes_rsc.errors %} open{% endif %}>
           <summary class="form-section-summary">
             <span class="form-section-title">Visibilidade — clientes RSC</span>

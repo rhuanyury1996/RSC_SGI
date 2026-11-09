@@ -103,6 +103,17 @@ class Empresa(models.Model):
     )
     # campos legados mantidos opcionais
     cnpj = models.CharField("CNPJ", max_length=18, blank=True)
+    razao_social = models.CharField("Razão social", max_length=200, blank=True)
+    nome_curto = models.CharField(
+        "Nome curto",
+        max_length=60,
+        blank=True,
+        help_text="Usado no nome do arquivo e da pasta da proposta (ex.: RME).",
+    )
+    logradouro = models.CharField("Logradouro e número", max_length=200, blank=True)
+    complemento = models.CharField("Complemento / bairro", max_length=200, blank=True)
+    cep = models.CharField("CEP", max_length=10, blank=True)
+    pais = models.CharField("País", max_length=60, blank=True, default="Brasil")
     observacoes = models.TextField("Observações", blank=True)
     ativa = models.BooleanField("Ativa", default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -147,6 +158,11 @@ class Contato(models.Model):
     )
     # legado
     cargo = models.CharField("Cargo", max_length=100, blank=True)
+    principal = models.BooleanField(
+        "Contato principal",
+        default=False,
+        help_text="Pré-selecionado nas propostas desta empresa.",
+    )
     ativo = models.BooleanField("Ativo", default=True)
 
     class Meta:
@@ -156,6 +172,14 @@ class Contato(models.Model):
 
     def __str__(self) -> str:
         return f"{self.nome_completo} ({self.empresa})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Um contato principal por empresa.
+        if self.principal and self.empresa_id:
+            Contato.objects.filter(empresa_id=self.empresa_id, principal=True).exclude(
+                pk=self.pk
+            ).update(principal=False)
 
     @property
     def nome_completo(self) -> str:
