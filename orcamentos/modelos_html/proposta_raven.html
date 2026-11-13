@@ -701,7 +701,9 @@ main{display:grid;gap:22px}
     cons:[{id:'trial',n:'Trial',u:'até 2',vig:[0]},{id:'basico',n:'Básico',u:'até 2',vig:[3,6,12],p:{3:6500,6:9300,12:14350}},
           {id:'profissional',n:'Profissional',u:'até 5',vig:[3,6,12],p:{3:7350,6:12460,12:16780}},{id:'enterprise',n:'Enterprise',u:'até 8',vig:[3,6,12]}]
   };
-  const RATE=h=>h<=40?46.21:h<=80?37.48:25.82;
+  let faixasHora=[{ate:40,valor:46.21},{ate:80,valor:37.48},{ate:null,valor:25.82}];
+  let descontoAvista=0.08, parcelasBoleto=10;
+  const RATE=h=>{const f=faixasHora.find(x=>x.ate==null||h<=x.ate);return f?f.valor:faixasHora[faixasHora.length-1].valor;};
   const DEF={cliente:'',contato:'',cidade:'',tipo:'ind',plano:'supernova',vig:'6',lic:'',impl:true,implv:'',visita:'8',mig:false,horas:'40',pag:'vista',val:'30',data:'2026-11-13'};
   const store={get(){try{return JSON.parse(localStorage.getItem('raven-cfg')||'null')}catch(e){return null}},set(v){try{localStorage.setItem('raven-cfg',JSON.stringify(v))}catch(e){}}};
   const PRESET=window.__RAVEN_PRESET||null;
@@ -765,8 +767,9 @@ main{display:grid;gap:22px}
     rows.push({l:trial?'Trial da plataforma RAVEN · 3 dias':`Licenciamento: plano ${pl.n}, ${cfg.vig} meses (${pl.u} usuários simultâneos)`,v:lic});
     if(impl)rows.push({l:`Implantação (visita a campo de até ${cfg.visita} h e mapeamento da planta)`,v:implv});
     if(mig)rows.push({l:`Cadastro de estudos existentes: pacote de ${h} horas × ${brl(RATE(h))}`,v:migv});
-    const disc=(!trial&&cfg.pag==='vista'&&lic)?Math.round(lic*0.08*100)/100:0;
-    if(disc)rows.push({l:'Desconto de 8% no pagamento à vista da licença',v:-disc,disc:true});
+    const pct=Math.round(descontoAvista*100);
+    const disc=(!trial&&cfg.pag==='vista'&&lic)?Math.round(lic*descontoAvista*100)/100:0;
+    if(disc)rows.push({l:'Desconto de '+pct+'% no pagamento à vista da licença',v:-disc,disc:true});
     let total=0,pend=false; rows.forEach(r=>{if(r.v==null)pend=true;else total+=r.v;});
     const d=cfg.data?cfg.data.split('-').reverse().join('/'):'';
     return {pl,trial,lic,ind,impl,implv,mig,h,migv,rows,total,pend,d};
@@ -785,7 +788,7 @@ main{display:grid;gap:22px}
     frag.querySelectorAll('[data-if]').forEach(e=>{if(!flags[e.dataset.if])e.remove();});
     frag.querySelectorAll('[data-cell]').forEach(e=>{if(e.dataset.cell===`${cfg.plano}-${cfg.vig}`){e.classList.add('sel');if(D.lic!=null&&!(D.pl.p&&D.pl.p[cfg.vig]===D.lic))e.innerHTML=`<b>${brl(D.lic)}</b><small>valor negociado</small>`;}});
     FL=flags;
-    frag.querySelectorAll('.price').forEach(e=>{const n=e.querySelector('.pn');if(n&&n.textContent.toLowerCase()===cfg.plano)e.classList.add('chosen');});
+    frag.querySelectorAll('.price').forEach(e=>{const n=e.querySelector('.pn');if(!n)return;const nome=n.textContent.trim().toLowerCase();const pln=PLANS[cfg.tipo].find(p=>p.n.toLowerCase()===nome);const pv=e.querySelector('.pv');const ps=e.querySelector('.ps');if(pln&&pv&&pln.p){const m=ps&&/(\d+)\s*meses/.exec(ps.textContent);const meses=m?m[1]:Object.keys(pln.p)[0];if(pln.p[meses]!=null)pv.textContent=brl(pln.p[meses]);}if(nome===String(cfg.plano).toLowerCase()||(pln&&pln.id===cfg.plano))e.classList.add('chosen');});
     const off=frag.querySelector('[data-gen="offer"]');
     if(off)off.innerHTML=`<div class="offer-h"><b>Para a ${esc(V.cliente)}, a RSC propõe</b></div>`+
       D.rows.map(r=>`<div class="ol${r.disc?' disc':''}"><span>${esc(r.l)}</span><b>${r.v==null?'R$ [valor]':r.disc?'− '+brl(-r.v):brl(r.v)}</b></div>`).join('')+
@@ -793,8 +796,8 @@ main{display:grid;gap:22px}
     const pl=frag.querySelector('[data-gen="paylic"]');
     if(pl){
       if(D.trial)pl.innerHTML='<span style="flex:1"><strong>Trial sem custo</strong> · R$ 0,00 por 3 dias</span>';
-      else{const L=D.lic;const a=L!=null?brl(L*0.92):'R$ [valor]',p=L!=null?brl(L/10):'R$ [valor]';
-        pl.innerHTML=`<span style="flex:1" class="${cfg.pag==='vista'?'pick':''}"><strong>À vista</strong> com 8% de desconto · ${a}</span><span style="flex:1" class="${cfg.pag==='10x'?'pick':''}"><strong>10×</strong> no boleto · ${p}</span>`;}
+      else{const L=D.lic;const a=L!=null?brl(L*(1-descontoAvista)):'R$ [valor]',p=L!=null?brl(L/parcelasBoleto):'R$ [valor]';
+        pl.innerHTML=`<span style="flex:1" class="${cfg.pag==='vista'?'pick':''}"><strong>À vista</strong> com ${Math.round(descontoAvista*100)}% de desconto · ${a}</span><span style="flex:1" class="${cfg.pag==='10x'?'pick':''}"><strong>${parcelasBoleto}×</strong> no boleto · ${p}</span>`;}
     }
     main.innerHTML='';
     const flow=frag.querySelector('#flow'); flow.remove();
@@ -806,7 +809,7 @@ main{display:grid;gap:22px}
   function summary(D){
     $('cfgSum').innerHTML=`<div class="cs-rows">${D.rows.map(r=>`<div${r.disc?' class="disc"':''}><span>${esc(r.l)}</span><b>${r.v==null?'a definir':r.disc?'− '+brl(-r.v):brl(r.v)}</b></div>`).join('')}</div>
       <div class="cs-tot"><span>Total</span><b>${brl(D.total)}${D.pend?' +':''}</b></div>
-      <div class="cs-pay">${D.trial?'Sem custo · login em até 48 h após o aceite':cfg.pag==='vista'?`À vista, com 8% de desconto já aplicado na licença`:`Licença em 10× de ${D.lic!=null?brl(D.lic/10):'—'} no boleto`} · validade ${cfg.val} dias</div>`;
+      <div class="cs-pay">${D.trial?'Sem custo · login em até 48 h após o aceite':cfg.pag==='vista'?`À vista, com ${Math.round(descontoAvista*100)}% de desconto já aplicado na licença`:`Licença em ${parcelasBoleto}× de ${D.lic!=null?brl(D.lic/parcelasBoleto):'—'} no boleto`} · validade ${cfg.val} dias</div>`;
   }
 
   // ---------- pagination ----------
@@ -891,7 +894,73 @@ main{display:grid;gap:22px}
     const done=()=>{b.textContent='Copiado';setTimeout(()=>b.textContent='Copiar chave',1800);};
     try{navigator.clipboard.writeText(t).then(done,()=>{b.textContent=t;});}catch(err){b.textContent=t;}});
 
+  function aplicarTabelaSgi(){
+    const s=window.__RAVEN_SGI; if(!s)return;
+    if(s.plans){PLANS.ind.splice(0,PLANS.ind.length,...s.plans.ind);PLANS.cons.splice(0,PLANS.cons.length,...s.plans.cons);}
+    if(s.faixas&&s.faixas.length)faixasHora=s.faixas;
+    if(s.desconto!=null)descontoAvista=+s.desconto;
+    if(s.parcelas)parcelasBoleto=+s.parcelas;
+  }
+  function escHtml(t){return String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  function instalarSgi(){
+    const s=window.__RAVEN_SGI; if(!s||!s.empresas||PRESET)return;
+    const cli=document.getElementById('f_cliente');
+    if(cli&&cli.tagName!=='SELECT'){
+      const sel=document.createElement('select'); sel.id='f_cliente'; sel.name='cliente';
+      sel.innerHTML='<option value="">Selecione a empresa</option>'+s.empresas.map(e=>'<option value="'+escHtml(e.nome)+'" data-id="'+e.id+'">'+escHtml(e.nome)+'</option>').join('');
+      cli.replaceWith(sel);
+      sel.addEventListener('change',()=>{
+        const id=sel.selectedOptions[0]&&sel.selectedOptions[0].dataset.id||'';
+        document.getElementById('sgi_empresa').value=id;
+        const emp=s.empresas.find(e=>String(e.id)===String(id));
+        const cont=document.getElementById('f_contato');
+        cont.innerHTML='<option value="">Contato principal da empresa</option>'+((emp&&emp.contatos)||[]).map(c=>'<option value="'+escHtml(c.nome)+'" data-id="'+c.id+'">'+(escHtml(c.nome)+(c.principal?' (principal)':''))+'</option>').join('');
+        const pref=emp&&emp.contatos.find(c=>c.principal);
+        document.getElementById('sgi_contato').value=pref?pref.id:'';
+        cfg.contato=pref?pref.nome:''; if(pref)cont.value=pref.nome;
+        if(emp&&emp.cidade){const cid=document.getElementById('f_cidade'); if(cid){cid.value=emp.cidade; cfg.cidade=emp.cidade;}}
+        schedule();
+      });
+    }
+    const cont=document.getElementById('f_contato');
+    if(cont&&cont.tagName!=='SELECT'){
+      const sel=document.createElement('select'); sel.id='f_contato'; sel.name='contato';
+      sel.innerHTML='<option value="">Contato principal da empresa</option>';
+      cont.replaceWith(sel);
+      sel.addEventListener('change',()=>{const op=sel.selectedOptions[0]; document.getElementById('sgi_contato').value=op&&op.dataset.id||'';});
+    }
+    const formEl=document.getElementById('cfg');
+    if(formEl&&!document.getElementById('sgi_empresa'))formEl.insertAdjacentHTML('beforeend','<input type="hidden" id="sgi_empresa"><input type="hidden" id="sgi_contato">');
+    const actions=document.querySelector('.cfg-actions');
+    if(actions&&!document.getElementById('cfgEmitir')){
+      const b=document.createElement('button'); b.type='button'; b.id='cfgEmitir'; b.className='cfg-go'; b.textContent='Emitir proposta no SGI'; b.onclick=emitirSgi; actions.appendChild(b);
+    }
+    const tb=document.querySelector('.topbar');
+    if(tb&&s.historicoUrl&&!document.getElementById('sgiVoltar')){
+      const a=document.createElement('a'); a.id='sgiVoltar'; a.href=s.historicoUrl; a.className='menu-btn'; a.style.display='inline-block'; a.textContent='Histórico SGI'; tb.appendChild(a);
+    }
+    if(s.aviso){
+      const box=document.getElementById('configurar');
+      if(box&&!document.getElementById('sgiAviso')){const p=document.createElement('p'); p.id='sgiAviso'; p.className='cfg-hint'; p.textContent=s.aviso; box.insertBefore(p, box.querySelector('form')||box.firstChild);}
+    }
+    if(s.previa){
+      const box=document.getElementById('configurar');
+      if(box&&!document.getElementById('sgiPrevia')){const p=document.createElement('p'); p.id='sgiPrevia'; p.className='cfg-hint'; p.textContent='Pré-visualização: '+s.previa; box.insertBefore(p, box.querySelector('form')||box.firstChild);}
+    }
+  }
+  function emitirSgi(){
+    const s=window.__RAVEN_SGI; if(!s)return;
+    const emp=document.getElementById('sgi_empresa').value;
+    if(!emp){alert('Selecione a empresa cadastrada no CRM.');return;}
+    const f=document.createElement('form'); f.method='post'; f.action=s.emitirUrl;
+    const campos={csrfmiddlewaretoken:s.csrf,acao:'emitir',empresa:emp,contato:document.getElementById('sgi_contato').value||'',tipo_cliente:cfg.tipo==='ind'?'industria':'consultoria',plano:cfg.plano,vigencia:cfg.plano==='trial'?'':String(cfg.vig||''),valor_licenca:cfg.lic||'',valor_implantacao:(cfg.impl&&cfg.tipo==='ind')?(cfg.implv||''):'',horas_visita:cfg.visita||'',cidade_visita:cfg.cidade||'',horas_pacote:cfg.mig?String(cfg.horas||0):'0',pagamento:cfg.pag||'vista',validade_dias:cfg.val||'30',data:cfg.data||''};
+    if(cfg.impl&&cfg.tipo==='ind'&&cfg.plano!=='trial')campos.implantacao='on';
+    Object.keys(campos).forEach(k=>{const i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=campos[k]; f.appendChild(i);});
+    document.body.appendChild(f); f.submit();
+  }
   window.__setCfg=o=>{cfg=Object.assign({},DEF,o);fillForm();render();};
+  aplicarTabelaSgi();
+  instalarSgi();
   fillForm();
   (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>{render();if(location.hash){const t=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(t)t.scrollIntoView();}});
 })();

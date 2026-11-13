@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 
+from pathlib import Path
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from crm.models import Empresa
@@ -17,20 +21,87 @@ from . import services_raven as services
 from .forms_raven import OrcamentoRavenForm, TabelaRavenForm
 from .models import OrcamentoRaven, StatusOrcamento, TabelaRaven, TipoClienteRaven
 from .permissions import pode_gerir_parametros, pode_sobrescrever_sequencial
-from .views import _contatos_por_empresa
+from .raven.calculo import ParametrosRaven
+from .raven.documento import MODELO
+
+JSON_TABELA = Path(__file__).resolve().parent / "raven" / "parametros_2026.json"
+
+
+def _garantir_tabela(ano: int) -> TabelaRaven | None:
+    tabela = TabelaRaven.objects.filter(ano=ano).first()
+    if tabela is None and JSON_TABELA.exists():
+        dados = json.loads(JSON_TABELA.read_text(encoding="utf-8"))
+        ParametrosRaven.de_dict(dados)
+        tabela, _ = TabelaRaven.objects.update_or_create(ano=ano, defaults={"dados": dados})
+    return tabela
+
+
+def _plans_js(dados: dict) -> dict:
+    def lado(tipo: str) -> list:
+        primeiro = next(iter(dados["planos"][tipo].values()))
+        lista = [{"id": "trial", "n": "Trial", "u": f"até {primeiro['usuarios']}", "vig": [0]}]
+        for chave, plano in dados["planos"][tipo].items():
+            item = {
+                "id": chave,
+                "n": plano["nome"],
+                "u": f"até {plano['usuarios']}",
+                "vig": [int(v) for v in plano["vigencias"]],
+            }
+            precos = plano.get("precos") or {}
+            if precos:
+                item["p"] = {str(k): float(v) for k, v in precos.items()}
+            lista.append(item)
+        return lista
+
+    return {"ind": lado("industria"), "cons": lado("consultoria")}
+
+
+def _empresas_js() -> list:
+    itens = []
+    for empresa in Empresa.objects.filter(ativa=True).prefetch_related("contatos").order_by("nome"):
+        contatos = [
+            {"id": c.pk, "nome": c.nome_completo, "principal": bool(c.principal)}
+            for c in empresa.contatos.all()
+            if c.ativo
+        ]
+        contatos.sort(key=lambda c: (not c["principal"], c["nome"]))
+        cidade = empresa.cidade or ""
+        if empresa.estado:
+            cidade = f"{cidade}/{empresa.estado}" if cidade else empresa.estado
+        itens.append({"id": empresa.pk, "nome": empresa.nome, "cidade": cidade, "contatos": contatos})
+    return itens
+
+
+def _tela_proposta(request, aviso: str = "", previa: str = "") -> HttpResponse:
+    tabela = _garantir_tabela(timezone.localdate().year) or _garantir_tabela(2026)
+    dados = tabela.dados if tabela else {}
+    payload = {
+        "csrf": get_token(request),
+        "emitirUrl": request.path,
+        "historicoUrl": reverse("orcamentos_raven"),
+        "aviso": aviso,
+        "previa": previa,
+        "versao": dados.get("versao_tabela", ""),
+        "plans": _plans_js(dados) if dados.get("planos") else None,
+        "faixas": [{"ate": f["ate"], "valor": float(f["valor_hora"])} for f in dados.get("pacote_horas", [])],
+        "desconto": float(dados.get("desconto_avista", 0.08)),
+        "parcelas": int(dados.get("parcelas_boleto", 10)),
+        "empresas": _empresas_js(),
+    }
+    texto = MODELO.read_text(encoding="utf-8")
+    bloco = "<script>window.__RAVEN_SGI=" + json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c") + ";</script>\n"
+    texto = texto.replace("<script>window.__RAVEN_PRESET=null;</script>", bloco + "<script>window.__RAVEN_PRESET=null;</script>", 1)
+    return HttpResponse(texto, content_type="text/html; charset=utf-8")
 
 
 @login_required
 def novo(request):
     funcionario = obter_funcionario(request)
     admin = pode_sobrescrever_sequencial(funcionario)
-    previa = None
-    pendencias = []
     if request.method == "POST":
         form = OrcamentoRavenForm(request.POST, pode_sobrescrever_sequencial=admin)
         if form.is_valid():
             dados = form.dados_do_pedido()
-            pendencias = services.pendencias_cadastro(dados["empresa"])
             try:
                 if request.POST.get("acao") == "emitir":
                     orc = services.emitir(dados, funcionario)
@@ -38,22 +109,16 @@ def novo(request):
                     return redirect("orcamentos_raven")
                 res, _tabela = services.calcular(dados)
                 previa = services.resumo_valores(res)
+                texto = previa["total"]
+                if previa["pendencias"]:
+                    texto += " · " + "; ".join(previa["pendencias"])
+                return _tela_proposta(request, previa=texto)
             except services.OrcamentoErro as exc:
-                messages.error(request, str(exc))
-    else:
-        form = OrcamentoRavenForm(pode_sobrescrever_sequencial=admin)
-    return render(
-        request,
-        "orcamentos/raven/novo.html",
-        {
-            "form": form,
-            "previa": previa,
-            "pendencias": pendencias,
-            "contatos_por_empresa": json.dumps(_contatos_por_empresa()),
-            "pode_admin": admin,
-            "funcionario": funcionario,
-        },
-    )
+                return _tela_proposta(request, aviso=str(exc))
+        erros = [f"{campo}: {'; '.join(lista)}" for campo, lista in form.errors.items()]
+        return _tela_proposta(request, aviso=" ".join(erros))
+    _garantir_tabela(2026)
+    return _tela_proposta(request)
 
 
 @login_required
