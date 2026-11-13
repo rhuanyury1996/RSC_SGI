@@ -95,7 +95,7 @@ def tabela_do_ano(ano: int) -> TabelaParametros:
 
 def proximo_sequencial(dia: date) -> int:
     """Maior N do dia no histórico do SGI (GEXCON e RAVEN) + 1."""
-    from orcamentos_raven.models import OrcamentoRaven
+    from .models import OrcamentoRaven
 
     prefixo = f"{dia:%y%m%d}-"
     maior = 0
@@ -147,7 +147,7 @@ def calcular(dados: dict):
         orc = montar_orcamento(pedido, params, cliente, proximo_sequencial)
     except (ValueError, LookupError) as exc:
         raise OrcamentoErro(str(exc).strip("'\"")) from exc
-    from orcamentos_raven.models import OrcamentoRaven
+    from .models import OrcamentoRaven
 
     if pedido.sequencial and (
         Orcamento.objects.filter(numero=orc.numero).exists()

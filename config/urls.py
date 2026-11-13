@@ -19,7 +19,6 @@ urlpatterns = [
     path("comercial/", include("crm.urls")),
     path("atividades/", include("atividades.urls")),
     path("pagamentos/", include("pagamentos.urls")),
-    path("orcamentos/raven/", include("orcamentos_raven.urls")),
     path("orcamentos/", include("orcamentos.urls")),
     path("financeiro/", include("financeiro.urls")),
 ]

@@ -3,13 +3,12 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    initial = True
-
     """Orçamento RAVEN: tabela de planos por ano e propostas emitidas."""
 
     dependencies = [
         ("crm", "0024_empresa_dados_proposta"),
         ("funcionarios", "0005_foto_perfil_data"),
+        ("orcamentos", "0003_merge_20261109"),
     ]
 
     operations = [
@@ -120,7 +119,7 @@ class Migration(migrations.Migration):
                     "tabela",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT, related_name="orcamentos",
-                        to="orcamentos_raven.tabelaraven",
+                        to="orcamentos.tabelaraven",
                     ),
                 ),
             ],

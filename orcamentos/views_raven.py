@@ -13,24 +13,11 @@ from django.utils import timezone
 from crm.models import Empresa
 from funcionarios.utils import obter_funcionario
 
-from . import services
-from .forms import OrcamentoRavenForm, TabelaRavenForm
+from . import services_raven as services
+from .forms_raven import OrcamentoRavenForm, TabelaRavenForm
 from .models import OrcamentoRaven, StatusOrcamento, TabelaRaven, TipoClienteRaven
-from orcamentos.permissions import pode_gerir_parametros, pode_sobrescrever_sequencial
-
-
-def _contatos_por_empresa() -> dict[str, list[dict]]:
-    """Mapa empresa → contatos ativos, para o select de contato filtrar sem ida ao servidor."""
-    mapa: dict[str, list[dict]] = {}
-    for empresa in Empresa.objects.filter(ativa=True).prefetch_related("contatos"):
-        itens = [
-            {"id": c.pk, "nome": c.nome_completo, "principal": c.principal}
-            for c in empresa.contatos.all()
-            if c.ativo
-        ]
-        itens.sort(key=lambda c: (not c["principal"], c["nome"]))
-        mapa[str(empresa.pk)] = itens
-    return mapa
+from .permissions import pode_gerir_parametros, pode_sobrescrever_sequencial
+from .views import _contatos_por_empresa
 
 
 @login_required
@@ -57,7 +44,7 @@ def novo(request):
         form = OrcamentoRavenForm(pode_sobrescrever_sequencial=admin)
     return render(
         request,
-        "orcamentos_raven/novo.html",
+        "orcamentos/raven/novo.html",
         {
             "form": form,
             "previa": previa,
@@ -96,7 +83,7 @@ def historico(request):
     pendentes_login = OrcamentoRaven.objects.filter(status=StatusOrcamento.ACEITA, login_liberado_em__isnull=True).count()
     return render(
         request,
-        "orcamentos_raven/historico.html",
+        "orcamentos/raven/historico.html",
         {
             "itens": itens[:300],
             "empresas": Empresa.objects.filter(orcamentos_raven__isnull=False).distinct().order_by("nome"),
@@ -174,7 +161,7 @@ def parametros(request):
             form = TabelaRavenForm(initial={"ano": timezone.localdate().year + 1})
     return render(
         request,
-        "orcamentos_raven/parametros.html",
+        "orcamentos/raven/parametros.html",
         {
             "tabelas": TabelaRaven.objects.select_related("atualizado_por"),
             "form": form,
@@ -203,6 +190,6 @@ def parametros_editar(request, ano: int):
         form = TabelaRavenForm(instance=tabela)
     return render(
         request,
-        "orcamentos_raven/parametros_editar.html",
+        "orcamentos/raven/parametros_editar.html",
         {"form": form, "tabela": tabela, "funcionario": funcionario},
     )

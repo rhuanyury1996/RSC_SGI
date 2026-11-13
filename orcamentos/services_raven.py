@@ -10,10 +10,7 @@ from django.utils import timezone
 
 from crm.models import Empresa
 
-from orcamentos.models import Orcamento  # numeração AAMMDD-N compartilhada com o GEXCON
-from orcamentos.services import linhas_endereco, pendencias_cadastro  # noqa: F401  (mesmas regras do GEXCON)
-
-from .models import OrcamentoRaven, StatusOrcamento, TabelaRaven
+from .models import Orcamento, OrcamentoRaven, StatusOrcamento, TabelaRaven
 from .raven.calculo import (
     PedidoRaven,
     ResultadoRaven,
@@ -23,10 +20,7 @@ from .raven.calculo import (
     numero_proposta,
 )
 from .raven.documento import gerar_html, preset
-
-
-class OrcamentoErro(ValueError):
-    """Erro de negócio com mensagem pronta para o usuário."""
+from .services import OrcamentoErro, linhas_endereco, pendencias_cadastro  # noqa: F401  (mesmas regras do GEXCON)
 
 
 def tabela_do_ano(ano: int) -> TabelaRaven:

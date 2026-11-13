@@ -223,13 +223,13 @@
                 <svg viewBox="0 0 24 24"><path d="M8 7h12M8 12h12M8 17h12"/><circle cx="4.5" cy="7" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="17" r="1"/></svg>
                 <span class="nav-text">Listas</span>
               </a>{% endif %}
-              {% if pode_ver.orcamentos %}<a class="nav-link {% if request.resolver_match.url_name == 'orcamentos' or request.resolver_match.url_name == 'orcamento_novo' or request.resolver_match.url_name == 'orcamento_parametros' or request.resolver_match.url_name == 'orcamento_parametros_editar' %}active{% endif %}" href="{% url 'orcamentos' %}" title="Orçamentos">
+              {% if pode_ver.orcamentos %}<a class="nav-link {% if request.resolver_match.url_name == 'orcamentos' or request.resolver_match.url_name == 'orcamento_novo' or request.resolver_match.url_name == 'orcamento_parametros' or request.resolver_match.url_name == 'orcamento_parametros_editar' %}active{% endif %}" href="{% url 'orcamentos' %}" title="Orçamentos GEXCON">
                 <svg viewBox="0 0 24 24"><path d="M7 3h10l3 3v15H7z"/><path d="M10 9h7M10 13h7M10 17h4"/></svg>
-                <span class="nav-text">Orçamentos</span>
+                <span class="nav-text">Orçamentos GEXCON</span>
               </a>
-              <a class="nav-link {% if request.resolver_match.url_name and 'raven' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'orcamentos_raven' %}" title="Orçamento RAVEN">
+              <a class="nav-link {% if request.resolver_match.url_name and 'raven' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'orcamentos_raven' %}" title="Orçamentos RAVEN">
                 <svg viewBox="0 0 24 24"><path d="M7 3h10l3 3v15H7z"/><path d="M10 10l2.5 2.5L17 8M10 17h7"/></svg>
-                <span class="nav-text">Orçamento RAVEN</span>
+                <span class="nav-text">Orçamentos RAVEN</span>
               </a>{% endif %}
               {% if pode_ver.comercial %}{% if nav_funis_clientes %}
               <details class="nav-funis-root" open>

@@ -13,7 +13,7 @@ from django.test import TestCase
 from crm.models import Contato, Empresa
 from funcionarios.models import Cargo, Funcionario
 
-from . import services as services_raven
+from . import services_raven
 from .models import OrcamentoRaven, StatusOrcamento, TabelaRaven
 from .raven.calculo import ParametrosRaven
 
@@ -75,13 +75,13 @@ class EmissaoTests(BaseRaven):
         self.assertIn("261113-1", html)
 
     def test_sequencial_compartilhado_com_gexcon(self):
-        from orcamentos.models import Orcamento
+        from .models import Orcamento
 
         self.assertEqual(services_raven.proximo_sequencial(DATA), 1)
         services_raven.emitir(self.pedido(), self.funcionario)
         self.assertEqual(services_raven.proximo_sequencial(DATA), 2)
         # o GEXCON também enxerga o número usado pelo RAVEN
-        from orcamentos import services as gexcon_services
+        from . import services as gexcon_services
 
         self.assertEqual(gexcon_services.proximo_sequencial(DATA), 2)
         self.assertFalse(Orcamento.objects.exists())

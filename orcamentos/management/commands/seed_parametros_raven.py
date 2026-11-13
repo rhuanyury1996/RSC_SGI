@@ -7,8 +7,8 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from orcamentos_raven.models import TabelaRaven
-from orcamentos_raven.raven.calculo import ParametrosRaven
+from orcamentos.models import TabelaRaven
+from orcamentos.raven.calculo import ParametrosRaven
 
 PADRAO = Path(__file__).resolve().parents[2] / "raven" / "parametros_2026.json"
 
