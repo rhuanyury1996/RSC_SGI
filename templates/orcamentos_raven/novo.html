@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Novo orçamento RAVEN · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos RAVEN <span>/</span> Novo{% endblock %}
+{% block page_title %}Novo orçamento RAVEN{% endblock %}
+{% block page_actions %}
+  <a class="btn secondary" href="{% url 'orcamentos_raven' %}">Histórico RAVEN</a>
+  <a class="btn ghost" href="{% url 'orcamento_raven_parametros' %}">Parâmetros</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if pendencias %}
+  <ul class="messages"><li class="warning">
+    Faltam dados no cadastro da empresa: {{ pendencias|join:", " }}.
+    Complete em <a href="{% url 'crm_empresas' %}">Empresas</a> antes de enviar a proposta.
+  </li></ul>
+  {% endif %}
+  {% if not form.catalogo %}
+  <ul class="messages"><li class="warning">
+    Não há tabela RAVEN para o ano da proposta. Cadastre em <a href="{% url 'orcamento_raven_parametros' %}">Parâmetros</a>
+    ou rode <code>python manage.py seed_parametros_raven</code>.
+  </li></ul>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Dados da proposta</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form" id="form-raven">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-section">
+          <h3 class="form-section-title">Cliente</h3>
+          <div class="empresa-grid">
+            <div class="field span-2">
+              <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }}</label>
+              {{ form.empresa }}{{ form.empresa.errors }}
+            </div>
+            <div class="field span-2">
+              <label for="{{ form.contato.id_for_label }}">{{ form.contato.label }}</label>
+              {{ form.contato }}{{ form.contato.errors }}
+              <p class="field-hint muted">Em branco: usa o contato principal da empresa.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Plano e vigência</h3>
+          <div class="orc-opcoes">
+            <div class="orc-linha">
+              <span class="orc-rotulo">{{ form.tipo_cliente.label }}</span>
+              <div class="orc-chips" role="radiogroup" aria-label="{{ form.tipo_cliente.label }}">
+                {% for op in form.tipo_cliente %}
+                <label class="orc-chip is-lg">{{ op.tag }}<span>{{ op.choice_label }}</span></label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="orc-linha">
+              <span class="orc-rotulo">Plano</span>
+              <div class="orc-chips js-planos" role="radiogroup" aria-label="Plano"></div>
+              {{ form.plano.errors }}
+            </div>
+            <div class="orc-linha js-linha-vig">
+              <span class="orc-rotulo">Vigência</span>
+              <div class="orc-chips js-vigencias" role="radiogroup" aria-label="Vigência"></div>
+              {{ form.vigencia.errors }}
+            </div>
+            <div class="orc-linha js-linha-lic">
+              <label class="orc-qtd">
+                <span class="orc-rotulo">{{ form.valor_licenca.label }}</span>
+                {{ form.valor_licenca }}
+              </label>
+              <p class="field-hint muted js-hint-lic">{{ form.valor_licenca.help_text }}</p>
+              {{ form.valor_licenca.errors }}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Serviços</h3>
+          <div class="empresa-grid">
+            <div class="field js-impl">
+              <label class="check-inline">{{ form.implantacao }} {{ form.implantacao.label }}</label>
+            </div>
+            <div class="field js-impl js-impl-campos">
+              <label for="{{ form.valor_implantacao.id_for_label }}">{{ form.valor_implantacao.label }}</label>
+              {{ form.valor_implantacao }}{{ form.valor_implantacao.errors }}
+            </div>
+            <div class="field js-impl js-impl-campos">
+              <label for="{{ form.horas_visita.id_for_label }}">{{ form.horas_visita.label }}</label>
+              {{ form.horas_visita }}{{ form.horas_visita.errors }}
+            </div>
+            <div class="field js-impl js-impl-campos">
+              <label for="{{ form.cidade_visita.id_for_label }}">{{ form.cidade_visita.label }}</label>
+              {{ form.cidade_visita }}
+              <p class="field-hint muted">{{ form.cidade_visita.help_text }}</p>
+            </div>
+            <div class="field">
+              <label for="{{ form.horas_pacote.id_for_label }}">{{ form.horas_pacote.label }}</label>
+              {{ form.horas_pacote }}{{ form.horas_pacote.errors }}
+              <p class="field-hint muted js-hint-horas">{{ form.horas_pacote.help_text }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Pagamento, validade e emissão</h3>
+          <div class="orc-opcoes">
+            <div class="orc-linha js-linha-pag">
+              <span class="orc-rotulo">{{ form.pagamento.label }}</span>
+              <div class="orc-chips" role="radiogroup" aria-label="{{ form.pagamento.label }}">
+                {% for op in form.pagamento %}
+                <label class="orc-chip">{{ op.tag }}<span>{{ op.choice_label }}</span></label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="empresa-grid">
+            <div class="field">
+              <label for="{{ form.validade_dias.id_for_label }}">{{ form.validade_dias.label }}</label>
+              {{ form.validade_dias }}{{ form.validade_dias.errors }}
+            </div>
+            <div class="field">
+              <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
+              {{ form.data }}{{ form.data.errors }}
+            </div>
+            {% if form.sequencial %}
+            <div class="field">
+              <label for="{{ form.sequencial.id_for_label }}">{{ form.sequencial.label }}</label>
+              {{ form.sequencial }}{{ form.sequencial.errors }}
+              <p class="field-hint muted">{{ form.sequencial.help_text }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit" name="acao" value="previa">Pré-visualizar valores</button>
+          {% if previa and not previa.pendencias %}
+          <button class="btn" type="submit" name="acao" value="emitir">Gerar proposta RAVEN</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </details>
+
+  {% if previa %}
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Pré-visualização</h2>
+        <span class="muted">Plano {{ previa.plano }}{% if previa.usuarios %} · até {{ previa.usuarios }} usuários simultâneos{% endif %} · validade {{ previa.validade }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      {% if previa.pendencias or previa.avisos %}
+      <ul class="messages">
+        {% for p in previa.pendencias %}<li class="error">{{ p }}</li>{% endfor %}
+        {% for a in previa.avisos %}<li class="warning">{{ a }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      <table class="recup-table">
+        <thead><tr><th>Item</th><th>Valor</th></tr></thead>
+        <tbody>
+          {% for l in previa.linhas %}
+          <tr{% if l.desconto %} class="raven-desc"{% endif %}><td>{{ l.descricao }}</td><td>{{ l.valor }}</td></tr>
+          {% endfor %}
+          <tr><td><strong>TOTAL</strong></td><td><strong>{{ previa.total }}</strong></td></tr>
+          <tr><td>Pagamento</td><td>{{ previa.pagamento }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<script id="contatos-por-empresa" type="application/json">{{ contatos_por_empresa|safe }}</script>
+<script id="catalogo-raven" type="application/json">{{ form.catalogo_json|safe }}</script>
+<script>
+(function () {
+  var mapa = JSON.parse(document.getElementById('contatos-por-empresa').textContent || '{}');
+  var cat = JSON.parse(document.getElementById('catalogo-raven').textContent || '{}');
+  var empresa = document.getElementById('{{ form.empresa.auto_id }}');
+  var contato = document.getElementById('{{ form.contato.auto_id }}');
+  var planoAtual;
+  planoAtual = '{{ form.plano.value|default_if_none:""|escapejs }}' || 'supernova';
+  var vigAtual = '{{ form.vigencia.value|default_if_none:""|escapejs }}';
+  var lic = document.getElementById('{{ form.valor_licenca.auto_id }}');
+  var impl = document.getElementById('{{ form.implantacao.auto_id }}');
+  var horas = document.getElementById('{{ form.horas_pacote.auto_id }}');
+  var boxPlanos = document.querySelector('.js-planos'), boxVig = document.querySelector('.js-vigencias');
+  function brl(v) { return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function tipo() { var r = document.querySelector('input[name="tipo_cliente"]:checked'); return r ? r.value : 'industria'; }
+  function planos() { return (cat.planos || {})[tipo()] || {}; }
+  function chip(name, value, label, checked) {
+    return '<label class="orc-chip"><input type="radio" name="' + name + '" value="' + value + '"' + (checked ? ' checked' : '') + '><span>' + label + '</span></label>';
+  }
+  function desenharPlanos() {
+    var ps = planos(), html = chip('plano', 'trial', 'Trial · ' + (cat.trial_dias || 3) + ' dias · R$ 0,00', planoAtual === 'trial');
+    if (planoAtual !== 'trial' && !ps[planoAtual]) planoAtual = Object.keys(ps)[1] || Object.keys(ps)[0] || 'trial';
+    Object.keys(ps).forEach(function (k) { html += chip('plano', k, ps[k].nome + ' · até ' + ps[k].usuarios + ' usuários', k === planoAtual); });
+    boxPlanos.innerHTML = html;
+    desenharVig();
+  }
+  function desenharVig() {
+    var p = planos()[planoAtual], trial = planoAtual === 'trial';
+    document.querySelector('.js-linha-vig').hidden = trial;
+    document.querySelector('.js-linha-lic').hidden = trial;
+    document.querySelector('.js-linha-pag').hidden = trial;
+    if (!p) { boxVig.innerHTML = ''; return syncHints(); }
+    if (p.vigencias.map(String).indexOf(String(vigAtual)) < 0) vigAtual = String(p.vigencias[0]);
+    boxVig.innerHTML = p.vigencias.map(function (m) {
+      var preco = (p.precos || {})[String(m)];
+      return chip('vigencia', m, m + ' meses' + (preco ? ' · ' + brl(preco) : ' · sob consulta'), String(m) === String(vigAtual));
+    }).join('');
+    syncHints();
+  }
+  function syncHints() {
+    var p = planos()[planoAtual], preco = p && (p.precos || {})[String(vigAtual)];
+    document.querySelector('.js-hint-lic').textContent = preco
+      ? 'Tabela: ' + brl(preco) + '. Em branco usa a tabela; preencha só para condição negociada.'
+      : 'Sem preço de tabela para esta vigência: informe o valor negociado.';
+    var ind = tipo() === 'industria' && planoAtual !== 'trial';
+    document.querySelectorAll('.js-impl').forEach(function (el) { el.hidden = !ind; });
+    document.querySelectorAll('.js-impl-campos').forEach(function (el) { el.hidden = !ind || !impl.checked; });
+    var h = parseInt(horas.value || '0', 10), f = (cat.faixas || []).find(function (x) { return x.ate === null || h <= x.ate; });
+    document.querySelector('.js-hint-horas').textContent = h > 0 && f
+      ? h + ' h × ' + brl(f.valor_hora) + ' = ' + brl(h * f.valor_hora)
+      : 'O cliente lança os dados, a menos que contrate o pacote de horas.';
+  }
+  boxPlanos.addEventListener('change', function (e) { planoAtual = e.target.value; desenharVig(); });
+  boxVig.addEventListener('change', function (e) { vigAtual = e.target.value; syncHints(); });
+  document.querySelectorAll('input[name="tipo_cliente"]').forEach(function (r) { r.addEventListener('change', desenharPlanos); });
+  impl.addEventListener('change', syncHints);
+  horas.addEventListener('input', syncHints);
+
+  function carregarContatos() {
+    var escolhido = contato.value, itens = mapa[empresa.value] || [];
+    contato.innerHTML = '<option value="">Contato principal da empresa</option>';
+    itens.forEach(function (c) {
+      var op = document.createElement('option'); op.value = c.id; op.textContent = c.nome + (c.principal ? ' (principal)' : ''); contato.appendChild(op);
+    });
+    if (escolhido) contato.value = escolhido;
+  }
+  empresa.addEventListener('change', carregarContatos);
+  carregarContatos();
+  desenharPlanos();
+})();
+</script>
+<style>
+.orc-opcoes { display: grid; gap: 1.1rem; margin-bottom: 1rem; }
+.orc-linha { display: grid; gap: 0.45rem; }
+.orc-rotulo { font-size: 0.82rem; font-weight: 700; color: var(--muted); }
+.orc-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.orc-chip { position: relative; display: inline-flex; cursor: pointer; margin: 0; }
+.orc-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.orc-chip span { display: inline-flex; align-items: center; min-height: 2.2rem; padding: 0 0.95rem; border: 1px solid var(--line-strong); border-radius: 999px; background: #fff; font-size: 0.88rem; font-weight: 600; color: var(--text); user-select: none; }
+.orc-chip.is-lg span { min-height: 2.6rem; padding: 0 1.2rem; border-radius: 12px; }
+.orc-chip:hover span { border-color: #98b3ff; }
+.orc-chip input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.orc-chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.orc-qtd { display: grid; gap: 0.35rem; margin: 0; max-width: 16rem; }
+.raven-desc td { color: #15803d; }
+</style>
+{% endblock %}

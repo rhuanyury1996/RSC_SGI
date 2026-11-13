@@ -1,0 +1,27 @@
+{
+  "versao_tabela": "RAVEN 2026",
+  "validade_ate": "2026-12-31",
+  "validade_dias_padrao": 30,
+  "desconto_avista": 0.08,
+  "parcelas_boleto": 10,
+  "trial_dias": 3,
+  "prazo_login_horas": 48,
+  "horas_visita_padrao": 8,
+  "planos": {
+    "industria": {
+      "starlight": {"nome": "Starlight", "usuarios": 3, "vigencias": [6, 12], "precos": {"6": 24750}},
+      "supernova": {"nome": "SuperNova", "usuarios": 5, "vigencias": [6, 12], "precos": {"6": 32780}},
+      "beyond": {"nome": "Beyond", "usuarios": 8, "vigencias": [6, 12], "precos": {}}
+    },
+    "consultoria": {
+      "basico": {"nome": "Básico", "usuarios": 2, "vigencias": [3, 6, 12], "precos": {"3": 6500, "6": 9300, "12": 14350}},
+      "profissional": {"nome": "Profissional", "usuarios": 5, "vigencias": [3, 6, 12], "precos": {"3": 7350, "6": 12460, "12": 16780}},
+      "enterprise": {"nome": "Enterprise", "usuarios": 8, "vigencias": [3, 6, 12], "precos": {}}
+    }
+  },
+  "pacote_horas": [
+    {"ate": 40, "valor_hora": 46.21},
+    {"ate": 80, "valor_hora": 37.48},
+    {"ate": null, "valor_hora": 25.82}
+  ]
+}

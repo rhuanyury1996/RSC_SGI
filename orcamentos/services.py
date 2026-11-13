@@ -94,14 +94,17 @@ def tabela_do_ano(ano: int) -> TabelaParametros:
 
 
 def proximo_sequencial(dia: date) -> int:
-    """Maior N do dia no histórico do SGI + 1."""
+    """Maior N do dia no histórico do SGI (GEXCON e RAVEN) + 1."""
+    from orcamentos_raven.models import OrcamentoRaven
+
     prefixo = f"{dia:%y%m%d}-"
     maior = 0
-    for numero in Orcamento.objects.filter(numero__startswith=prefixo).values_list("numero", flat=True):
-        try:
-            maior = max(maior, int(numero.split("-", 1)[1]))
-        except (IndexError, ValueError):
-            continue
+    for modelo in (Orcamento, OrcamentoRaven):
+        for numero in modelo.objects.filter(numero__startswith=prefixo).values_list("numero", flat=True):
+            try:
+                maior = max(maior, int(numero.split("-", 1)[1]))
+            except (IndexError, ValueError):
+                continue
     return maior + 1
 
 
@@ -144,7 +147,12 @@ def calcular(dados: dict):
         orc = montar_orcamento(pedido, params, cliente, proximo_sequencial)
     except (ValueError, LookupError) as exc:
         raise OrcamentoErro(str(exc).strip("'\"")) from exc
-    if pedido.sequencial and Orcamento.objects.filter(numero=orc.numero).exists():
+    from orcamentos_raven.models import OrcamentoRaven
+
+    if pedido.sequencial and (
+        Orcamento.objects.filter(numero=orc.numero).exists()
+        or OrcamentoRaven.objects.filter(numero=orc.numero).exists()
+    ):
         raise OrcamentoErro(f"Já existe a proposta {orc.numero}. Escolha outro sequencial.")
     return orc, params, tabela
 

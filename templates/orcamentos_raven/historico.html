@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load crm_format %}
+{% block title %}Orçamentos RAVEN · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos RAVEN{% endblock %}
+{% block page_title %}Orçamentos RAVEN{% endblock %}
+{% block page_actions %}
+  <a class="btn" href="{% url 'orcamento_raven_novo' %}">Novo orçamento RAVEN</a>
+  <a class="btn secondary" href="{% url 'orcamentos' %}">Orçamentos GEXCON</a>
+  <a class="btn ghost" href="{% url 'orcamento_raven_parametros' %}">Parâmetros</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if pendentes_login %}
+  <ul class="messages"><li class="warning">
+    {{ pendentes_login }} proposta{{ pendentes_login|pluralize }} aceita{{ pendentes_login|pluralize }} aguardando liberação de login (prazo de 48 h após o aceite).
+    <a href="?status=login">Ver</a>
+  </li></ul>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Filtros</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="get" class="com-form">
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="f-empresa">Empresa</label>
+            <select name="empresa" id="f-empresa">
+              <option value="">Todas</option>
+              {% for e in empresas %}<option value="{{ e.pk }}"{% if filtro.empresa == e.pk|stringformat:'s' %} selected{% endif %}>{{ e.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-tipo">Tipo de cliente</label>
+            <select name="tipo" id="f-tipo">
+              <option value="">Todos</option>
+              {% for valor, rotulo in tipos %}<option value="{{ valor }}"{% if filtro.tipo == valor %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select name="status" id="f-status">
+              <option value="">Todos</option>
+              {% for valor, rotulo in status_opcoes %}<option value="{{ valor }}"{% if filtro.status == valor %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+              <option value="login"{% if filtro.status == "login" %} selected{% endif %}>Aceitas aguardando login</option>
+            </select>
+          </div>
+          <div class="field"><label for="f-de">De</label><input type="date" name="de" id="f-de" value="{{ filtro.de }}"></div>
+          <div class="field"><label for="f-ate">Até</label><input type="date" name="ate" id="f-ate" value="{{ filtro.ate }}"></div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit">Filtrar</button>
+          <a class="btn ghost" href="{% url 'orcamentos_raven' %}">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Propostas emitidas</h2><span class="muted">{{ itens|length }}</span></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Número</th><th>Data</th><th>Empresa</th><th>Plano</th><th>Total</th><th>Status</th><th>Login</th><th>Emitida por</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for item in itens %}
+            <tr>
+              <td><strong>{{ item.numero }}</strong><div class="muted">{{ item.nome_arquivo }}</div></td>
+              <td>{{ item.data|date:"d/m/Y" }}<div class="muted">válida até {{ item.validade|date:"d/m/Y" }}</div></td>
+              <td>{% if item.empresa %}{{ item.empresa.nome }}{% else %}{{ item.cliente.razao_social }}{% endif %}
+                <div class="muted">{{ item.get_tipo_cliente_display }}</div></td>
+              <td>{{ item.plano_nome }}{% if item.trial %}<div class="muted">3 dias</div>{% else %}<div class="muted">{{ item.vigencia_meses }} meses · {{ item.get_pagamento_display }}</div>{% endif %}</td>
+              <td>{{ item.total|moeda }}</td>
+              <td><span class="badge info">{{ item.get_status_display }}</span></td>
+              <td>
+                {% if item.login_liberado_em %}
+                  <span class="badge success">Liberado</span><div class="muted">{{ item.login_liberado_em|date:"d/m H:i" }}</div>
+                {% elif item.aguardando_login %}
+                  <span class="badge {% if item.prazo_login < agora %}danger{% else %}warning{% endif %}">Até {{ item.prazo_login|date:"d/m H:i" }}</span>
+                  <form method="post" action="{% url 'orcamento_raven_login' item.pk %}" class="inline-form">{% csrf_token %}
+                    <button class="link-action" type="submit">Marcar liberado</button>
+                  </form>
+                {% else %}<span class="muted">—</span>{% endif %}
+              </td>
+              <td>{% if item.emitido_por %}{{ item.emitido_por.nome_completo }}{% else %}—{% endif %}</td>
+              <td class="com-row-actions">
+                <a class="link-action" href="{% url 'orcamento_raven_abrir' item.pk %}" target="_blank" rel="noopener">Abrir</a>
+                <a class="link-action" href="{% url 'orcamento_raven_download' item.pk %}">Baixar</a>
+                <form method="post" action="{% url 'orcamento_raven_status' item.pk %}" class="inline-form">
+                  {% csrf_token %}
+                  <select name="status" onchange="this.form.submit()" aria-label="Mudar status">
+                    {% for valor, rotulo in status_opcoes %}<option value="{{ valor }}"{% if item.status == valor %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+                  </select>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9" class="muted">Nenhuma proposta RAVEN emitida ainda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Tabela {{ tabela.ano }} · Área Comercial{% endblock %}
+{% block breadcrumb %}Área Comercial <span>/</span> Orçamentos RAVEN <span>/</span> Parâmetros {{ tabela.ano }}{% endblock %}
+{% block page_title %}Tabela RAVEN de {{ tabela.ano }}{% endblock %}
+{% block page_actions %}
+  <a class="btn ghost" href="{% url 'orcamento_raven_parametros' %}">Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Parâmetros</h2>
+        <span class="muted">{{ tabela.dados.versao_tabela }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" class="com-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="field">
+          <label for="{{ form.ano.id_for_label }}">{{ form.ano.label }}</label>
+          {{ form.ano }}
+        </div>
+        <div class="field">
+          <label for="{{ form.dados.id_for_label }}">{{ form.dados.label }}</label>
+          {{ form.dados }}{{ form.dados.errors }}
+          <p class="field-hint muted">
+            Propostas já emitidas guardam o valor calculado; mudar aqui não altera o histórico.
+          </p>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </details>
+</div>
+{% endblock %}
