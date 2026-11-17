@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -286,6 +288,10 @@ class MotivoFaltaRetorno(models.TextChoices):
     SEM_EMAIL = "sem_email", "Sem retorno de e-mail"
 
 
+MAX_TERCEIROS = 5
+ALIQUOTA_IMPOSTOS = Decimal("18")  # % sobre o valor do negócio
+
+
 class Oportunidade(models.Model):
     funil = models.ForeignKey(
         Funil,
@@ -462,6 +468,20 @@ class Oportunidade(models.Model):
         blank=True,
         help_text="Calculado: percentual de bônus × comissão (12%–35%).",
     )
+    # Proposta Ganha · custos do projeto
+    custos_terceiros = models.JSONField(
+        "Custos com terceiros",
+        default=list,
+        blank=True,
+        help_text=f"Até {MAX_TERCEIROS} terceiros: lista de {{nome, valor}}.",
+    )
+    custo_viagem = models.DecimalField(
+        "Custo com viagem",
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     # Pós-vendas · Serviço finalizado
     atc_enviado = models.BooleanField("ATC enviado", default=False)
     atc_enviado_em = models.DateTimeField("ATC enviado em", null=True, blank=True)
@@ -576,6 +596,83 @@ class Oportunidade(models.Model):
         if self.valor_final_fechado is not None:
             return self.valor_final_fechado
         return self.valor
+
+    # ── Resultado financeiro (custos lançados na Proposta Ganha) ──
+    @property
+    def origem_custos(self) -> "Oportunidade":
+        """Card filho de Pós-vendas usa os custos lançados no card de Negociações."""
+        if self.oportunidade_pai_id and not self.custos_terceiros and self.custo_viagem is None:
+            return self.oportunidade_pai
+        return self
+
+    @property
+    def custos_terceiros_lista(self) -> list[dict]:
+        itens = []
+        for item in self.origem_custos.custos_terceiros or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                valor = Decimal(str(item.get("valor") or "0"))
+            except (InvalidOperation, ValueError):
+                valor = Decimal("0")
+            nome = (item.get("nome") or "").strip()
+            if nome or valor:
+                itens.append({"nome": nome or "Terceiro", "valor": valor})
+        return itens
+
+    @property
+    def custos_terceiros_form(self) -> list[dict]:
+        """Sempre MAX_TERCEIROS linhas para o formulário da Proposta Ganha."""
+        linhas = []
+        for item in (self.custos_terceiros or [])[:MAX_TERCEIROS]:
+            if isinstance(item, dict):
+                linhas.append({"nome": item.get("nome") or "", "valor": item.get("valor")})
+        while len(linhas) < MAX_TERCEIROS:
+            linhas.append({"nome": "", "valor": None})
+        return linhas
+
+    @property
+    def custo_terceiros_total(self) -> Decimal:
+        return sum((i["valor"] for i in self.custos_terceiros_lista), Decimal("0"))
+
+    @property
+    def custo_viagem_efetivo(self) -> Decimal:
+        return self.origem_custos.custo_viagem or Decimal("0")
+
+    @property
+    def custo_total(self) -> Decimal:
+        return self.custo_terceiros_total + self.custo_viagem_efetivo
+
+    @property
+    def impostos(self) -> Decimal:
+        valor = self.valor_negocio or Decimal("0")
+        return (valor * ALIQUOTA_IMPOSTOS / Decimal("100")).quantize(Decimal("0.01"))
+
+    @property
+    def comissao_efetiva(self) -> Decimal:
+        if self.comissao is not None:
+            return self.comissao
+        if self.oportunidade_pai_id and self.oportunidade_pai.comissao is not None:
+            return self.oportunidade_pai.comissao
+        return Decimal("0")
+
+    @property
+    def bonus_agente_efetivo(self) -> Decimal:
+        if self.bonus_agente is not None:
+            return self.bonus_agente
+        if self.oportunidade_pai_id and self.oportunidade_pai.bonus_agente is not None:
+            return self.oportunidade_pai.bonus_agente
+        return Decimal("0")
+
+    @property
+    def comissoes_total(self) -> Decimal:
+        return self.comissao_efetiva + self.bonus_agente_efetivo
+
+    @property
+    def lucro_liquido(self) -> Decimal:
+        """Valor − custos (terceiros + viagem) − impostos − comissão − bônus."""
+        valor = self.valor_negocio or Decimal("0")
+        return valor - self.custo_total - self.impostos - self.comissoes_total
 
 
 class TipoHistoricoOpp(models.TextChoices):

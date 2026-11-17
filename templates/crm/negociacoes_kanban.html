@@ -445,7 +445,76 @@
       comOut.value = "";
       if (bonOut) bonOut.value = "";
     }
+    recalcCustos(form, valorEl);
   }
+
+  function recalcCustos(form, valorEl) {
+    var totalOut = form.querySelector(".js-custo-total-out");
+    if (!totalOut) return;
+    var impOut = form.querySelector(".js-impostos-out");
+    var lucroOut = form.querySelector(".js-lucro-out");
+    var custo = 0;
+    form.querySelectorAll(".js-custo-terceiro, .js-custo-viagem").forEach(function (el) {
+      var n = parseBR(el.value);
+      if (n != null) custo += n;
+    });
+    custo = Math.round(custo * 100) / 100;
+    totalOut.value = fmtBR(custo);
+    var valor = parseBR(valorEl.value);
+    if (valor == null) {
+      if (impOut) impOut.value = "";
+      if (lucroOut) lucroOut.value = "";
+      return;
+    }
+    var aliq = impOut ? (parseBR(impOut.getAttribute("data-aliquota")) || 0) : 0;
+    var impostos = Math.round(valor * aliq) / 100;
+    if (impOut) impOut.value = fmtBR(impostos);
+    if (lucroOut) {
+      var comEl = form.querySelector(".js-comissao-out");
+      var bonEl = form.querySelector(".js-bonus-out");
+      var comissoes = (comEl ? (parseBR(comEl.value) || 0) : 0) + (bonEl ? (parseBR(bonEl.value) || 0) : 0);
+      var lucro = Math.round((valor - custo - impostos - comissoes) * 100) / 100;
+      lucroOut.value = (lucro < 0 ? "-" : "") + fmtBR(Math.abs(lucro));
+    }
+  }
+
+  // Terceiros: mostra as linhas preenchidas + 1 vazia; botão revela a próxima
+  document.querySelectorAll(".deal-edit-form").forEach(function (form) {
+    var linhas = {};
+    form.querySelectorAll(".js-terceiro-row").forEach(function (el) {
+      var idx = el.getAttribute("data-idx");
+      (linhas[idx] = linhas[idx] || []).push(el);
+    });
+    var idxs = Object.keys(linhas).sort(function (a, b) { return a - b; });
+    if (!idxs.length) return;
+    var addWrap = form.querySelector(".js-terceiro-add-wrap");
+    function preenchida(idx) {
+      return linhas[idx].some(function (el) {
+        var inp = el.querySelector("input");
+        return inp && inp.value.trim() !== "";
+      });
+    }
+    var vaziaMostrada = false;
+    idxs.forEach(function (idx) {
+      var mostrar = preenchida(idx) || !vaziaMostrada;
+      if (!preenchida(idx) && mostrar) vaziaMostrada = true;
+      linhas[idx].forEach(function (el) { el.hidden = !mostrar; });
+    });
+    function atualizarBotao() {
+      var resta = idxs.some(function (idx) { return linhas[idx][0].hidden; });
+      if (addWrap) addWrap.hidden = !resta;
+    }
+    atualizarBotao();
+    var btn = form.querySelector(".js-terceiro-add");
+    if (btn) btn.addEventListener("click", function () {
+      var prox = idxs.find(function (idx) { return linhas[idx][0].hidden; });
+      if (prox == null) return;
+      linhas[prox].forEach(function (el) { el.hidden = false; });
+      var inp = linhas[prox][0].querySelector("input");
+      if (inp) inp.focus();
+      atualizarBotao();
+    });
+  });
 
   document.querySelectorAll(".deal-edit-form").forEach(function (form) {
     if (!form.querySelector(".js-calc-comissao")) return;

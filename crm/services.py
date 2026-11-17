@@ -429,6 +429,15 @@ def criar_card_pos_vendas(oportunidade: Oportunidade, *, autor=None) -> Oportuni
         .first()
     )
     if existente:
+        # Mantém o valor do filho em dia se a proposta ganha for reeditada
+        valor = oportunidade.valor_negocio
+        if (
+            existente.valor != valor
+            or existente.valor_final_fechado != oportunidade.valor_final_fechado
+        ):
+            existente.valor = valor
+            existente.valor_final_fechado = oportunidade.valor_final_fechado
+            existente.save(update_fields=["valor", "valor_final_fechado", "atualizado_em"])
         return existente
 
     funis = garantir_funis_para_cliente(oportunidade.funil.cliente_rsc)

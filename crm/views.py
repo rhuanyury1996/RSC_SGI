@@ -33,6 +33,8 @@ from .gmail_oauth import (
 )
 from .importacao import ImportacaoErro, importar_empresas_contatos
 from .models import (
+    ALIQUOTA_IMPOSTOS,
+    MAX_TERCEIROS,
     Contato,
     Empresa,
     EtapaFunil,
@@ -764,10 +766,38 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
             etapa.coluna_css = css_coluna_pos_vendas(etapa.nome)
             etapa.descricao_fase = DESCRICOES_ETAPAS_POS_VENDAS.get(etapa.nome, "")
             etapa.fase_key = fase_campos_pos_vendas(etapa.nome)
+    resumo_financeiro = None
+    if pos_vendas:
+        resumo_financeiro = {
+            "valor": Decimal("0"),
+            "custo_terceiros": Decimal("0"),
+            "custo_viagem": Decimal("0"),
+            "custo_total": Decimal("0"),
+            "impostos": Decimal("0"),
+            "comissao": Decimal("0"),
+            "bonus_agente": Decimal("0"),
+            "comissoes": Decimal("0"),
+            "lucro_liquido": Decimal("0"),
+            "aliquota": ALIQUOTA_IMPOSTOS,
+        }
     for etapa in etapas:
-        _metricas_coluna(etapa, com_valor=False)
+        _metricas_coluna(etapa, com_valor=pos_vendas)
         for opp in etapa.oportunidades.all():
             opp.tempo_etapa = tempo_na_etapa(opp)
+            if resumo_financeiro is not None:
+                resumo_financeiro["valor"] += opp.valor_negocio or Decimal("0")
+                resumo_financeiro["custo_terceiros"] += opp.custo_terceiros_total
+                resumo_financeiro["custo_viagem"] += opp.custo_viagem_efetivo
+                resumo_financeiro["custo_total"] += opp.custo_total
+                resumo_financeiro["impostos"] += opp.impostos
+                resumo_financeiro["comissao"] += opp.comissao_efetiva
+                resumo_financeiro["bonus_agente"] += opp.bonus_agente_efetivo
+                resumo_financeiro["comissoes"] += opp.comissoes_total
+                resumo_financeiro["lucro_liquido"] += opp.lucro_liquido
+    if resumo_financeiro is not None and resumo_financeiro["valor"]:
+        resumo_financeiro["margem"] = (
+            resumo_financeiro["lucro_liquido"] * Decimal("100") / resumo_financeiro["valor"]
+        ).quantize(Decimal("0.1"))
 
     historico = []
     posicao_na_etapa = None
@@ -808,6 +838,7 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
             "posicao_na_etapa": posicao_na_etapa,
             "total_cards": total_cards,
             "is_pos_vendas": pos_vendas,
+            "resumo_financeiro": resumo_financeiro,
             "responsaveis": Funcionario.objects.filter(ativo=True).order_by(
                 "nome", "sobrenome"
             ),
@@ -973,6 +1004,27 @@ def _funil_negociacoes(request, funil: Funil):
                         request.POST.get("percentual_comissao")
                     )
                     pct_bonus = _parse_decimal_br(request.POST.get("percentual_bonus"))
+                    custo_viagem = _parse_decimal_br(request.POST.get("custo_viagem"))
+                    nomes_terc = request.POST.getlist("terceiro_nome")
+                    valores_terc = request.POST.getlist("terceiro_valor")
+                    custos_terceiros = []
+                    for nome_t, valor_t in list(zip(nomes_terc, valores_terc))[:MAX_TERCEIROS]:
+                        nome_t = (nome_t or "").strip()
+                        valor_dec = _parse_decimal_br(valor_t)
+                        if not nome_t and valor_dec is None:
+                            continue
+                        if valor_dec is not None and valor_dec < 0:
+                            raise ValueError("valor negativo")
+                        custos_terceiros.append(
+                            {
+                                "nome": nome_t,
+                                "valor": str(valor_dec.quantize(Decimal("0.01")))
+                                if valor_dec is not None
+                                else "0.00",
+                            }
+                        )
+                    if custo_viagem is not None and custo_viagem < 0:
+                        raise ValueError("viagem negativa")
                 except (InvalidOperation, ValueError):
                     messages.error(
                         request, "Revise os valores numéricos da proposta ganha."
@@ -993,6 +1045,8 @@ def _funil_negociacoes(request, funil: Funil):
 
                 card_ativo.percentual_comissao = pct_comissao
                 card_ativo.percentual_bonus = pct_bonus
+                card_ativo.custos_terceiros = custos_terceiros
+                card_ativo.custo_viagem = custo_viagem
 
                 # Comissão = % × valor final; bônus = % × comissão
                 if (
@@ -1032,6 +1086,8 @@ def _funil_negociacoes(request, funil: Funil):
                         "percentual_bonus",
                         "comissao",
                         "bonus_agente",
+                        "custos_terceiros",
+                        "custo_viagem",
                         "valor",
                     ]
                 )
@@ -1189,6 +1245,7 @@ def _funil_negociacoes(request, funil: Funil):
         "crm/negociacoes_kanban.html",
         {
             "funil": funil,
+            "aliquota_impostos": ALIQUOTA_IMPOSTOS,
             "etapas": etapas,
             "form": form,
             "empresa_form": empresa_form,

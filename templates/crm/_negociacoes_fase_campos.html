@@ -67,6 +67,44 @@
   <p class="field-hint muted">% de bônus × valor da comissão.</p>
 </div>
 
+<div class="field span-2 custos-projeto-head">
+  <span class="form-section-title">Custos do projeto</span>
+  <p class="field-hint muted">Até 5 terceiros contratados para o projeto, mais o custo com viagem. Impostos: alíquota de {{ aliquota_impostos|default:"18" }}% sobre o valor final fechado.</p>
+</div>
+{% for t in card_ativo.custos_terceiros_form %}
+<div class="field js-terceiro-row" data-idx="{{ forloop.counter0 }}">
+  <label for="terceiro_nome_{{ fase }}_{{ forloop.counter }}">Terceiro {{ forloop.counter }}</label>
+  <input id="terceiro_nome_{{ fase }}_{{ forloop.counter }}" type="text" name="terceiro_nome" maxlength="120" value="{{ t.nome }}" placeholder="Empresa ou profissional">
+</div>
+<div class="field js-terceiro-row" data-idx="{{ forloop.counter0 }}">
+  <label for="terceiro_valor_{{ fase }}_{{ forloop.counter }}">Valor do terceiro {{ forloop.counter }}</label>
+  <input id="terceiro_valor_{{ fase }}_{{ forloop.counter }}" type="text" inputmode="decimal" name="terceiro_valor" class="js-money js-custo-terceiro" value="{{ t.valor|moeda_input }}" placeholder="0,00">
+</div>
+{% endfor %}
+<div class="field span-2 js-terceiro-add-wrap" hidden>
+  <button type="button" class="link-action js-terceiro-add">+ Adicionar terceiro</button>
+</div>
+<div class="field">
+  <label for="custo_viagem_{{ fase }}">Custo com viagem</label>
+  <input id="custo_viagem_{{ fase }}" type="text" inputmode="decimal" name="custo_viagem" class="js-money js-custo-viagem" value="{{ card_ativo.custo_viagem|moeda_input }}" placeholder="0,00">
+  <p class="field-hint muted">Passagens, hospedagem, deslocamento e diárias.</p>
+</div>
+<div class="field">
+  <label for="custo_total_{{ fase }}">Custo total</label>
+  <input id="custo_total_{{ fase }}" type="text" class="js-money js-custo-total-out" readonly value="{{ card_ativo.custo_total|moeda_input }}" placeholder="Calculado automaticamente">
+  <p class="field-hint muted">Terceiros + viagem.</p>
+</div>
+<div class="field">
+  <label for="impostos_{{ fase }}">Impostos ({{ aliquota_impostos|default:"18" }}%)</label>
+  <input id="impostos_{{ fase }}" type="text" class="js-money js-impostos-out" readonly data-aliquota="{{ aliquota_impostos|default:'18' }}" value="{{ card_ativo.impostos|moeda_input }}" placeholder="Calculado automaticamente">
+  <p class="field-hint muted">Alíquota × valor final fechado.</p>
+</div>
+<div class="field">
+  <label for="lucro_liquido_{{ fase }}">Lucro líquido</label>
+  <input id="lucro_liquido_{{ fase }}" type="text" class="js-money js-lucro-out" readonly value="{{ card_ativo.lucro_liquido|moeda_input }}" placeholder="Calculado automaticamente">
+  <p class="field-hint muted">Valor final − custo total − impostos − comissão − bônus.</p>
+</div>
+
 {% elif fase == "perdida" %}
 <div class="field span-2">
   <label for="obs_perdida">Observações / motivo</label>

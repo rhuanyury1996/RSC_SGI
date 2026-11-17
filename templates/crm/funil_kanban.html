@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load crm_format %}
+{% load l10n crm_format %}
 {% block title %}{{ funil.get_tipo_display }} · {% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · Área Comercial{% endblock %}
 {% block breadcrumb %}Área Comercial <span>/</span> <a href="{% url 'crm_funis' %}">Carteira</a>{% if funil.cliente_rsc %} <span>/</span> {{ funil.cliente_rsc.nome }}{% endif %} <span>/</span> {{ funil.get_tipo_display }}{% endblock %}
 {% block page_title %}{% if funil.cliente_rsc %}{{ funil.cliente_rsc.nome }}{% else %}{{ funil.nome }}{% endif %} · {{ funil.get_tipo_display }}{% endblock %}
@@ -24,6 +24,35 @@
     Cards filhos nascem em <strong>Acompanhando serviço</strong> quando a proposta é ganha em Negociações.
     Em <strong>Serviço finalizado</strong>, marque ATC/PSC e o retorno — com retorno recebido o card vai para <strong>Pós-venda finalizado</strong>.
   </p>
+  {% if resumo_financeiro %}
+  <section class="fin-resumo" aria-label="Resumo financeiro do pós-vendas">
+    <div class="fin-resumo-item">
+      <span class="fin-resumo-label">Soma dos cards</span>
+      <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.valor %}</strong>
+      <span class="fin-resumo-sub">{{ total_cards }} card(s) em pós-vendas</span>
+    </div>
+    <div class="fin-resumo-item">
+      <span class="fin-resumo-label">Custo total</span>
+      <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.custo_total %}</strong>
+      <span class="fin-resumo-sub">Terceiros {{ resumo_financeiro.custo_terceiros|moeda }} · Viagem {{ resumo_financeiro.custo_viagem|moeda }}</span>
+    </div>
+    <div class="fin-resumo-item">
+      <span class="fin-resumo-label">Impostos ({{ resumo_financeiro.aliquota }}%)</span>
+      <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.impostos %}</strong>
+      <span class="fin-resumo-sub">Sobre o valor dos negócios</span>
+    </div>
+    <div class="fin-resumo-item">
+      <span class="fin-resumo-label">Comissões</span>
+      <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.comissoes %}</strong>
+      <span class="fin-resumo-sub">Comissão {{ resumo_financeiro.comissao|moeda }} · Bônus {{ resumo_financeiro.bonus_agente|moeda }}</span>
+    </div>
+    <div class="fin-resumo-item fin-resumo-lucro{% if resumo_financeiro.lucro_liquido < 0 %} is-negativo{% endif %}">
+      <span class="fin-resumo-label">Lucro líquido</span>
+      <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.lucro_liquido %}</strong>
+      <span class="fin-resumo-sub">{% if resumo_financeiro.margem is not None %}Margem {{ resumo_financeiro.margem }}%{% else %}Valor − custos − impostos − comissões{% endif %}</span>
+    </div>
+  </section>
+  {% endif %}
   {% else %}
   <details class="apont-panel apont-lista" id="nova-oportunidade"{% if abrir_nova_opp %} open{% endif %}>
     <summary class="apont-lista-summary">
@@ -77,6 +106,9 @@
           <strong>{{ etapa.nome }}</strong>
           <div class="kanban-col-stats">
             <span class="kanban-stat"><span class="kanban-count">{{ etapa.cards_count|default:0 }}</span> cards</span>
+            {% if is_pos_vendas %}
+            <span class="kanban-stat kanban-valor"><span class="kanban-valor-total">{{ etapa.valor_acumulado|default:0|moeda }}</span></span>
+            {% endif %}
           </div>
           {% if etapa.descricao_fase %}
           <p class="kanban-col-desc">{{ etapa.descricao_fase }}</p>
@@ -86,7 +118,7 @@
       </header>
       <div class="kanban-drop" data-etapa-id="{{ etapa.pk }}">
         {% for opp in etapa.oportunidades.all %}
-        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
+        <article class="kanban-card{% if card_ativo and opp.pk == card_ativo.pk %} com-card-destaque{% endif %}" draggable="true" data-opp-id="{{ opp.pk }}" data-valor="{% if opp.valor_negocio %}{% localize off %}{{ opp.valor_negocio }}{% endlocalize %}{% else %}0{% endif %}" data-href="{% url 'crm_funil_detalhe' funil.pk %}?card={{ opp.pk }}">
           {% if is_pos_vendas %}
           <div class="kanban-card-tags">
             {% if opp.oportunidade_pai_id %}
@@ -188,6 +220,32 @@
         <p>{{ card_ativo.escopo_solicitado }}</p>
         {% endif %}
       </div>
+      {% endif %}
+
+      {% if is_pos_vendas %}
+      <section class="lp-section-card fin-card" aria-label="Resultado financeiro">
+        <div class="lp-section-head">
+          <h4>Resultado financeiro</h4>
+          {% if card_ativo.oportunidade_pai_id %}<span class="muted fin-card-origem">Custos e comissões lançados na Proposta Ganha</span>{% endif %}
+        </div>
+        <dl class="fin-linhas">
+          <div class="fin-linha"><dt>Valor do negócio</dt><dd>{% moeda_html card_ativo.valor_negocio %}</dd></div>
+          {% for t in card_ativo.custos_terceiros_lista %}
+          <div class="fin-linha fin-linha-sub"><dt>{{ t.nome }}</dt><dd>− {{ t.valor|moeda }}</dd></div>
+          {% empty %}
+          <div class="fin-linha fin-linha-sub"><dt>Terceiros</dt><dd class="muted">nenhum lançado</dd></div>
+          {% endfor %}
+          <div class="fin-linha fin-linha-sub"><dt>Viagem</dt><dd>− {{ card_ativo.custo_viagem_efetivo|moeda }}</dd></div>
+          <div class="fin-linha"><dt>Custo total</dt><dd>− {{ card_ativo.custo_total|moeda }}</dd></div>
+          <div class="fin-linha"><dt>Impostos ({{ resumo_financeiro.aliquota }}%)</dt><dd>− {{ card_ativo.impostos|moeda }}</dd></div>
+          <div class="fin-linha"><dt>Comissão</dt><dd>− {{ card_ativo.comissao_efetiva|moeda }}</dd></div>
+          <div class="fin-linha"><dt>Bônus do agente</dt><dd>− {{ card_ativo.bonus_agente_efetivo|moeda }}</dd></div>
+          <div class="fin-linha fin-linha-total{% if card_ativo.lucro_liquido < 0 %} is-negativo{% endif %}"><dt>Lucro líquido</dt><dd>{% moeda_html card_ativo.lucro_liquido %}</dd></div>
+        </dl>
+        {% if card_ativo.oportunidade_pai_id %}
+        <p class="field-hint muted">Para alterar terceiros, viagem ou comissões, edite a fase <a href="{% url 'crm_funil_detalhe' card_ativo.oportunidade_pai.funil_id %}?card={{ card_ativo.oportunidade_pai_id }}">Proposta Ganha</a> em Negociações.</p>
+        {% endif %}
+      </section>
       {% endif %}
 
       <section class="lp-progress js-etapa-stepper" aria-label="Progresso no funil">
