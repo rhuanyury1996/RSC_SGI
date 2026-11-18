@@ -37,7 +37,7 @@
       <span class="fin-resumo-sub">Terceiros {{ resumo_financeiro.custo_terceiros|moeda }} · Viagem {{ resumo_financeiro.custo_viagem|moeda }}</span>
     </div>
     <div class="fin-resumo-item">
-      <span class="fin-resumo-label">Impostos ({{ resumo_financeiro.aliquota }}%)</span>
+      <span class="fin-resumo-label">Impostos{% if resumo_financeiro.aliquota %} ({{ resumo_financeiro.aliquota }}%){% endif %}</span>
       <strong class="fin-resumo-valor">{% moeda_html resumo_financeiro.impostos %}</strong>
       <span class="fin-resumo-sub">Sobre o valor dos negócios</span>
     </div>
@@ -237,7 +237,7 @@
           {% endfor %}
           <div class="fin-linha fin-linha-sub"><dt>Viagem</dt><dd>− {{ card_ativo.custo_viagem_efetivo|moeda }}</dd></div>
           <div class="fin-linha"><dt>Custo total</dt><dd>− {{ card_ativo.custo_total|moeda }}</dd></div>
-          <div class="fin-linha"><dt>Impostos ({{ resumo_financeiro.aliquota }}%)</dt><dd>− {{ card_ativo.impostos|moeda }}</dd></div>
+          <div class="fin-linha"><dt>Impostos ({{ card_ativo.aliquota_efetiva_fmt }}%)</dt><dd>− {{ card_ativo.impostos|moeda }}</dd></div>
           <div class="fin-linha"><dt>Comissão</dt><dd>− {{ card_ativo.comissao_efetiva|moeda }}</dd></div>
           <div class="fin-linha"><dt>Bônus do agente</dt><dd>− {{ card_ativo.bonus_agente_efetivo|moeda }}</dd></div>
           <div class="fin-linha fin-linha-total{% if card_ativo.lucro_liquido < 0 %} is-negativo{% endif %}"><dt>Lucro líquido</dt><dd>{% moeda_html card_ativo.lucro_liquido %}</dd></div>

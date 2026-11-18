@@ -289,7 +289,11 @@ class MotivoFaltaRetorno(models.TextChoices):
 
 
 MAX_TERCEIROS = 5
-ALIQUOTA_IMPOSTOS = Decimal("18")  # % sobre o valor do negócio
+
+
+def formatar_percentual(valor: Decimal) -> str:
+    """18.00 → "18"; 16.50 → "16,5"."""
+    return format(Decimal(valor).normalize(), "f").replace(".", ",")
 
 
 class Oportunidade(models.Model):
@@ -482,6 +486,14 @@ class Oportunidade(models.Model):
         null=True,
         blank=True,
     )
+    aliquota_impostos = models.DecimalField(
+        "Alíquota de impostos (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Alíquota vigente quando a proposta foi ganha (Admin › Impostos).",
+    )
     # Pós-vendas · Serviço finalizado
     atc_enviado = models.BooleanField("ATC enviado", default=False)
     atc_enviado_em = models.DateTimeField("ATC enviado em", null=True, blank=True)
@@ -644,9 +656,26 @@ class Oportunidade(models.Model):
         return self.custo_terceiros_total + self.custo_viagem_efetivo
 
     @property
+    def aliquota_efetiva(self) -> Decimal:
+        """Alíquota gravada no negócio; sem ela, a vigente em Admin › Impostos."""
+        if self.aliquota_impostos is not None:
+            return self.aliquota_impostos
+        if self.oportunidade_pai_id and self.oportunidade_pai.aliquota_impostos is not None:
+            return self.oportunidade_pai.aliquota_impostos
+        if not hasattr(self, "_aliquota_vigente"):
+            from impostos.models import AliquotaImposto
+
+            self._aliquota_vigente = AliquotaImposto.vigente()
+        return self._aliquota_vigente
+
+    @property
+    def aliquota_efetiva_fmt(self) -> str:
+        return formatar_percentual(self.aliquota_efetiva)
+
+    @property
     def impostos(self) -> Decimal:
         valor = self.valor_negocio or Decimal("0")
-        return (valor * ALIQUOTA_IMPOSTOS / Decimal("100")).quantize(Decimal("0.01"))
+        return (valor * self.aliquota_efetiva / Decimal("100")).quantize(Decimal("0.01"))
 
     @property
     def comissao_efetiva(self) -> Decimal:

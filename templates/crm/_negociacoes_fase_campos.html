@@ -69,7 +69,7 @@
 
 <div class="field span-2 custos-projeto-head">
   <span class="form-section-title">Custos do projeto</span>
-  <p class="field-hint muted">Até 5 terceiros contratados para o projeto, mais o custo com viagem. Impostos: alíquota de {{ aliquota_impostos|default:"18" }}% sobre o valor final fechado.</p>
+  <p class="field-hint muted">Até 5 terceiros contratados para o projeto, mais o custo com viagem. Impostos: alíquota de {{ card_ativo.aliquota_efetiva_fmt }}% sobre o valor final fechado.</p>
 </div>
 {% for t in card_ativo.custos_terceiros_form %}
 <div class="field js-terceiro-row" data-idx="{{ forloop.counter0 }}">
@@ -95,8 +95,8 @@
   <p class="field-hint muted">Terceiros + viagem.</p>
 </div>
 <div class="field">
-  <label for="impostos_{{ fase }}">Impostos ({{ aliquota_impostos|default:"18" }}%)</label>
-  <input id="impostos_{{ fase }}" type="text" class="js-money js-impostos-out" readonly data-aliquota="{{ aliquota_impostos|default:'18' }}" value="{{ card_ativo.impostos|moeda_input }}" placeholder="Calculado automaticamente">
+  <label for="impostos_{{ fase }}">Impostos ({{ card_ativo.aliquota_efetiva_fmt }}%)</label>
+  <input id="impostos_{{ fase }}" type="text" class="js-money js-impostos-out" readonly data-aliquota="{{ card_ativo.aliquota_efetiva_fmt }}" value="{{ card_ativo.impostos|moeda_input }}" placeholder="Calculado automaticamente">
   <p class="field-hint muted">Alíquota × valor final fechado.</p>
 </div>
 <div class="field">

@@ -465,6 +465,7 @@ def criar_card_pos_vendas(oportunidade: Oportunidade, *, autor=None) -> Oportuni
         cidade=oportunidade.cidade,
         escopo_solicitado=oportunidade.escopo_solicitado,
         valor_final_fechado=oportunidade.valor_final_fechado,
+        aliquota_impostos=oportunidade.aliquota_impostos,
         oportunidade_pai=oportunidade,
         etapa_desde=timezone.now(),
     )

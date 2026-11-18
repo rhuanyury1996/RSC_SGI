@@ -32,9 +32,11 @@ from .gmail_oauth import (
     save_gmail_credentials,
 )
 from .importacao import ImportacaoErro, importar_empresas_contatos
+from impostos.models import AliquotaImposto
+
 from .models import (
-    ALIQUOTA_IMPOSTOS,
     MAX_TERCEIROS,
+    formatar_percentual,
     Contato,
     Empresa,
     EtapaFunil,
@@ -778,7 +780,7 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
             "bonus_agente": Decimal("0"),
             "comissoes": Decimal("0"),
             "lucro_liquido": Decimal("0"),
-            "aliquota": ALIQUOTA_IMPOSTOS,
+            "aliquotas": set(),
         }
     for etapa in etapas:
         _metricas_coluna(etapa, com_valor=pos_vendas)
@@ -790,10 +792,17 @@ def _funil_generico(request, funil: Funil, *, pos_vendas: bool = False):
                 resumo_financeiro["custo_viagem"] += opp.custo_viagem_efetivo
                 resumo_financeiro["custo_total"] += opp.custo_total
                 resumo_financeiro["impostos"] += opp.impostos
+                resumo_financeiro["aliquotas"].add(formatar_percentual(opp.aliquota_efetiva))
                 resumo_financeiro["comissao"] += opp.comissao_efetiva
                 resumo_financeiro["bonus_agente"] += opp.bonus_agente_efetivo
                 resumo_financeiro["comissoes"] += opp.comissoes_total
                 resumo_financeiro["lucro_liquido"] += opp.lucro_liquido
+    if resumo_financeiro is not None:
+        aliquotas = resumo_financeiro.pop("aliquotas")
+        if len(aliquotas) == 1:
+            resumo_financeiro["aliquota"] = aliquotas.pop()
+        elif not aliquotas:
+            resumo_financeiro["aliquota"] = formatar_percentual(AliquotaImposto.vigente())
     if resumo_financeiro is not None and resumo_financeiro["valor"]:
         resumo_financeiro["margem"] = (
             resumo_financeiro["lucro_liquido"] * Decimal("100") / resumo_financeiro["valor"]
@@ -1047,6 +1056,8 @@ def _funil_negociacoes(request, funil: Funil):
                 card_ativo.percentual_bonus = pct_bonus
                 card_ativo.custos_terceiros = custos_terceiros
                 card_ativo.custo_viagem = custo_viagem
+                if card_ativo.aliquota_impostos is None:
+                    card_ativo.aliquota_impostos = AliquotaImposto.vigente()
 
                 # Comissão = % × valor final; bônus = % × comissão
                 if (
@@ -1088,6 +1099,7 @@ def _funil_negociacoes(request, funil: Funil):
                         "bonus_agente",
                         "custos_terceiros",
                         "custo_viagem",
+                        "aliquota_impostos",
                         "valor",
                     ]
                 )
@@ -1245,7 +1257,6 @@ def _funil_negociacoes(request, funil: Funil):
         "crm/negociacoes_kanban.html",
         {
             "funil": funil,
-            "aliquota_impostos": ALIQUOTA_IMPOSTOS,
             "etapas": etapas,
             "form": form,
             "empresa_form": empresa_form,
