@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from django.utils.text import slugify
 
 from .forms import FuncionarioAdminForm
-from .acessos import CAMPOS_ACESSO
+from .acessos import CAMPOS_ACESSO, MODULOS_RESTRITOS
 from .models import AcessoModulo, Funcionario
 
 User = get_user_model()
@@ -75,7 +75,10 @@ class FuncionarioAdmin(admin.ModelAdmin):
             "Módulos que pode acessar",
             {
                 "fields": CAMPOS_ACESSO,
-                "description": "Sem acesso: some do menu e a URL é bloqueada. Só ver: abre, mas não salva nada.",
+                "description": (
+                    "Sem acesso: some do menu e a URL é bloqueada. Só ver: abre, mas não salva nada. "
+                    "Financeiro vale até para superusuário: precisa ser liberado aqui."
+                ),
             },
         ),
         (
@@ -189,9 +192,10 @@ class AcessoModuloAdmin(admin.ModelAdmin):
     def nome_completo_col(self, obj):
         return obj.nome_completo
 
-    @admin.action(description="Liberar todos os módulos (ver e editar)")
+    @admin.action(description="Liberar todos os módulos (ver e editar), exceto Financeiro")
     def liberar_tudo(self, request, queryset):
-        n = queryset.update(**{c: "editar" for c in CAMPOS_ACESSO})
+        restritos = {f"acesso_{m}" for m in MODULOS_RESTRITOS}
+        n = queryset.update(**{c: "editar" for c in CAMPOS_ACESSO if c not in restritos})
         self.message_user(request, f"{n} funcionário(s) com acesso total.")
 
     @admin.action(description="Tirar acesso ao Comercial e Orçamentos")

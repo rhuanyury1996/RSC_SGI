@@ -1,7 +1,8 @@
 """Controle de acesso por módulo do SGI.
 
 Cada funcionário tem um nível por módulo: editar, ver (só leitura) ou nenhum.
-Superusuário sempre tem acesso total.
+Superusuário sempre tem acesso total, exceto nos módulos restritos (Financeiro):
+esses só abrem para o CEO ou para quem tiver o acesso liberado no admin.
 """
 from django.contrib import messages
 from django.http import JsonResponse
@@ -20,11 +21,16 @@ MODULOS = (
     ("apontamentos", "Apontamentos", "/apontamentos/"),
     ("calendario", "Calendário", "/calendario/"),
     ("informativos", "Informativos", "/informativos/"),
+    ("financeiro", "Financeiro", "/financeiro/"),
 )
 CAMPOS_ACESSO = tuple(f"acesso_{chave}" for chave, _r, _p in MODULOS)
 METODOS_LEITURA = {"GET", "HEAD", "OPTIONS"}
+# Módulos restritos: começam fechados (padrão "nenhum") e não são liberados
+# automaticamente para superusuário nem para quem não tem funcionário vinculado.
+# O CEO sempre tem acesso total.
+MODULOS_RESTRITOS = ("financeiro",)
 # Áreas só do CEO: para qualquer outro usuário elas não existem (404)
-PREFIXOS_SO_CEO = ("/financeiro/", "/pagamentos/")
+PREFIXOS_SO_CEO = ("/pagamentos/",)
 
 
 def eh_ceo(user) -> bool:
@@ -38,20 +44,31 @@ def eh_ceo(user) -> bool:
 
 
 def niveis_do_usuario(user, funcionario=None) -> dict:
-    """{modulo: nivel}. Sem funcionário vinculado ou superusuário: tudo liberado."""
-    total = {chave: EDITAR for chave, _r, _p in MODULOS}
-    if not getattr(user, "is_authenticated", False) or user.is_superuser:
-        return total
+    """{modulo: nivel}.
+
+    Módulos comuns: sem funcionário vinculado ou superusuário, tudo liberado.
+    Módulos restritos (Financeiro): só o CEO ou quem tiver acesso no cadastro.
+    """
+    niveis = {chave: EDITAR for chave, _r, _p in MODULOS}
+    for chave in MODULOS_RESTRITOS:
+        niveis[chave] = NENHUM
+    if not getattr(user, "is_authenticated", False):
+        return niveis
+    if eh_ceo(user):
+        return {chave: EDITAR for chave, _r, _p in MODULOS}
     if funcionario is None:
         from .models import Funcionario
 
         funcionario = Funcionario.objects.filter(usuario=user, ativo=True).first()
     if funcionario is None:
-        return total
-    return {
-        chave: getattr(funcionario, f"acesso_{chave}", EDITAR) or EDITAR
-        for chave, _r, _p in MODULOS
-    }
+        return niveis
+    for chave, _r, _p in MODULOS:
+        restrito = chave in MODULOS_RESTRITOS
+        if user.is_superuser and not restrito:
+            continue
+        padrao = NENHUM if restrito else EDITAR
+        niveis[chave] = getattr(funcionario, f"acesso_{chave}", padrao) or padrao
+    return niveis
 
 
 def modulo_da_url(path: str) -> str | None:
@@ -84,9 +101,18 @@ class AcessoModuloMiddleware:
                 return redirect_to_login(request.get_full_path())
             raise Http404()
         modulo = modulo_da_url(request.path)
-        if modulo and user is not None and user.is_authenticated and not user.is_superuser:
+        if (
+            modulo
+            and user is not None
+            and user.is_authenticated
+            and (not user.is_superuser or modulo in MODULOS_RESTRITOS)
+        ):
             nivel = niveis_do_usuario(user).get(modulo, EDITAR)
             rotulo = dict((c, r) for c, r, _p in MODULOS)[modulo]
+            if nivel == NENHUM and modulo in MODULOS_RESTRITOS:
+                from django.http import Http404
+
+                raise Http404()  # para quem não tem acesso, a área nem existe
             if nivel == NENHUM:
                 return self._negar(request, f"Você não tem acesso ao módulo {rotulo}.", ir_para_home=True)
             if nivel == VER and request.method not in METODOS_LEITURA:

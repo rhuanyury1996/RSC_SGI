@@ -1,4 +1,4 @@
-"""Financeiro do SGI (portado do Arcturus). Acesso: só o CEO."""
+"""Financeiro do SGI (portado do Arcturus). Acesso: CEO + quem for liberado no admin."""
 from __future__ import annotations
 
 from collections import defaultdict

@@ -33,12 +33,12 @@ class NivelAcesso(models.TextChoices):
     NENHUM = "nenhum", "Sem acesso"
 
 
-def _campo_acesso(rotulo: str):
+def _campo_acesso(rotulo: str, padrao: str = NivelAcesso.EDITAR):
     return models.CharField(
         rotulo,
         max_length=10,
         choices=NivelAcesso.choices,
-        default=NivelAcesso.EDITAR,
+        default=padrao,
     )
 
 
@@ -164,6 +164,8 @@ class Funcionario(models.Model):
     acesso_calendario = _campo_acesso("Calendário")
     acesso_informativos = _campo_acesso("Informativos")
     acesso_pagamentos = _campo_acesso("Pagamentos")
+    # Financeiro começa fechado: só quem for liberado no admin (o CEO sempre acessa)
+    acesso_financeiro = _campo_acesso("Financeiro", NivelAcesso.NENHUM)
     criado_em = models.DateTimeField("Criado em", auto_now_add=True)
     atualizado_em = models.DateTimeField("Atualizado em", auto_now=True)
 

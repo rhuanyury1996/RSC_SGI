@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     "atividades",
     "pagamentos",
     "orcamentos",
-    # Financeiro (portado do Arcturus) — só o CEO
+    # Financeiro (portado do Arcturus) — CEO + quem for liberado no admin
     "workspaces",
     "ledger",
     "financeiro",
