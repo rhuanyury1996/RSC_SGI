@@ -57,4 +57,23 @@ A escolha é gravada no estado do estudo (`estado.cores`) e vale para quem abrir
 
 ```bash
 python manage.py test tecnico
+python manage.py carregar_estudo_prox
 ```
+
+## Estudo PROX (RT-0001)
+
+O comando `python manage.py carregar_estudo_prox` grava o estudo da planta piloto a partir de
+`tecnico/dados_estudos/prox.json`. Essa pasta está no `.gitignore` (dados do cliente). Para remontar o JSON
+na máquina que tem o script local: `python tecnico/dados_estudos/montar_prox.py` e, em seguida, o comando de carga.
+`--com-produtos-puros` acrescenta as fontes da Tabela 2 (14 produtos na balança e no exaustor).
+
+O que a carga registra, sem mudar a conta da calculadora:
+
+- Onde a FDS e o RT discordam (acetato de butila, PMA, diisobutileno, isobutanol, tolueno, butilglicol, DPM),
+  o estudo usa a FDS e marca `divergencia`. O RT fica só em `estado.rt_ref`, para a aba Comparação com o RT.
+- O RT não traz diâmetro de furo, taxa, volume nem vazão do exaustor. As fontes usam o furo de 2 mm do exemplo
+  da calculadora, com `PREMISSA - validar` na observação. As extensões saem da dispersão, não dos 0,5 m e 1,0 m
+  repetidos no RT para todos os produtos.
+- 2-etil-hexil acrilato não tem FDS. Entra com a Tabela B.1 (`n102`), marcado pendente, para as misturas 01 e 03
+  terem componentes com Antoine. Catalisador, anidrido maleico, HDI, TDI e o intermediário ficam fora do vapor.
+- Receitas B e C do RT estão sem número. Tanque de água e tanque de recuperação não viram fonte.

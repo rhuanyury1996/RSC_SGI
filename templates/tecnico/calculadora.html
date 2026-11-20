@@ -27,11 +27,11 @@
   --ok:#5cc88a; --ok-bg:#16301f; --warn:#e0a93b; --warn-bg:#33280f; --bad:#ef8174; --bad-bg:#37191a; --info:#7fb0e6; --info-bg:#172636;
   --z0:#ef8174; --z1:#f0a04b; --z2:#d9c24a; --zn:#5cc88a; color-scheme:dark;}
 *{box-sizing:border-box}
-html,body{height:100%}
+html,body{height:100%;overflow:hidden}
 body{margin:0;background:radial-gradient(circle at top right,rgba(37,99,235,.05),transparent 28%),var(--bg);color:var(--ink);font:14.5px/1.45 var(--sans);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}
-.app{display:grid;grid-template-columns:244px 1fr;min-height:100%}
-.side{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.app{display:grid;grid-template-columns:244px 1fr;height:100%;min-height:0}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:14px 12px;position:sticky;top:0;height:100%;max-height:100%;overflow:auto}
 .brand{display:flex;gap:10px;align-items:center;padding:2px 8px 16px;font-weight:600;letter-spacing:.2px}
 .brand i{width:26px;height:26px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:600 12px var(--mono);font-style:normal}
 .nav h6{margin:16px 10px 6px;font-size:11px;font-weight:500;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
@@ -40,7 +40,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav button[aria-current="page"]{background:var(--soft);font-weight:600}
 .nav .ref{font:11px var(--mono);color:var(--mut)}
 .nav .cnt{font:11px var(--mono);background:var(--info-bg);color:var(--info);padding:1px 7px;border-radius:10px}
-main{padding:18px 26px 60px;min-width:0}
+main{padding:14px 22px 28px;min-width:0;min-height:0;height:100%;overflow:auto}
 .top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
 .top h1{font-size:20px;margin:0;font-weight:600;flex:1 1 260px;text-wrap:balance}
 .top h1 small{display:block;font:400 12px var(--mono);color:var(--mut);margin-top:3px}
@@ -155,6 +155,8 @@ details summary{cursor:pointer;font-weight:500}
 .nav h6:hover{color:var(--ink)}
 .nav h6::after{content:"";width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .18s;margin-top:-3px}
 .nav section.shut h6::after{transform:rotate(-45deg);margin-top:0}
+.nav section.shut{margin-bottom:2px}
+.nav section.shut h6{margin-bottom:2px}
 .nav section.shut .gi{display:none}
 .nav button{position:relative;transition:background .15s}
 .nav button[aria-current="page"]::before{content:"";position:absolute;left:-12px;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
@@ -197,11 +199,6 @@ details.panel>summary{cursor:pointer;font-weight:600;font-family:var(--head);fon
 .cc-leg .lg{display:inline-flex;align-items:center;gap:8px;border:1px solid #e3e9f4;border-radius:999px;padding:5px 12px;font-size:12.5px;color:#334155;background:#fbfcfe}
 .cc-leg .lg i{width:18px;height:4px;border-radius:4px;display:inline-block}
 .cc-leg .lg b{font-weight:700;color:#0f172a}
-.cc-leg .cor-pick{appearance:none;-webkit-appearance:none;width:22px;height:22px;padding:0;border:1px solid #cbd5e1;border-radius:50%;background:none;cursor:pointer;overflow:hidden}
-.cc-leg .cor-pick::-webkit-color-swatch-wrapper{padding:0}
-.cc-leg .cor-pick::-webkit-color-swatch{border:0;border-radius:50%}
-.cc-leg .cor-pick::-moz-color-swatch{border:0;border-radius:50%}
-.cc-reset{border:0;background:none;color:#2563eb;font:600 12.5px var(--sans);cursor:pointer;padding:5px 6px;text-decoration:underline}
 :root[data-theme="dark"] .chartcard{background:#fff}
 @media (max-width:900px){
   .app{grid-template-columns:1fr}
@@ -594,7 +591,7 @@ const NAV = [
   ['Sequência de cálculo', [['fonte', 'Fonte e grau de liberação', 'A.1 · A.2', '1'], ['liq', 'Taxa: líquidos', 'A.3.1', '2'], ['gas', 'Taxa: gases e vapores', 'A.3.2', '2'], ['vz', 'Vazão mínima e Vz', 'B.5.2', '3'], ['pers', 'Tempo de persistência', 'B.5.2.5', '4'], ['zona', 'Grau, disponibilidade e zona', 'B.5.3 · B.6', '5'], ['fluxo', 'Fluxograma da norma', 'Anexo B', '6'], ['multi', 'Várias fontes no mesmo volume', 'B.2 · B.3', '7']]],
   ['Extensão', [['disp', 'Dispersão: jato e pluma', 'Yellow Book', '']]],
   ['Névoas', [['nevoa', 'Triagem de névoas', 'Anexo D', '']]],
-  ['Resultados', [['resumo', 'Resumo', '', ''], ['listas', 'Listas de dados', 'C.1 · C.2', '8'], ['memorial', 'Memorial de cálculo', '', '9'], ['conf', 'Conferência com a norma', '', '']]],
+  ['Resultados', [['resumo', 'Resumo', '', ''], ['listas', 'Listas de dados', 'C.1 · C.2', '8'], ['memorial', 'Memorial de cálculo', '', '9'], ['conf', 'Conferência com a norma', '', ''], ['rt', 'Comparação com o RT', 'RT-0001', '']]],
   ['Ajuda', [['tutorial', 'Tutorial', '', '']]],
 ];
 const TITLES = {};
@@ -671,14 +668,15 @@ function filtered() {
     if (UI.classeT && p.classeT !== UI.classeT) return false;
     if (UI.soLIE && !(p.lie_v > 0)) return false;
     if (!q) return true;
-    return (p.nome + ' ' + (p.sin || []).join(' ') + ' ' + (p.formula || '') + ' ' + (p.cas || '')).toLowerCase().includes(q);
+    return (p.nome + ' ' + (p.sin || []).join(' ') + ' ' + (p.formula || '') + ' ' + (p.cas || '') + ' ' + (p.nota || '')).toLowerCase().includes(q);
   });
 }
 function listRefresh() {
   const el = $('#lista'); if (!el) return;
   const all = filtered(); const rows = all.slice(0, UI.limit);
   $('#cntLista').textContent = `${all.length} de ${allProducts().length} produtos` + (all.length > rows.length ? ` · mostrando ${rows.length}` : '');
-  el.innerHTML = `<table class="tbl"><thead><tr><th>Produto</th><th class="n">M</th><th class="n">LIE %</th><th class="n">Fulgor °C</th><th class="n">Ign. °C</th><th>T</th><th>Gr.</th></tr></thead><tbody>${rows.map(p => `<tr class="click ${UI.sel === p.id ? 'sel' : ''}" data-pid="${p.id}"><td><b>${esc(p.nome)}</b>${p.sin && p.sin[0] ? `<div class="muted" style="font-size:12px">${esc(p.sin.slice(0, 2).join(' · '))}</div>` : ''}<div class="muted mono" style="font-size:11px">${esc(p.cas || 'sem CAS')} ${p.formula ? ' · ' + esc(p.formula) : ''}${p.origem ? ' · ' + esc(p.origem) : ''}</div></td><td class="n">${fmt(prod(p.id).M, 4)}</td><td class="n">${fmt(prod(p.id).lie_v, 3)}</td><td class="n">${p.fulgor !== null && p.fulgor !== undefined ? (p.fulgor_q || '') + fmt(p.fulgor, 3) : '—'}</td><td class="n">${fmt(p.ign, 3)}</td><td>${esc(p.classeT || '')}</td><td>${esc(p.grupo || '')}</td></tr>`).join('')}</tbody></table>${all.length > rows.length ? '<div style="padding:10px"><button class="btn" id="maisLista">Mostrar mais 100</button></div>' : ''}${!all.length ? '<div class="empty">Nenhum produto encontrado.</div>' : ''}`;
+  const marcaProd = p => { const o = S.over[p.id] || {}; return `${p.pendente || o.pendente ? ' · pendente' : ''}${p.divergencia || o.divergencia ? ' · FDS ≠ RT' : ''}`; };
+  el.innerHTML = `<table class="tbl"><thead><tr><th>Produto</th><th class="n">M</th><th class="n">LIE %</th><th class="n">Fulgor °C</th><th class="n">Ign. °C</th><th>T</th><th>Gr.</th></tr></thead><tbody>${rows.map(p => `<tr class="click ${UI.sel === p.id ? 'sel' : ''}" data-pid="${p.id}"><td><b>${esc(p.nome)}</b>${p.sin && p.sin[0] ? `<div class="muted" style="font-size:12px">${esc(p.sin.slice(0, 2).join(' · '))}</div>` : ''}<div class="muted mono" style="font-size:11px">${esc(p.cas || 'sem CAS')} ${p.formula ? ' · ' + esc(p.formula) : ''}${p.origem ? ' · ' + esc(p.origem) : ''}${esc(marcaProd(p))}</div></td><td class="n">${fmt(prod(p.id).M, 4)}</td><td class="n">${fmt(prod(p.id).lie_v, 3)}</td><td class="n">${p.fulgor !== null && p.fulgor !== undefined ? (p.fulgor_q || '') + fmt(p.fulgor, 3) : '—'}</td><td class="n">${fmt(p.ign, 3)}</td><td>${esc(prod(p.id).classeT || p.classeT || '')}</td><td>${esc(prod(p.id).grupo || p.grupo || '')}</td></tr>`).join('')}</tbody></table>${all.length > rows.length ? '<div style="padding:10px"><button class="btn" id="maisLista">Mostrar mais 100</button></div>' : ''}${!all.length ? '<div class="empty">Nenhum produto encontrado.</div>' : ''}`;
 }
 function overField(label, id, key, unit, normVal, o = {}) {
   const ov = (S.over[id] || {})[key];
@@ -697,6 +695,9 @@ function detRefresh() {
     <div class="row" style="margin-bottom:12px"><button class="btn pri" id="usarProd">Usar na fonte atual</button>${b.origem ? '<button class="btn" id="delProd">Excluir</button>' : ''}</div>
     <div class="muted mono" style="font-size:12px;margin-top:4px">LIE tabelado ${b.lie_m ? fmt(b.lie_m, 3) + ' g/m³' : '—'} · LSE ${b.lse_m ? fmt(b.lse_m, 3) + ' g/m³' : '—'} · dens. rel. ${fmt(b.dens, 3)} · MESG ${fmt(b.mesg, 3)} mm · grupo ${esc(b.grupo || '—')} · ${esc(P.classeT || '—')}${b.ant ? ' · Antoine Yaws válido de ' + fmt(b.ant.Tmin, 4) + ' a ' + fmt(b.ant.Tmax, 4) + ' °C' : ''}</div>
     ${b.nota ? `<div class="note">${esc(b.nota)}</div>` : ''}
+    ${(S.over[id] || {}).nota ? `<div class="note warn">${esc((S.over[id] || {}).nota)}</div>` : ''}
+    ${b.pendente || (S.over[id] || {}).pendente ? `<div class="note warn">Pendente: a FDS não fechou este produto. Não trate o valor como dado do RT.</div>` : ''}
+    ${b.divergencia || (S.over[id] || {}).divergencia ? `<div class="note warn">FDS ≠ RT: ${esc(b.divergencia || (S.over[id] || {}).divergencia)}</div>` : ''}
     ${Object.keys(b.raw || {}).length ? `<div class="note warn">Células com mais de um valor na norma: ${Object.entries(b.raw).map(([k, v]) => esc(k + ': ' + v)).join(' · ')}. O sistema usa o primeiro número.</div>` : ''}</div>
     ${fontesPainel(id)}`;
 }
@@ -1808,25 +1809,13 @@ function suave(pts, X, Z) { // Catmull-Rom fechado → Bézier
   }
   return d + 'Z';
 }
-/* Cores das linhas do gráfico da nuvem: [cor da linha, cor clara do degradê]; a escolha do usuário fica em S.cores */
-const CORES_PLUMA = { meio: ['#1d4ed8', '#3b82f6'], lie: ['#2563eb', '#93c5fd'], lse: ['#0e7490', '#67e8f9'] };
-function clareia(hex, t) { const n = parseInt(hex.slice(1), 16); return '#' + [16, 8, 0].map(s => Math.round(((n >> s) & 255) * (1 - t) + 255 * t).toString(16).padStart(2, '0')).join(''); }
-function corPluma(k) { const c = (S.cores || {})[k]; return /^#[0-9a-f]{6}$/i.test(c || '') ? [c, clareia(c, 0.5)] : CORES_PLUMA[k]; }
-function pintaPluma(k) {
-  const [c1, c2] = corPluma(k);
-  document.querySelectorAll('#res [data-cor="' + k + '"]').forEach(n => {
-    if (n.tagName === 'stop') n.setAttribute('stop-color', n.dataset.t === 'c1' ? c1 : c2);
-    else if (n.tagName === 'circle') n.setAttribute('stroke', c1);
-    else n.style.background = 'linear-gradient(90deg,' + c2 + ',' + c1 + ')';
-  });
-}
 function grafPluma(o) {
   if (o.jet && cur().disp.dir === 'V') return notes(['O gráfico lateral é traçado para jato horizontal ou pluma.'], 'info');
   const ic = UI.dpCls !== null && UI.dpCls !== undefined && o.rows[UI.dpCls] ? UI.dpCls : o.iw;
   const r = o.rows[ic]; if (!r) return '';
   const lse = o.c.P.lse_v > 0 ? o.c.P.lse_v / o.c.P.lie_v : null;
-  const curvas = [[0.5, 'meio', '50 % do LIE'], [1, 'lie', 'LIE']].concat(lse ? [[lse, 'lse', 'LSE']] : []);
-  const cs = curvas.map(([fr, k, n]) => { const [c1, c2] = corPluma(k); return { c: contorno(o, r, fr), c1, c2, n, fr, k }; }).filter(x => x.c);
+  const curvas = [[0.5, '#1d4ed8', '#3b82f6', '50 % do LIE'], [1, '#2563eb', '#93c5fd', 'LIE']].concat(lse ? [[lse, '#0e7490', '#67e8f9', 'LSE']] : []);
+  const cs = curvas.map(([fr, c1, c2, n]) => ({ c: contorno(o, r, fr), c1, c2, n, fr })).filter(x => x.c);
   if (!cs.length) return '';
   const W = 900, H = 360, ml = 52, mr = 24, mt = 26, mb = 40;
   const xmax = Math.max(...cs.map(x => x.c.x)) * 1.1, zmax = Math.max(o.h * 1.6, ...cs.map(x => x.c.zmax)) * 1.15;
@@ -1836,15 +1825,14 @@ function grafPluma(o) {
   let g = '';
   for (let x = 0; x <= XM + 1e-9; x += dx) g += `<line x1="${X(x)}" x2="${X(x)}" y1="${mt}" y2="${H - mb}"/><text class="tk" x="${X(x)}" y="${H - mb + 20}" text-anchor="middle">${fmt(+x.toFixed(6), 3)}</text>`;
   for (let z = 0; z <= ZM + 1e-9; z += dz) g += `<line x1="${ml}" x2="${W - mr}" y1="${Z(z)}" y2="${Z(z)}"/><text class="tk" x="${ml - 10}" y="${Z(z) + 4}" text-anchor="end">${fmt(+z.toFixed(6), 3)}</text>`;
-  const defs = cs.map((x, i) => `<linearGradient id="gf${i}" x1="0" x2="1" y1="0" y2="0"><stop data-cor="${x.k}" data-t="c2" offset="0" stop-color="${x.c2}" stop-opacity=".05"/><stop data-cor="${x.k}" data-t="c2" offset=".55" stop-color="${x.c2}" stop-opacity=".22"/><stop data-cor="${x.k}" data-t="c1" offset="1" stop-color="${x.c1}" stop-opacity=".10"/></linearGradient>
-    <linearGradient id="gs${i}" x1="0" x2="1" y1="0" y2="0"><stop data-cor="${x.k}" data-t="c2" offset="0" stop-color="${x.c2}"/><stop data-cor="${x.k}" data-t="c1" offset="1" stop-color="${x.c1}"/></linearGradient>`).join('');
+  const defs = cs.map((x, i) => `<linearGradient id="gf${i}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${x.c2}" stop-opacity=".05"/><stop offset=".55" stop-color="${x.c2}" stop-opacity=".22"/><stop offset="1" stop-color="${x.c1}" stop-opacity=".10"/></linearGradient>
+    <linearGradient id="gs${i}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${x.c2}"/><stop offset="1" stop-color="${x.c1}"/></linearGradient>`).join('');
   const paths = cs.slice().reverse().map(x => { const i = cs.indexOf(x), d = suave(x.c.pts, X, Z);
     return `<path d="${d}" fill="url(#gf${i})"/><path d="${d}" fill="none" stroke="url(#gs${i})" stroke-width="6" opacity=".22" filter="url(#glow)"/><path d="${d}" fill="none" stroke="url(#gs${i})" stroke-width="2.2" stroke-linejoin="round"/>
-      <circle data-cor="${x.k}" cx="${X(x.c.x)}" cy="${Z(o.h)}" r="3.5" fill="#fff" stroke="${x.c1}" stroke-width="2"/>`; }).join('');
+      <circle cx="${X(x.c.x)}" cy="${Z(o.h)}" r="3.5" fill="#fff" stroke="${x.c1}" stroke-width="2"/>`; }).join('');
   const pri = cs.find(x => x.fr === o.crit[o.ic][1]) || cs[0];
   const ex = extensao(cur());
-  const leg = cs.map(x => `<span class="lg"><i data-cor="${x.k}" style="background:linear-gradient(90deg,${x.c2},${x.c1})"></i>${x.n}<b>${fmt(x.c.x, 3)} m</b><input type="color" class="cor-pick" data-cor-pick="${x.k}" value="${x.c1}" title="Escolher a cor da linha ${x.n}" aria-label="Cor da linha ${x.n}"></span>`).join('')
-    + (S.cores && Object.keys(S.cores).length ? '<button type="button" class="cc-reset" id="corReset">Restaurar cores</button>' : '');
+  const leg = cs.map((x, i) => `<span class="lg"><i style="background:linear-gradient(90deg,${x.c2},${x.c1})"></i>${x.n}<b>${fmt(x.c.x, 3)} m</b></span>`).join('');
   return `<div class="panel chartcard"><h2>Vista lateral da nuvem<span>contornos no plano vertical do eixo</span></h2>
     <div class="cc-top"><div class="cc-meta">Condição ${r.cl}${fmt(r.u10, 2)} · vento ${fmt(r.u, 2)} m/s na altura da fonte · ${o.jet ? 'jato livre e pluma' : 'pluma gaussiana'}</div>
     <select id="dpCls" class="cc-pill" aria-label="Condição meteorológica do gráfico">${o.rows.map((x, i) => `<option value="${i}" ${i === ic ? 'selected' : ''}>${x.cl}${fmt(x.u10, 2)}${i === o.iw ? ' · pior caso' : ''}</option>`).join('')}</select></div>
@@ -1961,7 +1949,6 @@ TABS.pubchem = {
       <div class="row" style="margin-top:10px"><button class="btn pri" id="pcAdd">Adicionar ao banco</button><button class="btn" id="pcAddUse">Adicionar e usar na fonte atual</button><a class="btn" href="https://pubchem.ncbi.nlm.nih.gov/compound/${r.cid}" target="_blank" rel="noopener">Abrir no PubChem</a></div></div>`;
   },
 };
-document.addEventListener('input', e => { const kc = e.target.dataset && e.target.dataset.corPick; if (kc && CORES_PLUMA[kc]) { S.cores = S.cores || {}; S.cores[kc] = e.target.value; pintaPluma(kc); save(); } });
 document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.pc; if (k && UI.pc && UI.pc.v) UI.pc.v[k] = pn(e.target.value); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pcq') { e.preventDefault(); const q = e.target.value.trim(); if (q) pcBuscar(q); } });
 
@@ -2048,9 +2035,106 @@ function fontesPainel(id) {
 }
 
 /* ===================== Navegação e render ===================== */
+function grupoFechado(g) {
+  const v = (S.navClosed || {})[g];
+  return v === undefined ? true : !!v;
+}
+const GRUPO_RANK = { IIA: 1, IIB: 2, IIC: 3 };
+const CLASSE_RANK = { T1: 1, T2: 2, T3: 3, T4: 4, T5: 5, T6: 6 };
+function zonaPrincipal(txt) {
+  if (!txt) return '';
+  if (/^Não/.test(txt)) return 'NC';
+  const m = String(txt).match(/Zona\s*([012])/);
+  return m ? m[1] : '';
+}
+function numCsv(v) {
+  if (v === null || v === undefined || v === '' || (typeof v === 'number' && !isFinite(v))) return '';
+  return String(v).replace('.', ',');
+}
+function comparacaoItens() {
+  const ref = S.rt_ref || { itens: [] };
+  const porChave = Object.fromEntries((ref.itens || []).map(it => [it.chave, it]));
+  return S.fontes.filter(f => f.rt_chave).map(f => {
+    const it = porChave[f.rt_chave] || {};
+    const quente = /160/.test(f.nome || '');
+    const zRt = quente ? it.zona160 : it.zona25;
+    const vRt = quente ? it.vert160 : it.vert25;
+    const hRt = quente ? it.horiz160 : it.horiz25;
+    const c = calc(f);
+    const ex = extensao(f);
+    const P = c.P;
+    const zCalc = c.zona ? c.zona.texto : '';
+    const faltou = !P || c.miss.length || (ex && ex.txt === 'a calcular');
+    const zNum = zonaPrincipal(zCalc);
+    const zonaDifere = !faltou && String(zRt ?? '') !== '' && zNum !== String(zRt);
+    const extPar = (calcV, rtV) => {
+      if (rtV === null || rtV === undefined || rtV === '') return { abs: null, rel: null, dif: false };
+      if (calcV === null || calcV === undefined || calcV === '') return { abs: null, rel: null, dif: false };
+      const abs = Math.abs(+calcV - +rtV);
+      const rel = +rtV !== 0 ? abs / Math.abs(+rtV) : null;
+      return { abs, rel, dif: rel === null ? abs > 0 : rel > 0.25 };
+    };
+    const dV = extPar(ex.V, vRt);
+    const dH = extPar(ex.H, hRt);
+    const gCalc = P ? (P.grupo || '') : '';
+    const tCalc = P ? (P.classeT || '') : '';
+    const gRt = it.grupo || '';
+    const tRt = it.classeT || '';
+    const grupoMuda = !!(gCalc && gRt && gCalc !== gRt);
+    const classeMuda = !!(tCalc && tRt && tCalc !== tRt);
+    const grupoPior = grupoMuda && (GRUPO_RANK[gCalc] || 0) > (GRUPO_RANK[gRt] || 0);
+    const classePior = classeMuda && (CLASSE_RANK[tCalc] || 0) > (CLASSE_RANK[tRt] || 0);
+    const diverge = zonaDifere || dV.dif || dH.dif || grupoMuda || classeMuda;
+    const alerta = zonaDifere || grupoPior || classePior;
+    return { f, it, quente, zRt, vRt, hRt, c, ex, zCalc, faltou, zonaDifere, dV, dH, gCalc, tCalc, gRt, tRt, grupoMuda, classeMuda, grupoPior, classePior, diverge, alerta };
+  });
+}
+function baixarComparacao() {
+  const cab = ['Fonte', 'Chave RT', 'Temperatura', 'Zona RT', 'Zona calculada', 'Vertical RT (m)', 'Vertical calculada (m)', 'Diferença vertical (m)', 'Diferença vertical relativa', 'Horizontal RT (m)', 'Horizontal calculada (m)', 'Diferença horizontal (m)', 'Diferença horizontal relativa', 'Grupo RT', 'Grupo calculado', 'Classe T RT', 'Classe T calculada', 'Situação'];
+  const linhas = [cab].concat(comparacaoItens().map(r => {
+    const sit = r.faltou ? 'não calculado' : r.alerta ? 'alerta' : r.diverge ? 'diverge' : 'bate';
+    return [r.f.nome, r.f.rt_chave, r.quente ? '160 °C' : '25 °C', r.zRt ?? '', r.faltou ? ('faltam dados: ' + (r.c.miss || []).join(', ') || (r.ex && r.ex.txt) || 'a calcular') : (r.zCalc || 'a calcular'), numCsv(r.vRt), r.ex && r.ex.V !== null && r.ex.V !== undefined && r.ex.V !== '' ? numCsv(r.ex.V) : (r.ex && r.ex.txt || ''), numCsv(r.dV.abs), r.dV.rel === null ? '' : numCsv(+r.dV.rel.toFixed(4)), numCsv(r.hRt), r.ex && r.ex.H !== null && r.ex.H !== undefined && r.ex.H !== '' ? numCsv(r.ex.H) : (r.ex && r.ex.txt || ''), numCsv(r.dH.abs), r.dH.rel === null ? '' : numCsv(+r.dH.rel.toFixed(4)), r.gRt, r.gCalc, r.tRt, r.tCalc, sit];
+  }));
+  const csv = linhas.map(cols => cols.map(c => String(c ?? '').replaceAll(';', ',')).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'comparacao_rt.csv';
+  a.click();
+}
+TABS.rt = {
+  view() {
+    if (!S.rt_ref) return `<div class="panel"><div class="empty">Este estudo não tem referência de relatório técnico.</div></div>`;
+    const rows = comparacaoItens();
+    const batem = rows.filter(r => !r.faltou && !r.diverge).length;
+    const divergem = rows.filter(r => !r.faltou && r.diverge).length;
+    const pend = rows.filter(r => r.faltou).length;
+    const celExt = (rt, calc, d) => {
+      if (rt === null || rt === undefined || rt === '') return '<td class="n">n/a</td><td class="n">n/a</td><td class="n">—</td>';
+      const cv = calc === null || calc === undefined || calc === '' ? 'a calcular' : fmt(+calc, 3);
+      const cls = d.dif ? ' style="background:var(--warn-bg)"' : '';
+      return `<td class="n">${fmt(rt, 3)}</td><td class="n"${cls}>${cv}</td><td class="n"${cls}>${d.abs === null ? '—' : fmt(d.abs, 3)}${d.rel === null ? '' : ' (' + fmt(d.rel * 100, 3) + ' %)'}</td>`;
+    };
+    const corpo = rows.map(r => {
+      const fundo = r.alerta ? ' style="background:var(--bad-bg)"' : r.diverge ? ' style="background:var(--warn-bg)"' : '';
+      const zona = r.faltou ? (r.c.miss.length ? 'faltam dados: ' + r.c.miss.join(', ') : (r.ex && r.ex.txt) || 'a calcular') : (r.zCalc || 'a calcular');
+      return `<tr${fundo}><td>${esc(r.f.nome)}</td><td>${esc(r.zRt ?? '—')}</td><td${r.zonaDifere ? ' style="font-weight:700"' : ''}>${esc(zona)}</td>${celExt(r.vRt, r.ex.V, r.dV)}${celExt(r.hRt, r.ex.H, r.dH)}<td>${esc(r.gRt || '—')}</td><td${r.grupoPior ? ' style="font-weight:700"' : ''}>${esc(r.gCalc || '—')}</td><td>${esc(r.tRt || '—')}</td><td${r.classePior ? ' style="font-weight:700"' : ''}>${esc(r.tCalc || '—')}</td></tr>`;
+    }).join('');
+    return `<div class="tiles">
+      ${tile('Batem com o RT', String(batem), '', 'zona, extensão, grupo e classe T')}
+      ${tile('Divergem', String(divergem), '', 'zona diferente, extensão acima de 25 % ou grupo/classe T diferentes')}
+      ${tile('Não calculados', String(pend), '', 'falta dado ou a dispersão não fechou')}</div>
+      <div class="panel"><h2>Comparação com o RT<span>${esc(S.rt_ref.documento || '')}</span></h2>
+      <p class="muted">${esc(S.rt_ref.premissas || '')} Os números do RT não entram em nenhum cálculo. Vermelho: zona diferente, grupo mais severo ou classe T mais restritiva. Amarelo: extensão com diferença acima de 25 %, ou grupo/classe T diferentes sem serem mais severos.</p>
+      <div class="row" style="margin:8px 0 12px"><button class="btn pri" id="rtCsv">Baixar comparação (.csv)</button></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Fonte</th><th>Zona RT</th><th>Zona calculada</th><th class="n">Vert. RT</th><th class="n">Vert. calc.</th><th class="n">Δ vert.</th><th class="n">Horiz. RT</th><th class="n">Horiz. calc.</th><th class="n">Δ horiz.</th><th>Grupo RT</th><th>Grupo calc.</th><th>T RT</th><th>T calc.</th></tr></thead><tbody>${corpo || '<tr><td colspan="13"><div class="empty">Nenhuma fonte aponta para o RT.</div></td></tr>'}</tbody></table></div>
+      ${S.rt_ref.nao_classificados ? `<div class="note" style="margin-top:10px">Não classificados no RT (sem fonte neste estudo): ${esc((S.rt_ref.nao_classificados || []).join('; '))}.</div>` : ''}
+      ${S.rt_ref.observacao ? `<div class="note warn">${esc(S.rt_ref.observacao)}</div>` : ''}</div>`;
+  }
+};
 function renderSide() {
   S.navClosed = S.navClosed || {};
-  $('#side').innerHTML = `<div class="brand"><i>CA</i><span>Classificação de áreas</span></div><nav class="nav">${NAV.map(([g, items]) => `<section class="${S.navClosed[g] ? 'shut' : ''}" data-g="${esc(g)}"><h6 role="button" tabindex="0">${g}</h6><div class="gi">${items.map(([id, t, r, n]) => `<button data-tab="${id}" ${S.tab === id ? 'aria-current="page"' : ''}><span>${n ? `<span class="num">${n}</span>` : ''}${t}</span>${id === 'produtos' ? `<span class="cnt">${allProducts().length}</span>` : `<span class="ref">${r}</span>`}</button>`).join('')}</div></section>`).join('')}</nav>`;
+  const grupos = NAV.map(([g, items]) => [g, items.filter(([id]) => id !== 'rt' || S.rt_ref)]).filter(([, items]) => items.length);
+  $('#side').innerHTML = `<div class="brand"><i>CA</i><span>Classificação de áreas</span></div><nav class="nav">${grupos.map(([g, items]) => `<section class="${grupoFechado(g) ? 'shut' : ''}" data-g="${esc(g)}"><h6 role="button" tabindex="0">${g}</h6><div class="gi">${items.map(([id, t, r, n]) => `<button data-tab="${id}" ${S.tab === id ? 'aria-current="page"' : ''}><span>${n ? `<span class="num">${n}</span>` : ''}${t}</span>${id === 'produtos' ? `<span class="cnt">${allProducts().length}</span>` : `<span class="ref">${r}</span>`}</button>`).join('')}</div></section>`).join('')}</nav>`;
 }
 function renderTop() {
   const [t, r] = TITLES[S.tab] || ['', ''];
@@ -2059,7 +2143,9 @@ function renderTop() {
   $('#src').innerHTML = showSrc ? `<select id="fsel" aria-label="Fonte de risco">${S.fontes.map(f => `<option value="${f.id}" ${f.id === S.atual ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select><button class="btn sm" id="fnew">Nova fonte</button><button class="btn sm" id="fdup">Duplicar</button><button class="btn sm" id="fdel" ${S.fontes.length < 2 ? 'disabled' : ''}>Excluir</button>` : '';
 }
 function go(tab) {
-  S.tab = tab; save(); render(); window.scrollTo(0, 0);
+  S.tab = tab; save(); render();
+  const painel = document.querySelector('main');
+  if (painel) painel.scrollTop = 0;
   $('#side').classList.remove('open');
 }
 function render() {
@@ -2139,7 +2225,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   if (e.target.closest('.tip')) { const b = e.target.closest('.tip'); if (popPin === b) popHide(); else { popHide(); popShow(b, true); } return; }
   popHide();
-  const nh = e.target.closest('.nav h6'); if (nh) { const sct = nh.parentElement, g = sct.dataset.g; S.navClosed = S.navClosed || {}; S.navClosed[g] = !S.navClosed[g]; sct.classList.toggle('shut', S.navClosed[g]); save(); return; }
+  const nh = e.target.closest('.nav h6'); if (nh) { const sct = nh.parentElement, g = sct.dataset.g; S.navClosed = S.navClosed || {}; S.navClosed[g] = !grupoFechado(g); sct.classList.toggle('shut', S.navClosed[g]); save(); return; }
   const hh = e.target.closest('#view .panel > h2, #paper [data-lvl]'); if (hh && !e.target.closest('button, a, input, select')) { toggleSection(hh); return; }
   const t = e.target.closest('button, tr[data-pid], tr[data-fonte]'); if (!t) return;
   if (t.dataset.tab) return go(t.dataset.tab);
@@ -2149,7 +2235,6 @@ document.addEventListener('click', e => {
   if (t.dataset.mixdel !== undefined) { S.mix.linhas.splice(+t.dataset.mixdel, 1); save(); render(); return; }
   switch (t.id) {
     case 'burger': $('#side').classList.toggle('open'); break;
-    case 'corReset': delete S.cores; save(); refreshRes(); break;
     case 'fl': UI.soLIE = !UI.soLIE; t.setAttribute('aria-pressed', UI.soLIE); listRefresh(); break;
     case 'maisLista': UI.limit += 100; listRefresh(); break;
     case 'novoProd': {
@@ -2169,6 +2254,7 @@ document.addEventListener('click', e => {
     case 'fdup': { S.seq++; const id = 'f' + S.seq; const b = JSON.parse(JSON.stringify(cur())); b.id = id; b.nome += ' (cópia)'; S.fontes.push(b); S.atual = id; save(); render(); break; }
     case 'fdel': S.fontes = S.fontes.filter(f => f.id !== S.atual); S.atual = S.fontes[0].id; save(); render(); break;
     case 'copyCsv': try { navigator.clipboard.writeText(UI.csv).then(() => { toast('Copiado'); }, () => toast('Não foi possível copiar')); } catch (err) { toast('Não foi possível copiar'); } break;
+    case 'rtCsv': baixarComparacao(); break;
     case 'expJson': $('#jsonBox').value = JSON.stringify(S); $('#jsonBox').select(); break;
     case 'impJson': try { const n = JSON.parse($('#jsonBox').value); if (n && n.v === 1 && n.fontes && n.fontes.length) { S = n; normState(); save(); fillDatalist(); render(); } else t.textContent = 'JSON inválido'; } catch (err) { t.textContent = 'JSON inválido'; } break;
     case 'lstSel': { const el = $('#lst'); const r = document.createRange(); r.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); toast('Listas selecionadas: pressione Ctrl+C'); break; }

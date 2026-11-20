@@ -61,3 +61,41 @@ class SetorTecnicoTests(TestCase):
         r = self.client.post(reverse("tecnico_estudo_duplicar", args=[e.pk]))
         self.assertEqual(r.status_code, 302)
         self.assertEqual(EstudoClassificacao.objects.count(), 2)
+
+
+class CarregarEstudoProxTests(TestCase):
+    def test_carga_e_idempotente_e_nao_cria_empresa(self):
+        import tempfile
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        from crm.models import Empresa
+
+        estado = {
+            "v": 1,
+            "fontes": [{"id": "f1", "nome": "Balança @25 °C", "pid": "n140", "rt_chave": "balanca"}],
+            "fontes_puros": [{"id": "f9", "nome": "Tolueno @25 °C", "pid": "n145", "rt_chave": "balanca"}],
+            "custom": [{"id": "u001", "nome": "Mistura 01-RSC", "origem": "mistura", "pendente": True}],
+            "over": {"n102": {"pendente": True, "nota": "FDS não enviada"}},
+            "estudo": {
+                "projeto": "PROX · Planta piloto de tinta base solvente (refazer RT-0001)",
+                "cliente": "PROX DO BRASIL",
+                "rev": "0",
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            arq = Path(tmp) / "prox.json"
+            arq.write_text(json.dumps(estado), encoding="utf-8")
+            antes = Empresa.objects.count()
+            call_command("carregar_estudo_prox", arquivo=str(arq))
+            call_command("carregar_estudo_prox", arquivo=str(arq))
+            call_command("carregar_estudo_prox", arquivo=str(arq), com_produtos_puros=True)
+        self.assertEqual(Empresa.objects.count(), antes)
+        estudos = EstudoClassificacao.objects.filter(nome__startswith="PROX · Planta piloto")
+        self.assertEqual(estudos.count(), 1)
+        estudo = estudos.get()
+        self.assertEqual(estudo.cliente, "PROX DO BRASIL")
+        self.assertEqual(estudo.revisao, "0")
+        self.assertEqual(len(estudo.estado["fontes"]), 2)
+        self.assertNotIn("fontes_puros", estudo.estado)
