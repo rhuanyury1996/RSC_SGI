@@ -11,7 +11,7 @@ memorial de cálculo no formato do **Apêndice C** do relatório técnico RSC e 
 | `calculadora/classificacao_areas.html` | Calculadora completa (fonte da verdade). Funciona também aberta direto no navegador. |
 | `calculadora/gerar_template.py` | Gera `templates/tecnico/calculadora.html` a partir do HTML acima. |
 | `models.py` | `EstudoClassificacao`: cabeçalho (projeto, cliente, revisão, status) + `estado` (JSON da calculadora). |
-| `views.py` | Lista, criar, abrir (iframe), calculadora, salvar (POST JSON), baixar JSON, duplicar, status. |
+| `views.py` | Lista, criar, abrir (iframe), calculadora, salvar (POST JSON), baixar e importar JSON, duplicar, status. |
 | `permissions.py` | `pode_editar_tecnico`: nível "editar" no módulo `tecnico`. |
 | `templates/tecnico/` | `estudos.html` (lista), `estudo.html` (tela com o iframe), `calculadora.html` (gerado). |
 
@@ -23,6 +23,8 @@ memorial de cálculo no formato do **Apêndice C** do relatório técnico RSC e 
    grava por `POST /tecnico/classificacao/<id>/salvar/` (JSON, com CSRF). O status aparece no topo
    ("Salvo no SGI às 14:32"). Também guarda uma cópia no navegador como reserva.
 4. Quem tem "Só ver" no módulo abre a calculadora com aviso de leitura e nada é gravado (o servidor responde 403).
+5. **Importar JSON**, na tela do estudo, substitui o conteúdo pelo arquivo enviado (o mesmo formato do Baixar JSON).
+   Aceita o estado puro ou embrulhado em `{"estado": ...}`, e junta `fontes_puros` às fontes quando o arquivo traz essa chave.
 
 ## Atualizar a calculadora
 

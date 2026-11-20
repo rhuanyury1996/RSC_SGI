@@ -15,6 +15,13 @@
   </form>
   {% endif %}
   <a class="btn ghost" href="{% url 'tecnico_estudo_dados' estudo.pk %}">Baixar JSON</a>
+  {% if pode_editar %}
+  <form method="post" action="{% url 'tecnico_estudo_importar' estudo.pk %}" enctype="multipart/form-data" class="inline-form" id="formImportar">
+    {% csrf_token %}
+    <input type="file" name="arquivo" id="arqImportar" accept="application/json,.json" hidden onchange="this.form.submit()">
+    <button type="button" class="btn ghost" onclick="document.getElementById('arqImportar').click()" title="Substitui o conteúdo deste estudo pelo arquivo">Importar JSON</button>
+  </form>
+  {% endif %}
   <a class="btn secondary" href="{% url 'tecnico_estudo_app' estudo.pk %}" target="_blank" rel="noopener">Abrir em tela cheia</a>
   <a class="btn ghost" href="{% url 'tecnico' %}">Voltar</a>
 {% endblock %}

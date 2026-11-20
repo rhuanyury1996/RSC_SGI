@@ -63,6 +63,39 @@ class SetorTecnicoTests(TestCase):
         self.assertEqual(EstudoClassificacao.objects.count(), 2)
 
 
+class ImportarEstudoTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser("import_teste", "i@i.com", "senha-forte-123")
+        self.client.force_login(self.user)
+        self.estudo = EstudoClassificacao.objects.create(nome="Vazio")
+
+    def _enviar(self, conteudo):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        arq = SimpleUploadedFile("estudo.json", conteudo.encode("utf-8"), content_type="application/json")
+        return self.client.post(reverse("tecnico_estudo_importar", args=[self.estudo.pk]), {"arquivo": arq})
+
+    def test_importa_arquivo_e_atualiza_cabecalho(self):
+        estado = dict(ESTADO_MINIMO, fontes_puros=[{"id": "f2", "nome": "Puro", "pid": "n145"}])
+        r = self._enviar(json.dumps(estado))
+        self.assertEqual(r.status_code, 302)
+        self.estudo.refresh_from_db()
+        self.assertEqual(self.estudo.n_fontes, 2)
+        self.assertEqual((self.estudo.nome, self.estudo.cliente, self.estudo.revisao), ("Prox", "Cliente X", "1"))
+        self.assertNotIn("fontes_puros", self.estudo.estado)
+
+    def test_rejeita_formato_errado(self):
+        self._enviar(json.dumps({"v": 2}))
+        self.estudo.refresh_from_db()
+        self.assertEqual(self.estudo.estado, {})
+
+    def test_bloqueado_para_so_leitura(self):
+        with mock.patch("tecnico.permissions.niveis_do_usuario", return_value={"tecnico": "ver"}):
+            self._enviar(json.dumps(ESTADO_MINIMO))
+        self.estudo.refresh_from_db()
+        self.assertEqual(self.estudo.estado, {})
+
+
 class CarregarEstudoProxTests(TestCase):
     def test_carga_e_idempotente_e_nao_cria_empresa(self):
         import tempfile

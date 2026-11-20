@@ -129,6 +129,48 @@ def salvar(request, pk: int):
 
 
 @login_required
+@require_POST
+def importar(request, pk: int):
+    """Carrega um estudo a partir de um arquivo JSON (o mesmo do Baixar JSON)."""
+    if not pode_editar_tecnico(request):
+        messages.error(request, "Seu acesso ao Setor Técnico é só leitura.")
+        return redirect("tecnico_estudo", pk=pk)
+    estudo = get_object_or_404(EstudoClassificacao, pk=pk)
+    arquivo = request.FILES.get("arquivo")
+    if arquivo is None:
+        messages.error(request, "Escolha o arquivo JSON do estudo.")
+        return redirect("tecnico_estudo", pk=pk)
+    if arquivo.size > LIMITE_ESTADO_BYTES:
+        messages.error(request, "Arquivo acima de 5 MB.")
+        return redirect("tecnico_estudo", pk=pk)
+    try:
+        dados = json.loads(arquivo.read().decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        messages.error(request, "Arquivo não é um JSON válido.")
+        return redirect("tecnico_estudo", pk=pk)
+    estado = dados.get("estado") if isinstance(dados, dict) and "estado" in dados else dados
+    if not isinstance(estado, dict) or estado.get("v") != 1 or not isinstance(estado.get("fontes"), list) or not estado["fontes"]:
+        messages.error(request, "O arquivo não tem o formato da calculadora (exige v = 1 e fontes).")
+        return redirect("tecnico_estudo", pk=pk)
+    extras = estado.pop("fontes_puros", None)
+    if extras:
+        estado["fontes"] = list(estado["fontes"]) + list(extras)
+
+    estudo.estado = estado
+    cab = estado.get("estudo") or {}
+    if (cab.get("projeto") or "").strip():
+        estudo.nome = cab["projeto"].strip()[:200]
+    if (cab.get("cliente") or "").strip():
+        estudo.cliente = cab["cliente"].strip()[:200]
+    if (cab.get("rev") or "").strip():
+        estudo.revisao = str(cab["rev"]).strip()[:10]
+    estudo.atualizado_por = obter_funcionario(request)
+    estudo.save()
+    messages.success(request, f"Estudo importado: {len(estado['fontes'])} fontes.")
+    return redirect("tecnico_estudo", pk=estudo.pk)
+
+
+@login_required
 def dados(request, pk: int):
     """Estado do estudo em JSON (backup e integração)."""
     estudo = get_object_or_404(EstudoClassificacao, pk=pk)
