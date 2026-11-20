@@ -269,6 +269,19 @@
             </div>
           </details>{% endif %}
 
+          {% if pode_ver.tecnico %}<details class="nav-group" open>
+            <summary class="nav-group-summary">
+              <span class="nav-group-label">Setor Técnico</span>
+              <span class="nav-funil-caret" aria-hidden="true"></span>
+            </summary>
+            <div class="nav-group-body">
+              <a class="nav-link {% if request.resolver_match.url_name and request.resolver_match.url_name|slice:':7' == 'tecnico' %}active{% endif %}" href="{% url 'tecnico' %}" title="Classificação de áreas">
+                <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 8v5"/><circle cx="12" cy="16" r=".8"/></svg>
+                <span class="nav-text">Classificação de áreas</span>
+              </a>
+            </div>
+          </details>{% endif %}
+
           {% if pode_ver.atividades or pode_ver.financeiro %}<details class="nav-group" open>
             <summary class="nav-group-summary">
               <span class="nav-group-label">Operação</span>

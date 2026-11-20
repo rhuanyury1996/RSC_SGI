@@ -22,6 +22,7 @@ MODULOS = (
     ("calendario", "Calendário", "/calendario/"),
     ("informativos", "Informativos", "/informativos/"),
     ("financeiro", "Financeiro", "/financeiro/"),
+    ("tecnico", "Setor Técnico", "/tecnico/"),
 )
 CAMPOS_ACESSO = tuple(f"acesso_{chave}" for chave, _r, _p in MODULOS)
 METODOS_LEITURA = {"GET", "HEAD", "OPTIONS"}

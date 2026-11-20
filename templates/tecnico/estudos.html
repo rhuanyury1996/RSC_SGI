@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Classificação de áreas · Setor Técnico{% endblock %}
+{% block breadcrumb %}Setor Técnico <span>/</span> Classificação de áreas{% endblock %}
+{% block page_title %}Classificação de áreas{% endblock %}
+
+{% block extra_head %}
+<style>
+  .inline-form{display:inline-flex;align-items:center;gap:6px;margin:0}
+  .inline-form select{width:auto;min-width:0;padding:6px 10px}
+  .inline-form .link-action{background:none;border:0;cursor:pointer;font:inherit}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="com-page wide">
+  {% if pode_editar %}
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Novo estudo</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="post" action="{% url 'tecnico_estudo_novo' %}" class="com-form">
+        {% csrf_token %}
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="n-nome">Projeto</label>
+            <input type="text" name="nome" id="n-nome" required maxlength="200" placeholder="Ex.: Prox do Brasil · Fábrica de tintas">
+          </div>
+          <div class="field">
+            <label for="n-cliente">Cliente</label>
+            <input type="text" name="cliente" id="n-cliente" maxlength="200">
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn" type="submit">Criar e abrir</button>
+        </div>
+      </form>
+    </div>
+  </details>
+  {% endif %}
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head"><h2>Filtros</h2></div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <form method="get" class="com-form">
+        <div class="empresa-grid">
+          <div class="field">
+            <label for="f-q">Projeto ou cliente</label>
+            <input type="text" name="q" id="f-q" value="{{ filtro.q }}">
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select name="status" id="f-status">
+              <option value="">Ativos</option>
+              {% for valor, rotulo in status_opcoes %}
+              <option value="{{ valor }}"{% if filtro.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="empresa-form-actions">
+          <button class="btn secondary" type="submit">Filtrar</button>
+          <a class="btn ghost" href="{% url 'tecnico' %}">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <details class="apont-panel apont-lista" open>
+    <summary class="apont-lista-summary">
+      <div class="panel-head">
+        <h2>Estudos</h2>
+        <span class="muted">{{ estudos|length }}</span>
+      </div>
+      <span class="apont-lista-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="apont-lista-body">
+      <div class="apont-lista-scroll">
+        <table class="recup-table">
+          <thead>
+            <tr><th>Projeto</th><th>Cliente</th><th>Rev.</th><th>Fontes</th><th>Status</th><th>Atualizado</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for e in estudos %}
+            <tr>
+              <td><a href="{% url 'tecnico_estudo' e.pk %}"><strong>{{ e.nome }}</strong></a></td>
+              <td>{{ e.cliente|default:"—" }}</td>
+              <td>{{ e.revisao }}</td>
+              <td>{{ e.n_fontes }}</td>
+              <td><span class="badge info">{{ e.get_status_display }}</span></td>
+              <td>{{ e.atualizado_em|date:"d/m/Y H:i" }}{% if e.atualizado_por %}<div class="muted">{{ e.atualizado_por.nome_completo }}</div>{% endif %}</td>
+              <td class="com-row-actions">
+                <a class="link-action" href="{% url 'tecnico_estudo' e.pk %}">Abrir</a>
+                {% if pode_editar %}
+                <form method="post" action="{% url 'tecnico_estudo_duplicar' e.pk %}" class="inline-form">
+                  {% csrf_token %}<button class="link-action" type="submit">Duplicar</button>
+                </form>
+                <form method="post" action="{% url 'tecnico_estudo_status' e.pk %}" class="inline-form">
+                  {% csrf_token %}
+                  <select name="status" onchange="this.form.submit()" aria-label="Mudar status">
+                    {% for valor, rotulo in status_opcoes %}
+                    <option value="{{ valor }}"{% if e.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="muted">Nenhum estudo ainda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}

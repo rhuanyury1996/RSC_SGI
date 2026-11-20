@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ estudo.nome }} · Classificação de áreas{% endblock %}
+{% block breadcrumb %}Setor Técnico <span>/</span> <a href="{% url 'tecnico' %}">Classificação de áreas</a> <span>/</span> {{ estudo.nome }}{% endblock %}
+{% block page_title %}{{ estudo.nome }}{% endblock %}
+{% block page_actions %}
+  {% if pode_editar %}
+  <form method="post" action="{% url 'tecnico_estudo_status' estudo.pk %}" class="inline-form">
+    {% csrf_token %}
+    <input type="hidden" name="voltar" value="{{ request.path }}">
+    <select name="status" onchange="this.form.submit()" aria-label="Status do estudo">
+      {% for valor, rotulo in status_opcoes %}
+      <option value="{{ valor }}"{% if estudo.status == valor %} selected{% endif %}>{{ rotulo }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+  <a class="btn ghost" href="{% url 'tecnico_estudo_dados' estudo.pk %}">Baixar JSON</a>
+  <a class="btn secondary" href="{% url 'tecnico_estudo_app' estudo.pk %}" target="_blank" rel="noopener">Abrir em tela cheia</a>
+  <a class="btn ghost" href="{% url 'tecnico' %}">Voltar</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .inline-form{display:inline-flex;align-items:center;gap:6px;margin:0}
+  .inline-form select{width:auto;min-width:0;padding:6px 10px}
+  .tec-frame{width:100%;height:calc(100vh - 190px);min-height:640px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow);display:block}
+</style>
+{% endblock %}
+
+{% block content %}
+<iframe class="tec-frame" src="{% url 'tecnico_estudo_app' estudo.pk %}" title="Calculadora de classificação de áreas" loading="eager"></iframe>
+{% endblock %}

@@ -164,6 +164,7 @@ class Funcionario(models.Model):
     acesso_calendario = _campo_acesso("Calendário")
     acesso_informativos = _campo_acesso("Informativos")
     acesso_pagamentos = _campo_acesso("Pagamentos")
+    acesso_tecnico = _campo_acesso("Setor Técnico")
     # Financeiro começa fechado: só quem for liberado no admin (o CEO sempre acessa)
     acesso_financeiro = _campo_acesso("Financeiro", NivelAcesso.NENHUM)
     criado_em = models.DateTimeField("Criado em", auto_now_add=True)

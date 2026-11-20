@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "pagamentos",
     "orcamentos",
     "impostos",
+    "tecnico",  # Setor Técnico (classificação de áreas)
     # Financeiro (portado do Arcturus) — CEO + quem for liberado no admin
     "workspaces",
     "ledger",
