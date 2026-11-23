@@ -208,6 +208,20 @@ details.panel>summary{cursor:pointer;font-weight:600;font-family:var(--head);fon
   main{padding:14px 14px 50px}.two{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
+
+/* ---- Visão do estudo e Estudo final ---- */
+.stepper{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.stp{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;position:relative;font:inherit;color:inherit}
+.stp:hover{background:var(--soft)}
+.stp i{font:600 12px var(--mono);width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--soft);color:var(--mut);font-style:normal}
+.stp b{font-weight:600;font-size:13.5px}.stp span{font-size:12px;color:var(--mut)}.stp em{font:500 12px var(--mono);font-style:normal;color:var(--mut);margin-top:2px}
+.stp.done{border-color:var(--ok)}.stp.done i{background:var(--ok);color:#fff}.stp.done em{color:var(--ok)}
+.stp.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--info-bg)}.stp.now i{background:var(--accent);color:var(--accent-ink)}
+.tbl th.c,.tbl td.c{text-align:center}
+.dot{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);cursor:pointer;font-weight:700;font-size:13px;padding:0;background:var(--panel)}
+.dot.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}.dot.no{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.pkg{display:grid;gap:6px}.pkg div{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.pkg i{font:600 12px var(--mono);font-style:normal;color:var(--mut)}.pkg span{font-size:12px;color:var(--mut)}
 </style>
 </head>
 <body>
@@ -396,7 +410,7 @@ const pn = s => { const t = String(s).trim().replace(/\s/g, '').replace(',', '.'
 const dbById = Object.fromEntries(DB.map(p => [p.id, p]));
 function defaultState() {
   return {
-    v: 1, tab: 'produtos', atual: 'f1', seq: 1, useq: 0,
+    v: 1, tab: 'inicio', anexos: [], atual: 'f1', seq: 1, useq: 0,
     over: { n140: { rho_liq: 864, cp_gas: 1190, cp_liq: 1740, Tc: 616.89, Pc: 3535000 } },
     custom: [],
     mix: { linhas: [{ pid: 'n140', v: 60 }, { pid: 'n145', v: 40 }], base: 'massa', fase: 'liquida', T: 298.15, nome: '' },
@@ -416,7 +430,7 @@ else { try { const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : 
 if (!S) { S = defaultState(); if (SGI) { S.estudo = Object.assign({}, S.estudo || {}, { projeto: SGI.nome || '', cliente: SGI.cliente || '', rev: SGI.revisao || '0', autor: SGI.autor || '' }); } }
 normState();
 function normState() {
-  S.alt = S.alt || {}; S.dsel = S.dsel || {}; S.estudo = S.estudo || {}; S.closed = S.closed || {}; S.navClosed = S.navClosed || {}; ['projeto', 'cliente', 'local', 'autor', 'data', 'planta', 'desenhos'].forEach(k => { if (S.estudo[k] === undefined) S.estudo[k] = ''; }); if (S.estudo.rev === undefined) S.estudo.rev = '0';
+  S.anexos = S.anexos || []; S.alt = S.alt || {}; S.dsel = S.dsel || {}; S.estudo = S.estudo || {}; S.closed = S.closed || {}; S.navClosed = S.navClosed || {}; ['projeto', 'cliente', 'local', 'autor', 'data', 'planta', 'desenhos'].forEach(k => { if (S.estudo[k] === undefined) S.estudo[k] = ''; }); if (S.estudo.rev === undefined) S.estudo.rev = '0';
   S.fontes.forEach(f => { f.fl = Object.assign({ qtd: '1', fontes: '1', elim: '0', mudaGrau: '0', mudaVent: '0' }, f.fl || {}); if (!f.vent.tipo) f.vent.tipo = 'A'; ['extV', 'extH', 'refExt', 'obsTab', 'just', 'obs'].forEach(k => { if (f[k] === undefined) f[k] = ''; }); if (f.vent.nExa === undefined) { f.vent.nExa = 2; f.vent.qExa = 1115; } if (!f.extMode) f.extMode = (f.extV !== '' && f.extV !== null) || (f.extH !== '' && f.extH !== null) ? 'man' : 'auto'; if (f.extMarg === undefined) f.extMarg = 1; f.disp = Object.assign({ modo: 'auto', dir: 'H', qFonte: 'calc', qMan: null, h: 1, zr: null, meteo: 'PB', cls: 'F', u: 1.5, zref: 10, z0: '1', tav: 20, critExt: '0' }, f.disp || {}); });
 }
 let saveT = null;
@@ -587,11 +601,12 @@ function prodBox(f, c) {
 /* ===================== Abas ===================== */
 const TABS = {};
 const NAV = [
+  ['Estudo', [['inicio', 'Visão do estudo', '', '']]],
   ['Dados', [['produtos', 'Banco de produtos', '80079-20-1', ''], ['misturas', 'Misturas', '', ''], ['pubchem', 'Buscar no PubChem', 'NCBI', '']]],
   ['Sequência de cálculo', [['fonte', 'Fonte e grau de liberação', 'A.1 · A.2', '1'], ['liq', 'Taxa: líquidos', 'A.3.1', '2'], ['gas', 'Taxa: gases e vapores', 'A.3.2', '2'], ['vz', 'Vazão mínima e Vz', 'B.5.2', '3'], ['pers', 'Tempo de persistência', 'B.5.2.5', '4'], ['zona', 'Grau, disponibilidade e zona', 'B.5.3 · B.6', '5'], ['fluxo', 'Fluxograma da norma', 'Anexo B', '6'], ['multi', 'Várias fontes no mesmo volume', 'B.2 · B.3', '7']]],
   ['Extensão', [['disp', 'Dispersão: jato e pluma', 'Yellow Book', '']]],
   ['Névoas', [['nevoa', 'Triagem de névoas', 'Anexo D', '']]],
-  ['Resultados', [['resumo', 'Resumo', '', ''], ['listas', 'Listas de dados', 'C.1 · C.2', '8'], ['memorial', 'Memorial de cálculo', '', '9'], ['conf', 'Conferência com a norma', '', ''], ['rt', 'Comparação com o RT', 'RT-0001', '']]],
+  ['Resultados', [['resumo', 'Resumo', '', ''], ['listas', 'Listas de dados', 'C.1 · C.2', '8'], ['memorial', 'Memorial de cálculo', '', '9'], ['final', 'Estudo final', 'pacote', '10'], ['conf', 'Conferência com a norma', '', ''], ['rt', 'Comparação com o RT', 'RT-0001', '']]],
   ['Ajuda', [['tutorial', 'Tutorial', '', '']]],
 ];
 const TITLES = {};
@@ -2037,7 +2052,8 @@ function fontesPainel(id) {
 /* ===================== Navegação e render ===================== */
 function grupoFechado(g) {
   const v = (S.navClosed || {})[g];
-  return v === undefined ? true : !!v;
+  if (v === undefined) { const gr = NAV.find(x => x[0] === g); return !(g === 'Estudo' || (gr && gr[1].some(i => i[0] === S.tab))); }
+  return !!v;
 }
 const GRUPO_RANK = { IIA: 1, IIB: 2, IIC: 3 };
 const CLASSE_RANK = { T1: 1, T2: 2, T3: 3, T4: 4, T5: 5, T6: 6 };
@@ -2139,7 +2155,7 @@ function renderSide() {
 function renderTop() {
   const [t, r] = TITLES[S.tab] || ['', ''];
   $('#ttl').innerHTML = `${esc(t)}${r ? `<small>${esc(r)} · ABNT NBR IEC 60079-10-1:2009</small>` : '<small>ABNT NBR ISO/IEC 80079-20-1:2020 · Tabela B.1</small>'}`;
-  const showSrc = !['produtos', 'misturas', 'conf', 'tutorial'].includes(S.tab);
+  const showSrc = !['inicio', 'final', 'produtos', 'misturas', 'conf', 'tutorial'].includes(S.tab);
   $('#src').innerHTML = showSrc ? `<select id="fsel" aria-label="Fonte de risco">${S.fontes.map(f => `<option value="${f.id}" ${f.id === S.atual ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select><button class="btn sm" id="fnew">Nova fonte</button><button class="btn sm" id="fdup">Duplicar</button><button class="btn sm" id="fdel" ${S.fontes.length < 2 ? 'disabled' : ''}>Excluir</button>` : '';
 }
 function go(tab) {
@@ -2181,6 +2197,7 @@ function resolve(bind) {
   else if (root === 'c') { const id = p.shift(); obj = S.custom.find(x => x.id === id); }
   else if (root === 'alt') { const id = p.shift(); S.alt[id] = S.alt[id] || {}; obj = S.alt[id]; }
   else if (root === 'ds') { const id = p.shift(); S.dsel[id] = S.dsel[id] || {}; obj = S.dsel[id]; }
+  else if (root === 'ax') { const id = p.shift(); obj = S.anexos.find(x => x.id === id) || {}; }
   else if (root === 'ab') { obj = UI; const k = p.shift(); return { obj, key: k === 'z' ? 'abz' : 'abt' }; }
   while (p.length > 1) obj = obj[p.shift()];
   return { obj, key: p[0] };
@@ -2280,6 +2297,240 @@ document.addEventListener('click', e => {
     case 'resetAll': S = defaultState(); normState(); save(); fillDatalist(); render(); break;
   }
 });
+/* ============================================================
+   VISÃO DO ESTUDO E ESTUDO FINAL (pacote completo)
+   Usa o estado v:1 existente; só acrescenta S.anexos.
+   ============================================================ */
+const FILES = {}; // arquivos anexados nesta sessão (id do anexo → File)
+const idFonte = f => 'FR-' + String(S.fontes.indexOf(f) + 1).padStart(2, '0');
+const ESTADO_TXT = { G: 'Gás/vapor', L: 'Líquido' };
+const usados = () => { const ids = []; S.fontes.forEach(f => { if (f.pid && !ids.includes(f.pid)) ids.push(f.pid); }); return ids; };
+const pv20 = P => P && P.ant && P.ant.A != null ? E.antoine(P.ant, 20) / 1000 : (P && P.pv ? P.pv / 1000 : null);
+
+function fonteStatus(f) {
+  const c = calc(f); let ext = null; try { ext = extensao(f); } catch (e) { ext = null; }
+  const nc = !!(c.zona && /^Não/.test(c.zona.texto));
+  return { c, ext, nc, prod: !!(c.P && c.M && c.lie), taxa: c.dGdt > 0, vent: !!c.vent, zona: !!c.zona,
+    extOk: !!c.zona && (nc || !!(ext && typeof ext.V === 'number' && typeof ext.H === 'number')) };
+}
+function extStr(st, k) {
+  if (!st.zona) return '—';
+  if (st.nc) return 'não se aplica';
+  const x = st.ext; if (!x) return '—';
+  return typeof x[k] === 'number' ? fmt(x[k], 3) : (x.txt || '—');
+}
+function zonaStr(c) { return c.zona ? c.zona.texto + (c.zona.nota ? ' (' + c.zona.nota + ')' : '') : '—'; }
+
+/* ---------- pendências ---------- */
+function pendencias() {
+  const L = [], add = (n, msg, tab, fid) => L.push({ n, msg, tab, fid });
+  const e = S.estudo || {};
+  [['projeto', 'Projeto'], ['cliente', 'Cliente'], ['autor', 'Elaborado por']].forEach(([k, l]) => { if (!String(e[k] || '').trim()) add('warn', `Dados do estudo: "${l}" não preenchido.`, 'final'); });
+  S.fontes.forEach(f => {
+    const st = fonteStatus(f), c = st.c, nm = f.nome || f.id;
+    if (!c.P) { add('bad', `${nm}: produto não escolhido.`, 'fonte', f.id); return; }
+    if (c.miss.length) add('bad', `${nm}: faltam ${c.miss.join(', ')}.`, f.taxa === 'liq' ? 'liq' : 'gas', f.id);
+    else if (!st.zona) add('bad', `${nm}: zona não definida (confira ventilação, f e disponibilidade).`, 'vz', f.id);
+    else if (!st.extOk) add('bad', `${nm}: extensão da zona sem valor${st.ext && st.ext.ref ? ' (' + st.ext.ref + ')' : ''}.`, 'disp', f.id);
+    c.w.forEach(w => add('warn', `${nm}: ${w}`, 'fonte', f.id));
+  });
+  usados().forEach(id => {
+    const P = prod(id); if (!P) return;
+    if (P.fulgor === null || P.fulgor === undefined) add('warn', `Produto "${P.nome}": ponto de fulgor não informado.`, 'produtos');
+    if (!P.classeT || !P.grupo) add('warn', `Produto "${P.nome}": grupo de gás e/ou classe de temperatura não informados.`, 'produtos');
+    if (!S.anexos.some(a => a.tipo === 'FDS' && a.ref === id && a.arquivo)) add('warn', `Produto "${P.nome}": FDS não anexada.`, 'final');
+  });
+  S.anexos.filter(a => !a.arquivo).forEach(a => add('warn', `Anexo "${a.titulo}": sem arquivo.`, 'final'));
+  if (!S.anexos.some(a => a.tipo === 'Desenho')) add('info', 'Nenhum desenho ou mapa de áreas classificadas cadastrado.', 'final');
+  return L;
+}
+
+/* ---------- Visão do estudo ---------- */
+const ETAPAS = [
+  ['final', 'Dados do estudo', 'Projeto, cliente e responsável', () => { const e = S.estudo || {}; return [['projeto', 'cliente', 'autor'].filter(k => String(e[k] || '').trim()).length, 3]; }],
+  ['produtos', 'Produtos e misturas', 'Substância com M e LIE em cada fonte', fs => [fs.filter(x => x.st.prod).length, fs.length]],
+  ['fonte', 'Fontes e taxas de liberação', 'Grau de liberação e dG/dt', fs => [fs.filter(x => x.st.taxa).length, fs.length]],
+  ['vz', 'Ventilação e tipo de zona', 'Vz, grau de ventilação e Tabela B.1', fs => [fs.filter(x => x.st.zona).length, fs.length]],
+  ['disp', 'Extensão da zona', 'Dispersão (jato e pluma) ou valor informado', fs => [fs.filter(x => x.st.extOk).length, fs.length]],
+];
+TABS.inicio = {
+  view() { return `<div id="res"></div>`; },
+  res() {
+    const fs = S.fontes.map(f => ({ f, st: fonteStatus(f) }));
+    const pend = pendencias(), nbad = pend.filter(p => p.n === 'bad').length;
+    const prog = ETAPAS.map(([tab, t, s, fn]) => { const [ok, tot] = fn(fs); return { tab, t, s, ok, tot, done: tot > 0 && ok === tot }; });
+    const prox = prog.find(p => !p.done);
+    const nz = fs.filter(x => x.st.zona);
+    const cnt = k => nz.filter(x => zonaClass(x.st.c.zona.texto) === k).length;
+    const feitos = prog.filter(p => p.done).length;
+    const chave = { produtos: 'prod', fonte: 'taxa', vz: 'zona', disp: 'extOk' };
+    const falha = prox && chave[prox.tab] ? fs.find(x => !x.st[chave[prox.tab]]) : null, pend1 = falha ? falha.f.id : '';
+    const steps = prog.map((p, i) => `<button class="stp ${p.done ? 'done' : p === prox ? 'now' : ''}" data-gof="|${p.tab}"><i>${p.done ? '✓' : i + 1}</i><b>${p.t}</b><span>${p.s}</span><em>${p.ok} de ${p.tot}</em></button>`).join('');
+    const cell = (ok, f, tab) => `<td class="c"><button class="dot ${ok ? 'ok' : 'no'}" data-gof="${f.id}|${tab}" title="${ok ? 'completo' : 'pendente: clique para abrir'}">${ok ? '✓' : '✕'}</button></td>`;
+    const matriz = fs.map(({ f, st }) => `<tr><td><b>${esc(idFonte(f))}</b> ${esc(f.nome)}<div class="muted" style="font-size:12px">${esc(f.local || '')}</div></td><td>${st.c.P ? esc(st.c.P.nome) : '<span class="muted">—</span>'}</td>${cell(st.prod, f, 'fonte')}${cell(st.taxa, f, f.taxa === 'liq' ? 'liq' : 'gas')}${cell(st.zona, f, 'vz')}${cell(st.extOk, f, 'disp')}<td>${st.zona ? zonaPill(st.c.zona) : '<span class="pill">—</span>'}</td></tr>`).join('');
+    return `
+    <div class="tiles">${tile('Etapas concluídas', feitos, 'de ' + prog.length, nbad ? nbad + ' pendência(s) impeditiva(s)' : 'sem pendências impeditivas')}${tile('Fontes de risco', S.fontes.length, '', nz.length + ' com zona definida')}${tile('Zona 0', cnt('z0'), '', '')}${tile('Zona 1', cnt('z1'), '', '')}${tile('Zona 2', cnt('z2'), '', cnt('zn') + ' não classificada(s)')}</div>
+    <div class="panel"><h2>Etapas do estudo<span>clique para ir direto à etapa</span></h2>
+      <div class="stepper">${steps}</div>
+      <div class="row" style="margin-top:12px">${prox ? `<button class="btn pri" data-gof="${pend1}|${prox.tab}">Continuar: ${prox.t}</button>` : `<button class="btn pri" data-go="final">Tudo completo: ir ao estudo final</button>`}<button class="btn" data-go="tutorial">Como usar</button></div></div>
+    <div class="panel"><h2>Situação de cada fonte<span>✓ completo · ✕ pendente</span></h2>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Fonte</th><th>Produto</th><th class="c">Produto</th><th class="c">Taxa</th><th class="c">Zona</th><th class="c">Extensão</th><th>Classificação</th></tr></thead><tbody>${matriz || '<tr><td colspan="7" class="muted">Nenhuma fonte.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="fnew2">+ Nova fonte de risco</button></div></div>
+    ${pend.length ? `<div class="panel"><h2>Pendências (${pend.length})<span>veja todas em Estudo final</span></h2>${pend.slice(0, 6).map(p => `<div class="note ${p.n}" style="cursor:pointer" data-gof="${p.fid || ''}|${p.tab}">${p.msg}</div>`).join('')}${pend.length > 6 ? `<div class="muted">+ ${pend.length - 6} outras.</div>` : ''}</div>` : ''}`;
+  },
+};
+
+/* ---------- tabelas do estudo (tela e .doc) ---------- */
+const TH = { s: 'border:1px solid #8793a3;padding:3pt 5pt;font-size:9pt;vertical-align:top', h: 'background:#17324D;color:#fff;font-weight:bold' };
+function T(head, rows, o = {}) {
+  const th = head.map(h => `<th style="${TH.s};${TH.h}">${esc(h)}</th>`).join('');
+  const tr = rows.map(r => `<tr>${r.map(c => `<td style="${TH.s}">${c === null || c === undefined || c === '' ? '—' : (typeof c === 'object' && c.raw ? c.raw : esc(c))}</td>`).join('')}</tr>`).join('');
+  return `<table style="border-collapse:collapse;width:100%;margin:4pt 0 10pt"><thead><tr>${th}</tr></thead><tbody>${tr || `<tr><td style="${TH.s}" colspan="${head.length}">Sem dados.</td></tr>`}</tbody></table>`;
+}
+function tabProdutos() {
+  return T(['Produto', 'Fórmula', 'CAS', 'M (kg/kmol)', 'LIE (% vol)', 'Fulgor (°C)', 'Ignição (°C)', 'Classe T', 'Grupo', 'Pv 20 °C (kPa)', 'ρ líq. (kg/m³)'],
+    usados().map(id => { const P = prod(id); return [P.nome, P.formula, P.cas, fmt(P.M, 5), fmt(P.lie_v, 3), fmt(P.fulgor, 4), fmt(P.ign, 4), P.classeT, P.grupo, fmt(pv20(P), 4), fmt(P.rho_liq, 4)]; }));
+}
+function tabFontes() {
+  return T(['ID', 'Fonte de risco', 'Local', 'Produto', 'Estado', 'Grau', 'T (°C)', 'p (kPa abs.)'],
+    S.fontes.map(f => { const P = prod(f.pid); return [idFonte(f), f.nome, f.local, P && P.nome, ESTADO_TXT[f.estado] || f.estado, GRAU[f.grau], fmt(f.proc.T - 273.15, 4), fmt(f.proc.p / 1000, 4)]; }));
+}
+function tabTaxas() {
+  return T(['ID', 'Fonte', 'Produto', 'Método', 'dG/dt (kg/s)', 'k', 'LIE (kg/m³)', '(dV/dt)min (m³/s)'],
+    S.fontes.map(f => { const c = calc(f); return [idFonte(f), f.nome, c.P && c.P.nome, c.taxaRef, fmt(c.dGdt, 4), fmt(c.k, 3), fmt(c.lie, 4), fmt(c.dVdt, 4)]; }));
+}
+function tabVent() {
+  return T(['ID', 'Ambiente', 'Vo (m³)', 'C (s⁻¹)', 'f', 'Vz (m³)', 'Grau de ventilação', 'Disponibilidade', 't persist. (s)'],
+    S.fontes.map(f => { const c = calc(f); return [idFonte(f), f.vent.grp || (f.vent.amb === 'aberto' ? 'Área aberta' : 'Ambiente fechado'), fmt(c.Vo, 4), fmt(c.C, 4), fmt(c.f, 3), c.vent ? fmt(c.vent.Vz, 4) : '—', c.gv ? c.gv.grau + ' (' + c.gv.sigla + ')' : '—', f.vent.disp, c.pers && isFinite(c.pers.t) ? fmt(c.pers.t, 4) : '—']; }));
+}
+function tabClass() {
+  return T(['ID', 'Fonte', 'Local', 'Produto', 'Grau', 'Tipo de zona', 'Extensão vertical (m)', 'Extensão horizontal (m)', 'Base da extensão', 'Grupo | Classe T'],
+    S.fontes.map(f => { const st = fonteStatus(f), c = st.c; return [idFonte(f), f.nome, f.local, c.P && c.P.nome, GRAU[f.grau], zonaStr(c), extStr(st, 'V'), extStr(st, 'H'), st.ext && st.ext.ref ? st.ext.ref : '', c.P ? (c.P.grupo || '—') + ' | ' + (c.P.classeT || '—') : '—']; }));
+}
+function tabB1() {
+  const g = [['C', 'Contínuo'], ['P', 'Primário'], ['S', 'Secundário']], v = ['Alto', 'Médio', 'Baixo'], d = ['Boa', 'Satisfatória', 'Pobre'];
+  const rows = []; g.forEach(([gk, gl]) => v.forEach(vk => rows.push([gl, vk].concat(d.map(dk => { const z = E.zona(gk, vk, dk); return z ? z.texto + (z.nota ? ' (' + z.nota + ')' : '') : '—'; })))));
+  return T(['Grau da fonte', 'Grau da ventilação', 'Disp. boa', 'Disp. satisfatória', 'Disp. pobre'], rows);
+}
+function tabDesenhos() { return T(['Nº de controle', 'Descrição', 'Arquivo'], S.anexos.filter(a => a.tipo === 'Desenho').map(a => [a.ref, a.titulo, a.arquivo || 'pendente'])); }
+function tabAnexosIdx() {
+  const fds = S.anexos.filter(a => a.tipo === 'FDS'), ou = S.anexos.filter(a => a.tipo === 'Outro');
+  return T(['Anexo', 'Item', 'Produto/Ref.', 'Arquivo'], fds.map((a, i) => ['A.' + (i + 1), a.titulo, (prod(a.ref) || {}).nome || a.ref, a.arquivo || 'pendente']).concat(ou.map((a, i) => ['C.' + (i + 1), a.titulo, a.ref, a.arquivo || 'pendente'])));
+}
+
+/* ---------- texto do estudo (parametrizado) ---------- */
+const P_ = t => `<p style="font-family:Calibri,Arial,sans-serif;font-size:11pt;text-align:justify;margin:0 0 6pt;line-height:1.3">${t}</p>`;
+const H1_ = t => `<h1 style="font-family:Calibri,Arial,sans-serif;font-size:16pt;color:#17324D;margin:22pt 0 8pt;page-break-before:always">${esc(t)}</h1>`;
+const H2_ = t => `<h2 style="font-family:Calibri,Arial,sans-serif;font-size:13pt;color:#24527A;margin:14pt 0 5pt">${esc(t)}</h2>`;
+const H4_ = t => `<h4 style="font-family:Calibri,Arial,sans-serif;font-size:10.5pt;color:#555F69;margin:10pt 0 3pt">${esc(t)}</h4>`;
+function estudoHTML() {
+  const e = S.estudo || {}, hoje = new Date().toLocaleDateString('pt-BR');
+  const fs = S.fontes.map(f => ({ f, st: fonteStatus(f) }));
+  const nMan = S.fontes.filter(f => f.extMode === 'man').length, nAuto = S.fontes.length - nMan;
+  const cnt = k => fs.filter(x => x.st.zona && zonaClass(x.st.c.zona.texto) === k).length;
+  const capa = `<div style="text-align:center;margin-top:70pt;font-family:Calibri,Arial,sans-serif"><p style="font-size:11pt;letter-spacing:2px;color:#555F69">RELATÓRIO TÉCNICO</p><h1 style="font-size:22pt;color:#17324D;margin:8pt 0">ESTUDO DE CLASSIFICAÇÃO DE ÁREAS (ATEX)</h1><p style="font-size:11pt">Atmosferas explosivas de gás e vapor inflamável, conforme ABNT NBR IEC 60079-10-1</p><p style="font-size:12pt;margin-top:24pt">Preparado para <b>${esc(e.cliente || '—')}</b>${e.local ? ' | ' + esc(e.local) : ''}</p><p style="font-size:12pt">Projeto: <b>${esc((e.projeto || '—').toUpperCase())}</b></p>
+    <table style="border-collapse:collapse;width:90%;margin:30pt auto"><tr>${['Planta', 'Revisão', 'Data', 'Elaborado por'].map(h => `<th style="${TH.s};${TH.h}">${h}</th>`).join('')}</tr><tr>${[e.planta || e.local, e.rev || '0', e.data || hoje, e.autor].map(v => `<td style="${TH.s}">${esc(v || '—')}</td>`).join('')}</tr></table></div>`;
+  const sum = H1_('Sumário') + `<ol style="font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.6"><li>Introdução</li><li>Metodologia</li><li>Resultados e discussão</li><li>Conclusão</li></ol><p style="font-family:Calibri,Arial,sans-serif;font-size:11pt">Apêndice A – Memorial de cálculo<br>Anexo A – Fichas de Informações de Segurança (FDS)<br>Anexo B – Desenhos e mapas de áreas classificadas<br>Anexo C – Outros documentos</p>`;
+  const c1 = H1_('1 Introdução') + H2_('1.1 Objetivo') + P_(`Este relatório apresenta o estudo de classificação de áreas do projeto <b>${esc(e.projeto || '—')}</b>${e.cliente ? ' (' + esc(e.cliente) + ')' : ''}, com o objetivo de identificar as fontes de risco de gás e vapor inflamável, determinar o tipo de zona (0, 1 ou 2) de cada uma e delimitar a extensão das zonas ao seu redor.`)
+    + H2_('1.2 Escopo') + P_(`O estudo abrange <b>${S.fontes.length}</b> fonte(s) de risco e <b>${usados().length}</b> produto(s) ou mistura(s)${e.desenhos ? ', com referência aos desenhos ' + esc(e.desenhos) : ''}.`)
+    + H2_('1.3 Documentos de referência') + P_('ABNT NBR IEC 60079-10-1; ABNT NBR ISO/IEC 80079-20-1 (propriedades dos gases e vapores); ABNT NBR IEC 60079-0; ABNT NBR IEC 60079-17; TNO Yellow Book (CPR 14E) e Purple Book (CPR 18E); Fichas de Informações de Segurança dos produtos (Anexo A).');
+  const c2 = H1_('2 Metodologia') + H2_('2.1 Fundamentos') + P_('A norma define a zona pela frequência e pela duração da atmosfera explosiva. As definições adotadas estão resumidas a seguir.')
+    + T(['Zona', 'Definição'], [['Zona 0', 'Atmosfera explosiva de gás presente continuamente, por longos períodos ou com frequência.'], ['Zona 1', 'Atmosfera explosiva de gás provável de se formar ocasionalmente em operação normal.'], ['Zona 2', 'Atmosfera explosiva de gás improvável em operação normal e, se ocorrer, de curta duração.']])
+    + H2_('2.2 Sequência de cálculo') + P_(`Para cada fonte determinou-se: (1) o grau de liberação (contínuo, primário ou secundário, Anexo A.1); (2) a taxa de liberação de gás ou vapor, por escoamento de ${S.fontes.some(f => f.taxa === 'liq') ? 'líquido (A.3.1) e ' : ''}gás (A.3.2)${S.fontes.some(f => f.taxa === 'man') ? ' ou valor informado' : ''}; (3) a vazão mínima de ventilação (dV/dt)min e o volume hipotético Vz (B.5.2); (4) o grau da ventilação (alto, médio ou baixo) e a disponibilidade (boa, satisfatória ou pobre) e, por fim, (5) o tipo de zona pela Tabela B.1, reproduzida abaixo.`) + tabB1()
+    + H2_('2.3 Extensão das zonas') + P_(`A extensão foi determinada ${nAuto ? `por dispersão atmosférica, com as equações do Yellow Book (CPR 14E) e do Purple Book (CPR 18E), usando jato livre e pluma gaussiana quando aplicável, e arredondada para cima em múltiplos de 0,5 m (${nAuto} fonte(s))` : ''}${nAuto && nMan ? '; ' : ''}${nMan ? `por valor informado e justificado na tabela de resultados (${nMan} fonte(s))` : ''}. Quando a ventilação é baixa, a zona abrange todo o ambiente (B.5.3).`)
+    + H2_('2.4 Produtos e premissas') + P_('As propriedades dos produtos, na ordem de prioridade do cadastro (norma 80079-20-1, cadastro próprio, PubChem), são as da Tabela 1. Misturas usam a lei de Raoult e a regra de Le Chatelier, conforme a aba Misturas.');
+  const c3 = H1_('3 Resultados e discussão') + H2_('3.1 Produtos avaliados') + tabProdutos() + H2_('3.2 Fontes de risco') + tabFontes() + H2_('3.3 Taxas de liberação') + tabTaxas() + H2_('3.4 Ventilação, grau e disponibilidade') + tabVent() + H2_('3.5 Classificação de áreas') + tabClass() + H2_('3.6 Mapas de áreas classificadas') + tabDesenhos();
+  const c4 = H1_('4 Conclusão') + P_(`Foram avaliadas ${S.fontes.length} fonte(s) de risco. O estudo resultou em ${cnt('z0')} fonte(s) com Zona 0, ${cnt('z1')} com Zona 1, ${cnt('z2')} com Zona 2 e ${cnt('zn')} em área não classificada, com as extensões da Tabela de classificação (3.5). Os equipamentos elétricos e não elétricos instalados nas zonas devem ter o grupo e a classe de temperatura compatíveis com os produtos, conforme a ABNT NBR IEC 60079-0.`);
+  const saved = UI.memEsc; UI.memEsc = 'todas'; let mem; try { mem = buildMemorial(); } finally { UI.memEsc = saved; }
+  const apA = `<div style="page-break-before:always">${mem.html}</div>`;
+  const ax = H1_('Anexo A – FDS') + tabAnexosIdx().replace(/Sem dados\./, 'Nenhum anexo cadastrado.') + H1_('Anexo B – Desenhos e mapas') + tabDesenhos();
+  return capa + sum + c1 + c2 + c3 + c4 + apA + ax;
+}
+function docWrap(titulo, corpo) {
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse}</style></head><body>${corpo}</body></html>`;
+}
+function baixarArq(nome, conteudo, tipo) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo })); a.download = nome; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 600);
+}
+const slugN = s => String(s || 'estudo').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) || 'estudo';
+function manifesto() {
+  const e = S.estudo || {}, partes = [{ ordem: 1, tipo: 'corpo', titulo: 'Capa, Capítulos 1 a 4 e Apêndice A (memorial)', origem: 'gerado' }];
+  S.anexos.filter(a => a.tipo === 'FDS').forEach(a => partes.push({ ordem: partes.length + 1, tipo: 'anexo-a-fds', titulo: a.titulo, produto: (prod(a.ref) || {}).nome || a.ref, arquivo: a.arquivo || null }));
+  S.anexos.filter(a => a.tipo === 'Desenho').forEach(a => partes.push({ ordem: partes.length + 1, tipo: 'anexo-b-desenho', titulo: a.titulo, controle: a.ref, arquivo: a.arquivo || null }));
+  S.anexos.filter(a => a.tipo === 'Outro').forEach(a => partes.push({ ordem: partes.length + 1, tipo: 'anexo-c-outro', titulo: a.titulo, arquivo: a.arquivo || null }));
+  return { projeto: e.projeto, cliente: e.cliente, revisao: e.rev, gerado_em: new Date().toISOString(), partes };
+}
+function csvClass() {
+  const q = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+  const H = ['ID', 'Fonte', 'Local', 'Produto', 'Estado', 'Grau', 'T (°C)', 'p (kPa abs.)', 'dG/dt (kg/s)', 'Vz (m3)', 'Grau de ventilação', 'Disponibilidade', 'Zona', 'Extensão vertical (m)', 'Extensão horizontal (m)', 'Base da extensão'];
+  const rows = S.fontes.map(f => { const st = fonteStatus(f), c = st.c; return [idFonte(f), f.nome, f.local, c.P && c.P.nome, ESTADO_TXT[f.estado], GRAU[f.grau], numCsv(f.proc.T - 273.15), numCsv(f.proc.p / 1000), numCsv(c.dGdt), c.vent ? numCsv(c.vent.Vz) : '', c.gv ? c.gv.grau : '', f.vent.disp, zonaStr(c), extStr(st, 'V'), extStr(st, 'H'), st.ext && st.ext.ref || ''].map(q).join(';'); });
+  return '﻿' + [H.map(q).join(';')].concat(rows).join('\r\n');
+}
+
+/* ---------- Estudo final ---------- */
+TABS.final = {
+  view() {
+    const e = S.estudo || {};
+    const ax = S.anexos.map(a => `<tr><td><select data-b="ax.${a.id}.tipo" data-reload="1"><option value="FDS" ${a.tipo === 'FDS' ? 'selected' : ''}>FDS (Anexo A)</option><option value="Desenho" ${a.tipo === 'Desenho' ? 'selected' : ''}>Desenho/mapa (Anexo B)</option><option value="Outro" ${a.tipo === 'Outro' ? 'selected' : ''}>Outro (Anexo C)</option></select></td>
+      <td><input class="txt" data-b="ax.${a.id}.titulo" value="${esc(a.titulo)}"></td>
+      <td>${a.tipo === 'FDS' ? `<select data-b="ax.${a.id}.ref" data-reload="1"><option value="">— produto —</option>${usados().map(id => `<option value="${id}" ${a.ref === id ? 'selected' : ''}>${esc((prod(id) || {}).nome || id)}</option>`).join('')}</select>` : `<input class="txt" data-b="ax.${a.id}.ref" value="${esc(a.ref)}" placeholder="${a.tipo === 'Desenho' ? 'nº de controle' : 'referência'}">`}</td>
+      <td>${a.arquivo ? `<span class="pill ok">${esc(a.arquivo)}</span>` : '<span class="pill warn">sem arquivo</span>'} <input type="file" accept=".pdf,.png,.jpg,.jpeg" data-axf="${a.id}" style="max-width:190px;font-size:11px"></td>
+      <td><button class="btn sm" data-axdel="${a.id}">×</button></td></tr>`).join('');
+    return `
+    <div class="panel"><h2>Dados do estudo<span>capa e controle do documento</span></h2><div class="grid">
+      ${textField('Projeto', 'e.projeto', e.projeto)}${textField('Cliente', 'e.cliente', e.cliente)}${textField('Local', 'e.local', e.local)}${textField('Planta', 'e.planta', e.planta)}${textField('Desenhos de referência', 'e.desenhos', e.desenhos)}${textField('Elaborado por', 'e.autor', e.autor)}${textField('Revisão', 'e.rev', e.rev)}${textField('Data', 'e.data', e.data)}</div></div>
+    <div id="res"></div>
+    <div class="panel"><h2>Anexos<span>FDS, desenhos e outros documentos</span></h2>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Tipo</th><th>Título</th><th>Referência</th><th>Arquivo</th><th></th></tr></thead><tbody>${ax || '<tr><td colspan="5" class="muted">Nenhum anexo.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:10px"><button class="btn pri" id="axFds">Criar FDS dos produtos em uso</button><button class="btn" id="axDes">+ Desenho/mapa</button><button class="btn" id="axOut">+ Outro anexo</button></div>
+      <div class="note info" style="margin-top:10px">Os arquivos ficam disponíveis enquanto esta página estiver aberta. O estudo guarda título, referência e nome do arquivo; o manifesto do pacote lista a ordem de montagem para a junção dos PDFs.</div></div>`;
+  },
+  res() {
+    const pend = pendencias(), nbad = pend.filter(p => p.n === 'bad').length;
+    const nF = S.anexos.filter(a => a.tipo === 'FDS').length, nD = S.anexos.filter(a => a.tipo === 'Desenho').length, nO = S.anexos.filter(a => a.tipo === 'Outro').length;
+    const partes = [['Capa, sumário e Capítulo 1 (introdução)', 'gerado'], ['Capítulo 2: metodologia (Tabela B.1 incluída)', 'gerado com as premissas deste estudo'], ['Capítulo 3: resultados (produtos, fontes, taxas, ventilação, classificação, mapas)', 'gerado e recalculado'], ['Capítulo 4: conclusão', 'gerado'], ['Apêndice A: memorial de cálculo (todas as fontes)', `gerado: ${S.fontes.length} fonte(s)`], ['Anexo A: FDS', nF + ' item(ns)'], ['Anexo B: desenhos e mapas', nD + ' item(ns)']].concat(nO ? [['Anexo C: outros', nO + ' item(ns)']] : []);
+    return `
+    <div class="panel"><h2>Pendências antes de emitir <span>${nbad ? nbad + ' impeditiva(s)' : 'nenhuma impeditiva'}</span></h2>
+      ${pend.length ? pend.map(p => `<div class="note ${p.n}" style="cursor:pointer" data-gof="${p.fid || ''}|${p.tab}">${p.msg}</div>`).join('') : '<div class="note ok">Nenhuma pendência.</div>'}</div>
+    <div class="panel"><h2>Pacote do estudo completo<span>ordem de montagem</span></h2>
+      <div class="pkg">${partes.map(([t, s], i) => `<div><i>${i + 1}</i><b>${t}</b><span>${s}</span></div>`).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="btn pri" id="expEstudo">Baixar estudo completo (.doc)</button><button class="btn" id="expApC">Baixar apêndice de cálculo (.doc)</button><button class="btn" id="expCsvF">Tabela de classificação (.csv)</button><button class="btn" id="expManif">Manifesto do pacote (.json)</button><button class="btn" id="expPrint">Imprimir / salvar em PDF</button></div>
+      <div class="muted" style="font-size:13px;margin-top:10px">O .doc abre no Word com todas as tabelas e o memorial. A junção dos PDFs anexados (FDS e desenhos) ao corpo do estudo segue a ordem do manifesto.</div></div>
+    <div class="panel"><h2>Prévia das tabelas<span>mesmas tabelas do estudo</span></h2>
+      <h3 style="font-size:13px;margin:6px 0">Produtos avaliados</h3><div class="scroll">${tabProdutos()}</div>
+      <h3 style="font-size:13px;margin:10px 0 6px">Fontes de risco</h3><div class="scroll">${tabFontes()}</div>
+      <h3 style="font-size:13px;margin:10px 0 6px">Taxas de liberação</h3><div class="scroll">${tabTaxas()}</div>
+      <h3 style="font-size:13px;margin:10px 0 6px">Ventilação, grau e disponibilidade</h3><div class="scroll">${tabVent()}</div>
+      <h3 style="font-size:13px;margin:10px 0 6px">Classificação de áreas</h3><div class="scroll">${tabClass()}</div></div>`;
+  },
+};
+
+/* ---------- eventos do módulo ---------- */
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-gof]');
+  if (g) { const [fid, tab] = g.dataset.gof.split('|'); if (fid && S.fontes.some(f => f.id === fid)) S.atual = fid; go(tab); return; }
+  const d = e.target.closest('[data-axdel]');
+  if (d) { S.anexos = S.anexos.filter(a => a.id !== d.dataset.axdel); delete FILES[d.dataset.axdel]; save(); render(); return; }
+  const b = e.target.closest('button'); if (!b) return;
+  const novoAx = (tipo, titulo, ref) => { S.useq = (S.useq || 0) + 1; S.anexos.push({ id: 'x' + S.useq, tipo, titulo, ref: ref || '', arquivo: '' }); };
+  switch (b.id) {
+    case 'fnew2': { S.seq++; const id = 'f' + S.seq; const base = JSON.parse(JSON.stringify(S.fontes[S.fontes.length - 1])); base.id = id; base.nome = 'Fonte ' + S.seq; S.fontes.push(base); S.atual = id; save(); go('fonte'); break; }
+    case 'axFds': { let n = 0; usados().forEach(id => { if (!S.anexos.some(a => a.tipo === 'FDS' && a.ref === id)) { novoAx('FDS', 'FDS: ' + ((prod(id) || {}).nome || id), id); n++; } }); save(); render(); toast(n ? n + ' FDS criada(s): anexe os arquivos' : 'Todos os produtos já têm FDS'); break; }
+    case 'axDes': novoAx('Desenho', 'Desenho', ''); save(); render(); break;
+    case 'axOut': novoAx('Outro', 'Documento', ''); save(); render(); break;
+    case 'expEstudo': baixarArq(`Estudo_completo_${slugN(S.estudo.projeto)}_rev${S.estudo.rev || '0'}.doc`, '﻿' + docWrap('Estudo de classificação de áreas', estudoHTML()), 'application/msword'); toast('Estudo gerado'); break;
+    case 'expApC': { const sv = UI.memEsc; UI.memEsc = 'todas'; try { const o = buildMemorial(); baixarArq(`Apendice_A_Memorial_${slugN(S.estudo.projeto)}_rev${S.estudo.rev || '0'}.doc`, '﻿' + o.doc, 'application/msword'); } finally { UI.memEsc = sv; } break; }
+    case 'expCsvF': baixarArq(`classificacao_${slugN(S.estudo.projeto)}_rev${S.estudo.rev || '0'}.csv`, csvClass(), 'text/csv;charset=utf-8'); break;
+    case 'expManif': baixarArq(`manifesto_${slugN(S.estudo.projeto)}_rev${S.estudo.rev || '0'}.json`, JSON.stringify(manifesto(), null, 2), 'application/json'); break;
+    case 'expPrint': { const w = window.open('', '_blank'); if (!w) { toast('Permita pop-ups para imprimir'); break; } w.document.write(docWrap('Estudo', estudoHTML())); w.document.close(); setTimeout(() => w.print(), 400); break; }
+  }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset && el.dataset.axf) { const a = S.anexos.find(x => x.id === el.dataset.axf), f = el.files[0]; if (!a || !f) return; FILES[a.id] = f; a.arquivo = f.name; a.tamanho = f.size; save(); render(); }
+});
+
 fillDatalist();
 if (SGI && SGI.somente_leitura) { document.documentElement.classList.add('sgi-ro'); }
 render();
